@@ -1,0 +1,7 @@
+# Cache de lectura de hojas (se regenera solo desde el Excel).
+# NO subir al repo: son ~5 MB de archivos derivados que se rearman
+# automaticamente la primera vez que arranca la app.
+data/_parquet_cache/
+
+__pycache__/
+*.pyc
