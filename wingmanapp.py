@@ -517,6 +517,20 @@ def _rend_pill_a(valor, color):
     return _rend_pill(f"{valor} {emoji}".strip(), color)
 
 
+def _trab_pill(valor, color):
+    """
+    Pill de la sección "Trabajables" (agosto 2026, vigésima segunda
+    vuelta -- pedido explícito de Sabas): a diferencia de _rend_pill (que
+    SIEMPRE fuerza fondo gris y solo cambia el color del texto), esta
+    pill deja que el FONDO cambie de color según `color` -- "el fondo de
+    la pill también cambia de color, fondo pastel + texto oscuro encima,
+    mismo estilo visual que el resto de pills de Wingman". Reusa las
+    clases sup-pill-{color} que ya existían en theme.py (orange/purple/
+    gray/red/yellow), no hace falta CSS nuevo.
+    """
+    return f'<span class="sup-pill sup-pill-{color}">{valor}</span>'
+
+
 def _rend_color_conversion(pct):
     if pct < 10:
         return "red"
@@ -899,6 +913,190 @@ def render_tabla_farmers_supervisor(pais):
     # Se evalúa SIEMPRE (no solo en el rerun del click) -- ver docstring.
     if st.session_state.get(fs_flag_key):
         _tabla_fullscreen_dialog(pais, fs_flag_key)
+
+
+# =========================
+# SECCIÓN: TRABAJABLES (agosto 2026, vigésima segunda vuelta)
+# =========================
+# 4 tabs con el top 10 de marcas priorizadas por gap/oportunidad para
+# cada palanca (Adquisición Ads, Upselling Ads, Adquisición MD,
+# Recuperación Churn) -- pedido explícito de Sabas, construido sobre las
+# 4 funciones de data_layer.py ya validadas a mano en el chat para
+# sabas.ramirez antes de convertirlas en feature. Vista Farmer: solo SUS
+# marcas. Vista Supervisor: TODAS las marcas del país agregadas en un
+# solo ranking competitivo, con columna "Farmer" mostrando el dueño.
+
+_TRAB_THEAD_ADQ_ADS = (
+    "<thead><tr><th>#</th><th>Marca</th><th>Gap (USD)</th><th>Budget semanal (ARS)</th></tr></thead>"
+)
+_TRAB_THEAD_ADQ_ADS_SUP = (
+    "<thead><tr><th>#</th><th>Marca</th><th>Farmer</th><th>Gap (USD)</th><th>Budget semanal (ARS)</th></tr></thead>"
+)
+_TRAB_THEAD_UPS_ADS = (
+    "<thead><tr><th>#</th><th>Marca</th><th>Real actual</th><th>Target</th>"
+    "<th>Gap (USD)</th><th>Upsell semanal (ARS)</th></tr></thead>"
+)
+_TRAB_THEAD_UPS_ADS_SUP = (
+    "<thead><tr><th>#</th><th>Marca</th><th>Farmer</th><th>Real actual</th><th>Target</th>"
+    "<th>Gap (USD)</th><th>Upsell semanal (ARS)</th></tr></thead>"
+)
+_TRAB_THEAD_ADQ_MD = (
+    "<thead><tr><th>#</th><th>Marca</th><th>GMV actual</th><th>Store Status</th></tr></thead>"
+)
+_TRAB_THEAD_ADQ_MD_SUP = (
+    "<thead><tr><th>#</th><th>Marca</th><th>Farmer</th><th>GMV actual</th><th>Store Status</th></tr></thead>"
+)
+_TRAB_THEAD_CHURN = (
+    "<thead><tr><th>#</th><th>Categoría</th><th>Marca</th><th>GMV</th><th>Contacto</th></tr></thead>"
+)
+_TRAB_THEAD_CHURN_SUP = (
+    "<thead><tr><th>#</th><th>Categoría</th><th>Marca</th><th>Farmer</th><th>GMV</th><th>Contacto</th></tr></thead>"
+)
+
+
+def _trab_num_pill(n):
+    return _trab_pill(str(n), "orange")
+
+
+def _trab_marca_pill(brand):
+    return _trab_pill(html_lib.escape(str(brand)), "purple")
+
+
+def render_trabajables_adquisicion_ads(farmer_or_list, is_supervisor):
+    """Tab "Adquisición Ads" de Trabajables -- ver trabajables_adquisicion_ads en data_layer.py."""
+    df = dl.trabajables_adquisicion_ads(farmer_or_list)
+    if df.empty:
+        st.info("No hay marcas de adquisición pendientes ahora mismo. 🎉")
+        return
+
+    filas = []
+    for i, row in enumerate(df.itertuples(), 1):
+        farmer_td = f'<td>{_trab_pill(html_lib.escape(row.farmer), "gray")}</td>' if is_supervisor else ""
+        filas.append(
+            "<tr>"
+            f"<td>{_trab_num_pill(i)}</td>"
+            f"<td>{_trab_marca_pill(row.brand)}</td>"
+            f"{farmer_td}"
+            f'<td>{_trab_pill(f"${row.gap_usd:,.2f}".replace(",", "."), "gray")}</td>'
+            f'<td>{_trab_pill(dl.fmt_money(row.budget_semanal_ars, "ARS"), "gray")}</td>'
+            "</tr>"
+        )
+    thead = _TRAB_THEAD_ADQ_ADS_SUP if is_supervisor else _TRAB_THEAD_ADQ_ADS
+    st.markdown(
+        f'<div class="mgmt-card"><table class="sup-table">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_trabajables_upselling_ads(farmer_or_list, is_supervisor):
+    """Tab "Upselling Ads" de Trabajables -- ver trabajables_upselling_ads en data_layer.py."""
+    df = dl.trabajables_upselling_ads(farmer_or_list)
+    if df.empty:
+        st.info("No hay marcas de upselling pendientes ahora mismo. 🎉")
+        return
+
+    filas = []
+    for i, row in enumerate(df.itertuples(), 1):
+        farmer_td = f'<td>{_trab_pill(html_lib.escape(row.farmer), "gray")}</td>' if is_supervisor else ""
+        filas.append(
+            "<tr>"
+            f"<td>{_trab_num_pill(i)}</td>"
+            f"<td>{_trab_marca_pill(row.brand)}</td>"
+            f"{farmer_td}"
+            f'<td>{_trab_pill(dl.fmt_money(row.real_actual, "USD"), "gray")}</td>'
+            f'<td>{_trab_pill(dl.fmt_money(row.target, "USD"), "gray")}</td>'
+            f'<td>{_trab_pill(dl.fmt_money(row.gap_usd, "USD"), "gray")}</td>'
+            f'<td>{_trab_pill(dl.fmt_money(row.upsell_semanal_ars, "ARS"), "gray")}</td>'
+            "</tr>"
+        )
+    thead = _TRAB_THEAD_UPS_ADS_SUP if is_supervisor else _TRAB_THEAD_UPS_ADS
+    st.markdown(
+        f'<div class="mgmt-card"><table class="sup-table">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_trabajables_adquisicion_md(farmer_or_list, is_supervisor):
+    """Tab "Adquisición MD" de Trabajables -- ver trabajables_adquisicion_md en data_layer.py."""
+    df = dl.trabajables_adquisicion_md(farmer_or_list)
+    if df.empty:
+        st.info("No hay marcas sin Markdown activo ahora mismo. 🎉")
+        return
+
+    filas = []
+    for i, row in enumerate(df.itertuples(), 1):
+        farmer_td = f'<td>{_trab_pill(html_lib.escape(row.farmer), "gray")}</td>' if is_supervisor else ""
+        filas.append(
+            "<tr>"
+            f"<td>{_trab_num_pill(i)}</td>"
+            f"<td>{_trab_marca_pill(row.brand)}</td>"
+            f"{farmer_td}"
+            f'<td>{_trab_pill(dl.fmt_money(row.gmv, "ARS"), "gray")}</td>'
+            f'<td>{_trab_pill(html_lib.escape(row.store_status), "gray")}</td>'
+            "</tr>"
+        )
+    thead = _TRAB_THEAD_ADQ_MD_SUP if is_supervisor else _TRAB_THEAD_ADQ_MD
+    st.markdown(
+        f'<div class="mgmt-card"><table class="sup-table">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_trabajables_recuperacion_churn(farmer_or_list, is_supervisor):
+    """
+    Tab "Recuperación Churn" de Trabajables -- ver
+    trabajables_recuperacion_churn en data_layer.py. Única tab con
+    colores de categoría propios: pill de "Churn" en ROJO, pill de "PW1"
+    en AMARILLO (pedido explícito de Sabas: "a excepto de las categorías
+    de churn que esas llevan su color rojo y amarillo correspondiente"
+    -- el resto de columnas de este tab sí van grises, igual que los
+    otros 3 tabs).
+    """
+    df = dl.trabajables_recuperacion_churn(farmer_or_list)
+    if df.empty:
+        st.info("No hay marcas en Churn o PW1 ahora mismo. 🎉")
+        return
+
+    filas = []
+    for i, row in enumerate(df.itertuples(), 1):
+        cat_color = "red" if row.categoria == "Churn" else "yellow"
+        farmer_td = f'<td>{_trab_pill(html_lib.escape(row.farmer), "gray")}</td>' if is_supervisor else ""
+        filas.append(
+            "<tr>"
+            f"<td>{_trab_num_pill(i)}</td>"
+            f"<td>{_trab_pill(row.categoria, cat_color)}</td>"
+            f"<td>{_trab_marca_pill(row.brand)}</td>"
+            f"{farmer_td}"
+            f'<td>{_trab_pill(dl.fmt_money(row.gmv, "ARS"), "gray")}</td>'
+            f'<td>{_trab_pill(html_lib.escape(row.contacto), "gray")}</td>'
+            "</tr>"
+        )
+    thead = _TRAB_THEAD_CHURN_SUP if is_supervisor else _TRAB_THEAD_CHURN
+    st.markdown(
+        f'<div class="mgmt-card"><table class="sup-table">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_trabajables(farmer_or_list, is_supervisor):
+    """
+    Sección "Trabajables" completa: 4 tabs con st.tabs nativo de
+    Streamlit -- pedido explícito de Sabas. `farmer_or_list` es un email
+    (vista Farmer) o una lista de emails (vista Supervisor, agregando
+    todo el país en un solo ranking competitivo por tab).
+    """
+    st.markdown('<div class="mgmt-card-title">🛠️ Trabajables</div>', unsafe_allow_html=True)
+    tab_adq_ads, tab_ups_ads, tab_adq_md, tab_churn = st.tabs(
+        ["Adquisición Ads", "Upselling Ads", "Adquisición MD", "Recuperación Churn"]
+    )
+    with tab_adq_ads:
+        render_trabajables_adquisicion_ads(farmer_or_list, is_supervisor)
+    with tab_ups_ads:
+        render_trabajables_upselling_ads(farmer_or_list, is_supervisor)
+    with tab_adq_md:
+        render_trabajables_adquisicion_md(farmer_or_list, is_supervisor)
+    with tab_churn:
+        render_trabajables_recuperacion_churn(farmer_or_list, is_supervisor)
 
 
 def render_login_tracker_supervisor():
@@ -1507,6 +1705,7 @@ with col_sidebar:
         NAV_SECTIONS = [
             ("brand_finder", "🔍 Buscador de Marcas"),
             ("management",   "📊 Gestión General"),
+            ("trabajables",  "🛠️ Trabajables"),
         ]
         for sec_key, sec_label in NAV_SECTIONS:
             active = st.session_state["section"] == sec_key
@@ -1875,7 +2074,10 @@ def render_brand_coverage_and_contact(farmer_or_list):
 
 if st.session_state["view"] == "landing":
     section = st.session_state["section"]
-    section_label = "Buscador de Marcas" if section == "brand_finder" else "Gestión General"
+    section_label = {
+        "brand_finder": "Buscador de Marcas",
+        "trabajables": "Trabajables",
+    }.get(section, "Gestión General")
     header_name = "Supervisor" if IS_SUPERVISOR else dl.farmer_display(selected)
     header(header_name, section_label, "")
 
@@ -1905,6 +2107,25 @@ if st.session_state["view"] == "landing":
                     st.info(f"No encontré ninguna marca con el ID {qkey} {donde}.")
             else:
                 st.info("Escribe un ID válido (ej. AR97338 o simplemente 97338).")
+
+    # =====================================================
+    # SECCIÓN: TRABAJABLES (agosto 2026, vigésima segunda vuelta)
+    # =====================================================
+    elif section == "trabajables":
+        if IS_SUPERVISOR:
+            # Vista Supervisor: mismo selector de país que Gestión
+            # General (reusa supervisor_pais de session_state, así que
+            # si el usuario ya eligió un país en Gestión General, se
+            # respeta acá también) -- top 10 agregado de TODOS los
+            # farmers de ese país, con columna Farmer mostrando el dueño
+            # de cada marca (pedido explícito de Sabas).
+            st.session_state.setdefault("supervisor_pais", "AR")
+            render_conosur_map()
+            pais_actual = st.session_state["supervisor_pais"]
+            farmers_pais = dl.farmers_por_pais(pais_actual)
+            render_trabajables(farmers_pais, is_supervisor=True)
+        else:
+            render_trabajables(selected, is_supervisor=False)
 
     # =====================================================
     # SECCIÓN: MANAGEMENT DASHBOARD — Brand Coverage + Contact Performance

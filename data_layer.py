@@ -2520,6 +2520,225 @@ def upselling_ads_target_for(farmer_emails):
     return max(necesarias, _dias_habiles_totales_mes())
 
 
+USD_A_ARS = 1500  # tasa fija pedida por Sabas (agosto 2026), sin API de tipo de cambio.
+
+
+def trabajables_adquisicion_ads(farmer_emails, top_n=10):
+    """
+    Sección "Trabajables" · tab Adquisición Ads (pedido explícito de
+    Sabas, agosto 2026, vigésima segunda vuelta): top N marcas de
+    adquisición Ads (target>0, las 4 columnas de bookings en 0),
+    priorizadas por mayor gap -- MISMO criterio de _camino_mas_corto ya
+    validado a mano en el chat para sabas.ramirez (Jofa Cookies,
+    La Catedral Del Pisco, etc.), ahora expuesto como función reusable
+    para cualquier farmer o lista de farmers.
+
+    "Budget semanal ARS" = gap USD / 4 semanas * USD_A_ARS -- pedido
+    explícito de Sabas: NO es el modelo de ads_plan (18% del GMV del mes
+    anterior), es directo desde el gap de Booking pendiente, repartido
+    en las 4 semanas del mes.
+
+    farmer_emails: un email (vista Farmer) o una lista (vista Supervisor,
+    agregando TODAS las marcas de todos los farmers en un solo ranking
+    competitivo -- pedido explícito de Sabas: "muestra el top 10 de
+    marcas, añadiendo la columna de farmer"). Devuelve DataFrame con
+    columnas: farmer, brand, gap_usd, budget_semanal_ars -- siempre
+    incluye "farmer" (con el nombre ya resuelto vía farmer_display),
+    aunque la vista Farmer no la muestre en la tabla.
+    """
+    rel = load_export_ads_relation()
+    cols = ["farmer", "brand", "gap_usd", "budget_semanal_ars"]
+    if rel.empty:
+        return pd.DataFrame(columns=cols)
+    emails = [farmer_emails] if isinstance(farmer_emails, str) else list(farmer_emails)
+    emails = {str(e).strip().lower() for e in emails}
+    d = rel[rel["farmer"].isin(emails)].copy()
+    if d.empty:
+        return pd.DataFrame(columns=cols)
+
+    es_adq = (
+        (d["target_bookings"] > 0)
+        & (d["bookings_totales"] == 0)
+        & (d["bookings_totales_corr"] == 0)
+        & (d["bookings_reales"] == 0)
+        & (d["bookings_reales_corr"] == 0)
+    )
+    adq = d[es_adq].copy()
+    if adq.empty:
+        return pd.DataFrame(columns=cols)
+    adq["gap_usd"] = adq["target_bookings"]
+    adq = adq.sort_values("gap_usd", ascending=False).head(top_n)
+
+    out = pd.DataFrame()
+    out["farmer"] = adq["farmer"].apply(farmer_display)
+    out["brand"] = adq["brand"]
+    out["gap_usd"] = adq["gap_usd"]
+    out["budget_semanal_ars"] = adq["gap_usd"] / 4 * USD_A_ARS
+    return out.reset_index(drop=True)
+
+
+def trabajables_upselling_ads(farmer_emails, top_n=10):
+    """
+    Sección "Trabajables" · tab Upselling Ads -- mismo patrón que
+    trabajables_adquisicion_ads, para marcas con actividad real
+    (bookings_reales_corr > 0) pero por debajo de su target. Devuelve
+    columnas: farmer, brand, real_actual, target, gap_usd,
+    upsell_semanal_ars.
+    """
+    rel = load_export_ads_relation()
+    cols = ["farmer", "brand", "real_actual", "target", "gap_usd", "upsell_semanal_ars"]
+    if rel.empty:
+        return pd.DataFrame(columns=cols)
+    emails = [farmer_emails] if isinstance(farmer_emails, str) else list(farmer_emails)
+    emails = {str(e).strip().lower() for e in emails}
+    d = rel[rel["farmer"].isin(emails)].copy()
+    if d.empty:
+        return pd.DataFrame(columns=cols)
+
+    es_ups = (d["bookings_reales_corr"] > 0) & (d["bookings_reales_corr"] < d["target_bookings"])
+    ups = d[es_ups].copy()
+    if ups.empty:
+        return pd.DataFrame(columns=cols)
+    ups["gap_usd"] = ups["target_bookings"] - ups["bookings_reales_corr"]
+    ups = ups.sort_values("gap_usd", ascending=False).head(top_n)
+
+    out = pd.DataFrame()
+    out["farmer"] = ups["farmer"].apply(farmer_display)
+    out["brand"] = ups["brand"]
+    out["real_actual"] = ups["bookings_reales_corr"]
+    out["target"] = ups["target_bookings"]
+    out["gap_usd"] = ups["gap_usd"]
+    out["upsell_semanal_ars"] = ups["gap_usd"] / 4 * USD_A_ARS
+    return out.reset_index(drop=True)
+
+
+def trabajables_adquisicion_md(farmer_emails, top_n=10):
+    """
+    Sección "Trabajables" · tab Adquisición MD (pedido explícito de
+    Sabas: "por ahora solo MD, ignora [MD] PRO") -- top N marcas SIN
+    Markdown activo (markdown_md de portfolio_for en 0 o NaN, el mismo
+    criterio ya validado a mano para sabas.ramirez -- NO basta con que
+    la marca aparezca en la hoja MD, tiene que tener el MONTO real de
+    Markdown mayor a 0; una marca con una campaña "creada" pero
+    MARKDOWN $ vacío en el Excel cuenta como sin MD activo, ver el
+    caso real de "La Catedral Del Pisco" encontrado en el chat),
+    priorizadas por GMV actual (mayor oportunidad primero).
+
+    "Store Status" sale de PRIORITY DATA (load_coinversion_md): "Con
+    coinversión (<grupo>)" si Coinversion MD="SI" (el grupo entre
+    paréntesis es STATUS Brand SIN el prefijo numérico, ej. "5.
+    Prioritized" -> "Prioritized" -- pedido explícito de Sabas), "Asumido
+    por el aliado" si no. OJO (documentado explícitamente en el chat):
+    STATUS Brand es el GRUPO DE PRIORIDAD COMERCIAL de la marca
+    (Prioritized/Rest/Churn Prevention/etc.), NO un tipo de coinversión
+    -- no existe en el Excel actual un campo de tipo de coinversión
+    (50/50, 100% aliado, etc.), así que este paréntesis es lo más cercano
+    disponible, con esa salvedad ya conocida.
+
+    farmer_emails: un email o una lista (vista Supervisor, agregando
+    marcas de TODOS los farmers en un solo ranking). Devuelve columnas:
+    farmer, brand, gmv, store_status.
+    """
+    cols = ["farmer", "brand", "gmv", "store_status"]
+    emails = [farmer_emails] if isinstance(farmer_emails, str) else list(farmer_emails)
+    emails = [str(e).strip().lower() for e in emails]
+
+    portfolios = []
+    for e in emails:
+        p = portfolio_for(e)
+        if not p.empty:
+            p = p.copy()
+            p["farmer_email"] = e
+            portfolios.append(p)
+    if not portfolios:
+        return pd.DataFrame(columns=cols)
+    port = pd.concat(portfolios, ignore_index=True) if len(portfolios) > 1 else portfolios[0]
+
+    sin_md = port[(port["markdown_md"] == 0) | (port["markdown_md"].isna())].copy()
+    if sin_md.empty:
+        return pd.DataFrame(columns=cols)
+    sin_md = sin_md.sort_values("gmv", ascending=False).head(top_n)
+
+    coinv = load_coinversion_md()
+    coinv_map = coinv.set_index("key")["status_label"].to_dict() if not coinv.empty else {}
+
+    def _status(key):
+        label = coinv_map.get(key)
+        if not label or label == "No":
+            return "Asumido por el aliado"
+        grupo = re.sub(r"^\d+\.\s*", "", str(label).strip())
+        return f"Con coinversión ({grupo})" if grupo and grupo.lower() != "sí" else "Con coinversión"
+
+    out = pd.DataFrame()
+    out["farmer"] = sin_md["farmer_email"].apply(farmer_display)
+    out["brand"] = sin_md["brand_id"] + " - " + sin_md["brand_name"]
+    out["gmv"] = sin_md["gmv"]
+    out["store_status"] = sin_md["key"].apply(_status)
+    return out.reset_index(drop=True)
+
+
+def trabajables_recuperacion_churn(farmer_emails, top_n=10):
+    """
+    Sección "Trabajables" · tab Recuperación Churn -- pedido explícito de
+    Sabas: "Churn primero + completar con PW1 hasta 10", mismo criterio
+    ya validado a mano para sabas.ramirez (Come Bien!, Helados
+    Montalbano, Shelby Burgers en Churn + Simón Pastas... en PW1).
+    Dentro de cada categoría, ordenado por GMV descendente. Churn NUNCA
+    se recorta aunque haya más de 10 en Churn (Sabas: "Churn siempre
+    tendrá prioridad") -- si hay, por ejemplo, 12 en Churn, el tab
+    muestra las 12 (top_n es un PISO para completar con PW1, no un techo
+    duro sobre Churn).
+
+    "Contacto" sale de portfolio_for (columna telefono, ya cruzada desde
+    ASIGNACION/PHONE ALIADO) -- "?" si no hay número (pedido explícito de
+    Sabas).
+
+    farmer_emails: un email o una lista (vista Supervisor, agregando
+    TODOS los farmers). Devuelve columnas: farmer, categoria, brand,
+    gmv, contacto.
+    """
+    cols = ["farmer", "categoria", "brand", "gmv", "contacto"]
+    emails = [farmer_emails] if isinstance(farmer_emails, str) else list(farmer_emails)
+    emails = [str(e).strip().lower() for e in emails]
+
+    portfolios = []
+    for e in emails:
+        p = portfolio_for(e)
+        if not p.empty:
+            p = p.copy()
+            p["farmer_email"] = e
+            portfolios.append(p)
+    if not portfolios:
+        return pd.DataFrame(columns=cols)
+    port = pd.concat(portfolios, ignore_index=True) if len(portfolios) > 1 else portfolios[0]
+
+    cmap = churn_map()
+    port["churn_estado"] = port["key"].map(cmap)
+
+    churn_marcas = port[port["churn_estado"] == "Churn"].sort_values("gmv", ascending=False)
+    faltan = max(top_n - len(churn_marcas), 0)
+    pw1_marcas = port[port["churn_estado"] == "PW1"].sort_values("gmv", ascending=False).head(faltan)
+
+    combinado = pd.concat([churn_marcas, pw1_marcas], ignore_index=True)
+    if combinado.empty:
+        return pd.DataFrame(columns=cols)
+    categorias = ["Churn"] * len(churn_marcas) + ["PW1"] * len(pw1_marcas)
+
+    def _fmt_tel(t):
+        if pd.isna(t) or str(t).strip() in ("", "nan", "0"):
+            return "?"
+        s = str(t).strip()
+        return s[:-2] if s.endswith(".0") else s
+
+    out = pd.DataFrame()
+    out["farmer"] = combinado["farmer_email"].apply(farmer_display)
+    out["categoria"] = categorias
+    out["brand"] = combinado["brand_id"] + " - " + combinado["brand_name"]
+    out["gmv"] = combinado["gmv"]
+    out["contacto"] = combinado["telefono"].apply(_fmt_tel)
+    return out.reset_index(drop=True)
+
+
 def _checkout_count_for(farmer_emails, tipo):
     """
     Cuenta filas de CHECKOUT para un farmer/lista de farmers y un `tipo`
