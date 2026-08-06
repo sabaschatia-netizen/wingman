@@ -644,7 +644,25 @@ def _fila_rendimiento_html(row):
 
     if ads_kam["revenue_pace_pct"] is not None:
         revenue_val = ads_kam["revenue_pace_pct"]
-        revenue_pill = _rend_pill_a(f"{revenue_val:.0f}%", _rend_color_revenue_pace(revenue_val))
+        # Formato "Att real% / Att esperado% - Pace%" (agosto 2026,
+        # decimoctava vuelta -- pedido explícito de Sabas): en vez de
+        # mostrar solo el pace final ("69%"), se muestra el Att% real de
+        # hoy sobre el Att% que correspondería a este punto del mes --
+        # así el farmer ve "18% / 21%" y entiende que va casi al día, no
+        # solo un número aislado que puede confundir como "voy bien"
+        # sin referencia del punto del mes. Si por algún motivo no hay
+        # att_revenue_esperado_pct (mes cerrado, dias_transcurridos=None
+        # -- ver _dias_calendario_mes), cae al formato viejo de solo el
+        # pace, para no mostrar "None%".
+        att_real = ads_kam.get("att_revenue_pct")
+        att_esperado = ads_kam.get("att_revenue_esperado_pct")
+        if att_real is not None and att_esperado is not None:
+            revenue_pill = _rend_pill_a(
+                f"{att_real:.0f}% / {att_esperado:.0f}% - {revenue_val:.0f}%",
+                _rend_color_revenue_pace(revenue_val),
+            )
+        else:
+            revenue_pill = _rend_pill_a(f"{revenue_val:.0f}%", _rend_color_revenue_pace(revenue_val))
     else:
         revenue_pill = _rend_pill("Sin dato", "gray")
         revenue_val = -1

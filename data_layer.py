@@ -2819,16 +2819,37 @@ def ads_kam_for(farmer_emails):
     dias_transcurridos, dias_totales = _dias_calendario_mes(emails)
     revenue_pace_pct = att_revenue_pct
     bookings_pace_pct = att_bookings_pct
+    # att_*_esperado_pct (agosto 2026, decimoctava vuelta -- pedido
+    # explícito de Sabas): "el Att% que HOY debería tener" según el
+    # calendario (reparto lineal del mes: dias_transcurridos/dias_totales
+    # * 100) -- el denominador de la nueva pill "Att real / Att esperado
+    # - Pace%". Sabas señaló que mostrar solo el pace final (ej. "69%")
+    # confunde al farmer: un 69% se lee como "voy bien" aunque el
+    # farmer no tenga referencia de qué % correspondía a este punto del
+    # mes -- mostrando explícitamente "18% / 21% - 86%" el farmer ve de
+    # un vistazo que va CASI al día, no que "solo lleva 18%". Att
+    # esperado y Att real dividido entre sí (att_real/att_esperado*100)
+    # da EXACTAMENTE el mismo pace_pct que ya se calculaba antes (mismo
+    # álgebra, confirmado numéricamente con Sabas para sabas.ramirez:
+    # 65.99% en ambos casos) -- no es una fórmula nueva, es la misma
+    # descompuesta en sus dos partes para mostrarlas.
+    att_bookings_esperado_pct = None
+    att_revenue_esperado_pct = None
     if dias_transcurridos:
         if att_revenue_pct is not None:
             revenue_pace_pct = att_revenue_pct * dias_totales / dias_transcurridos
+            att_revenue_esperado_pct = dias_transcurridos / dias_totales * 100
         if att_bookings_pct is not None:
             bookings_pace_pct = att_bookings_pct * dias_totales / dias_transcurridos
+            att_bookings_esperado_pct = dias_transcurridos / dias_totales * 100
 
     return {
         "att_bookings_pct": att_bookings_pct,
+        "att_bookings_esperado_pct": att_bookings_esperado_pct,
         "target_bookings": target_bookings,
         "revenue_pace_pct": revenue_pace_pct,
+        "att_revenue_pct": att_revenue_pct,
+        "att_revenue_esperado_pct": att_revenue_esperado_pct,
         "target_revenue": target_revenue,
         "bookings_pace_pct": bookings_pace_pct,
     }
