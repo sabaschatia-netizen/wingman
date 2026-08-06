@@ -2066,9 +2066,45 @@ with tab_home:
     )
     ads_chip = f"{dl.fmt_roi(row.roas)}" if row.roas > 0 else ""
     ads_badge = None
+    # Att% de la card de Palancas (agosto 2026, decimonovena vuelta --
+    # pedido explícito de Sabas): antes comparaba el Att% acumulado de
+    # la marca contra un umbral fijo (90%), sin tener en cuenta el punto
+    # del mes -- mismo problema ya resuelto en Objetivo Ads Revenue de
+    # la tabla. Ahora se compara contra el Att% ESPERADO hoy según
+    # calendario (att_esperado_hoy_pct, mismo cálculo que ya usa
+    # ads_kam_for para el agregado del farmer, aplicado aquí a una marca
+    # puntual). Tres estados (no dos):
+    #   - RITMO BAJO (rojo): Att real < Att esperado -- va atrasado.
+    #   - RITMO SANO (verde): Att esperado <= Att real <= 2x Att esperado.
+    #   - RITMO ACELERADO CON RIESGO (amarillo): Att real > 2x Att
+    #     esperado -- pedido explícito de Sabas: un ritmo MUY por encima
+    #     de lo esperado tampoco es necesariamente bueno (podría ser
+    #     sobre-gasto o un dato atípico), así que se marca como
+    #     advertencia en vez de premiarlo como "sano" sin más.
+    # El signo (> o <) en el texto compara real vs esperado
+    # automáticamente, no está hardcodeado.
     if row.bookings > 0 and row.att_revenue > 0:
-        att_color = COLORS["success"] if row.att_revenue >= 0.90 else COLORS["danger"]
-        ads_badge = (f"Att {row.att_revenue * 100:.0f}%", att_color)
+        att_real = row.att_revenue * 100
+        firma_email_ads = row.farmer_owner if (IS_SUPERVISOR and "farmer_owner" in row.index) else selected
+        att_esperado = dl.att_esperado_hoy_pct(firma_email_ads)
+        if att_esperado is not None and att_esperado > 0:
+            signo = ">" if att_real >= att_esperado else "<"
+            if att_real < att_esperado:
+                estado, att_color = "Ritmo bajo", COLORS["danger"]
+            elif att_real > att_esperado * 2:
+                estado, att_color = "Ritmo acelerado con riesgo", COLORS["warning"]
+            else:
+                estado, att_color = "Ritmo sano", COLORS["success"]
+            ads_badge = (
+                f"{estado} Att {att_real:.0f}% {signo} {att_esperado:.0f}%",
+                att_color,
+            )
+        else:
+            # Sin PRODUCTIVITY para calcular el esperado (mes cerrado o
+            # sin gestiones) -- cae al criterio viejo de umbral fijo,
+            # mismo fallback que ads_kam_for usa para revenue_pace_pct.
+            att_color = COLORS["success"] if row.att_revenue >= 0.90 else COLORS["danger"]
+            ads_badge = (f"Att {att_real:.0f}%", att_color)
 
     md_txt, _ = state_text(row.markdown_md > 0)
     md_camp = row.campaign_md if row.campaign_md and row.campaign_md != "-" else ""

@@ -2756,6 +2756,31 @@ def _dias_calendario_mes(emails):
     return dias_transcurridos, dias_totales
 
 
+def att_esperado_hoy_pct(farmer_email):
+    """
+    Att% que HOY debería tener cualquier marca de este farmer, según el
+    calendario (reparto lineal del mes: dias_transcurridos/dias_totales *
+    100) -- pedido explícito de Sabas (agosto 2026, decimonovena vuelta)
+    para la card "Palancas" de la ficha de marca (Ads: "Active 🚀"), que
+    hasta ahora comparaba el Att% acumulado de la marca contra un umbral
+    fijo (90%) sin tener en cuenta el punto del mes en el que estamos --
+    mismo problema ya resuelto para Objetivo Ads Revenue en la tabla de
+    Rendimiento País/Farmer (ver ads_kam_for), esta función expone el
+    mismo cálculo de "Att esperado" para usarlo también a nivel de UNA
+    marca individual (no el agregado del farmer completo).
+
+    Recibe un solo email (no lista) porque esta card es siempre de un
+    farmer puntual (el dueño de la marca que se está viendo). Devuelve
+    None si no hay gestiones de PRODUCTIVITY para ese farmer este mes
+    (mismo fallback que _dias_calendario_mes).
+    """
+    dias_transcurridos, dias_totales = _dias_calendario_mes({str(farmer_email).strip().lower()})
+    if not dias_transcurridos or not dias_totales:
+        return None
+    return dias_transcurridos / dias_totales * 100
+
+
+
 def ads_kam_for(farmer_emails):
     """
     Cumplimiento de Ads (Bookings y Revenue) para uno o varios Farmers,
