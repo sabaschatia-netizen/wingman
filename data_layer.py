@@ -3077,12 +3077,24 @@ def ads_kam_for(farmer_emails):
     # álgebra, confirmado numéricamente con Sabas para sabas.ramirez:
     # 65.99% en ambos casos) -- no es una fórmula nueva, es la misma
     # descompuesta en sus dos partes para mostrarlas.
+    #
+    # REVENUE, 1 día MENOS que Bookings (agosto 2026, vigésima cuarta
+    # vuelta -- pedido explícito de Sabas: "ese archivo específico se
+    # actualiza a día vencido" -- EXPORT ADS KAM trae Revenue con un día
+    # de rezago adicional respecto a Bookings/PRODUCTIVITY, así que el
+    # "días transcurridos" para el pace de Revenue debe ser 1 menos que
+    # el que ya usa Bookings/att_esperado_hoy_pct/Contactos Efectivos.
+    # Bookings NO cambia -- Sabas confirmó explícitamente "solo Objetivo
+    # Ads Revenue", Bookings sigue con dias_transcurridos normal. Piso de
+    # 1 para no dividir por cero el primer día hábil del mes (mismo
+    # criterio que _dias_calendario_mes ya usa para el caso general).
+    dias_transcurridos_revenue = max(dias_transcurridos - 1, 1) if dias_transcurridos else dias_transcurridos
     att_bookings_esperado_pct = None
     att_revenue_esperado_pct = None
     if dias_transcurridos:
         if att_revenue_pct is not None:
-            revenue_pace_pct = att_revenue_pct * dias_totales / dias_transcurridos
-            att_revenue_esperado_pct = dias_transcurridos / dias_totales * 100
+            revenue_pace_pct = att_revenue_pct * dias_totales / dias_transcurridos_revenue
+            att_revenue_esperado_pct = dias_transcurridos_revenue / dias_totales * 100
         if att_bookings_pct is not None:
             bookings_pace_pct = att_bookings_pct * dias_totales / dias_transcurridos
             att_bookings_esperado_pct = dias_transcurridos / dias_totales * 100
