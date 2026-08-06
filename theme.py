@@ -541,12 +541,13 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
     color: {COLORS["muted"]}; margin-bottom: 18px;
 }}
-/* Brand Coverage · Live: 6 donuts (agosto 2026, sexta vuelta -- se
-   agregó Upselling Ads al lado de Adquisición Ads, antes eran 5:
-   Conversión Ads/MD + PW1/PW2/Churn). grid-template-columns pasa de
-   repeat(5,1fr) a repeat(6,1fr) -- con 5 columnas fijas, el 6to donut
-   se iba a una segunda fila con 4 huecos vacíos al lado. */
-.donut-grid {{ display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; justify-items: center; }}
+/* Brand Coverage · Live: 5 donuts (agosto 2026, vigésima vuelta -- se
+   eliminó PW2, pedido explícito de Sabas; antes 6: Adquisición Ads +
+   Upselling Ads + Conversión MD + PW1 + PW2 + Churn). grid-template-
+   columns pasa de repeat(6,1fr) a repeat(5,1fr) -- con 6 columnas
+   fijas, el 5to donut quedaba corrido y dejaba un hueco vacío en la
+   6ta posición en vez de repartir el ancho parejo entre los 5 reales. */
+.donut-grid {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; justify-items: center; }}
 .donut-item {{ display: flex; flex-direction: column; align-items: center; gap: 8px; }}
 .donut-wrap {{ position: relative; width: 82px; height: 82px; }}
 .donut-pct {{

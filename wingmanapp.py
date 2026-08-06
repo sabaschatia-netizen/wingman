@@ -1625,7 +1625,7 @@ def render_brand_coverage_and_contact(farmer_or_list):
     adq = dl.adquisicion_ads_for(farmer_or_list)
     ups = dl.upselling_ads_for(farmer_or_list)
 
-    # ── Card 1: Brand Coverage · Live (6 donuts) ──
+    # ── Card 1: Brand Coverage · Live (5 donuts) ──
     # Se sacaron Ads/Markdown/MD PRO "activo o no" (base: marcas de la
     # cartera) -- pedido explícito de Sabas: esa info ya se puede ver
     # en el Home de cada marca, y no aportaba tanto como conversión
@@ -1666,15 +1666,16 @@ def render_brand_coverage_and_contact(farmer_or_list):
     # decidir el color, así que se le pasa md_pct*100 igual -- el color
     # resultante es razonable aunque el significado de fondo (tasa vs
     # ritmo) sea distinto, coherente con que la card ya mezcla bases
-    # distintas (ver nota más arriba). PW1/PW2/Churn NO son ritmo (son %
-    # de cartera) -- mantienen su color fijo de warning/danger, sin
-    # emoji.
+    # distintas (ver nota más arriba). PW1/Churn NO son ritmo (son % de
+    # cartera) -- mantienen su color fijo de warning/danger, sin emoji.
+    #
+    # PW2 eliminado (agosto 2026, vigésima vuelta -- pedido explícito de
+    # Sabas): quedan 5 donuts en vez de 6.
     donut_specs = [
         ("adq_pct",   "Adquisición Ads", None),
         ("ups_pct",   "Upselling Ads",   None),
         ("md_pct",    "Conversión MD",   None),
         ("pw1",       "PW1",            COLORS["warning"]),
-        ("pw2",       "PW2",            COLORS["warning"]),
         ("churn",     "Churn",          COLORS["danger"]),
     ]
 
