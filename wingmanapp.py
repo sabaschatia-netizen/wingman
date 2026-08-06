@@ -941,16 +941,16 @@ _TRAB_THEAD_UPS_ADS_SUP = (
     "<th>Gap (USD)</th><th>Upsell semanal (ARS)</th></tr></thead>"
 )
 _TRAB_THEAD_ADQ_MD = (
-    "<thead><tr><th>#</th><th>Marca</th><th>GMV actual</th><th>Store Status</th></tr></thead>"
+    "<thead><tr><th>#</th><th>Marca</th><th>Store Status</th></tr></thead>"
 )
 _TRAB_THEAD_ADQ_MD_SUP = (
-    "<thead><tr><th>#</th><th>Marca</th><th>Farmer</th><th>GMV actual</th><th>Store Status</th></tr></thead>"
+    "<thead><tr><th>#</th><th>Marca</th><th>Farmer</th><th>Store Status</th></tr></thead>"
 )
 _TRAB_THEAD_CHURN = (
-    "<thead><tr><th>#</th><th>Categoría</th><th>Marca</th><th>GMV</th><th>Contacto</th></tr></thead>"
+    "<thead><tr><th>#</th><th>Categoría</th><th>Marca</th><th>Contacto</th></tr></thead>"
 )
 _TRAB_THEAD_CHURN_SUP = (
-    "<thead><tr><th>#</th><th>Categoría</th><th>Marca</th><th>Farmer</th><th>GMV</th><th>Contacto</th></tr></thead>"
+    "<thead><tr><th>#</th><th>Categoría</th><th>Marca</th><th>Farmer</th><th>Contacto</th></tr></thead>"
 )
 
 
@@ -983,7 +983,7 @@ def render_trabajables_adquisicion_ads(farmer_or_list, is_supervisor):
         )
     thead = _TRAB_THEAD_ADQ_ADS_SUP if is_supervisor else _TRAB_THEAD_ADQ_ADS
     st.markdown(
-        f'<div class="mgmt-card"><table class="sup-table">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
+        f'<div class="mgmt-card"><table class="sup-table sup-table-trab">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
         unsafe_allow_html=True,
     )
 
@@ -1011,13 +1011,19 @@ def render_trabajables_upselling_ads(farmer_or_list, is_supervisor):
         )
     thead = _TRAB_THEAD_UPS_ADS_SUP if is_supervisor else _TRAB_THEAD_UPS_ADS
     st.markdown(
-        f'<div class="mgmt-card"><table class="sup-table">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
+        f'<div class="mgmt-card"><table class="sup-table sup-table-trab">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
         unsafe_allow_html=True,
     )
 
 
 def render_trabajables_adquisicion_md(farmer_or_list, is_supervisor):
-    """Tab "Adquisición MD" de Trabajables -- ver trabajables_adquisicion_md en data_layer.py."""
+    """
+    Tab "Adquisición MD" de Trabajables -- ver trabajables_adquisicion_md
+    en data_layer.py. La columna GMV se ORDENA por (mayor oportunidad
+    primero) pero ya NO se MUESTRA en la tabla (pedido explícito de
+    Sabas, agosto 2026, vigésima tercera vuelta) -- el orden de las filas
+    sigue siendo por GMV descendente, solo se quitó la columna visible.
+    """
     df = dl.trabajables_adquisicion_md(farmer_or_list)
     if df.empty:
         st.info("No hay marcas sin Markdown activo ahora mismo. 🎉")
@@ -1031,13 +1037,12 @@ def render_trabajables_adquisicion_md(farmer_or_list, is_supervisor):
             f"<td>{_trab_num_pill(i)}</td>"
             f"<td>{_trab_marca_pill(row.brand)}</td>"
             f"{farmer_td}"
-            f'<td>{_trab_pill(dl.fmt_money(row.gmv, "ARS"), "gray")}</td>'
             f'<td>{_trab_pill(html_lib.escape(row.store_status), "gray")}</td>'
             "</tr>"
         )
     thead = _TRAB_THEAD_ADQ_MD_SUP if is_supervisor else _TRAB_THEAD_ADQ_MD
     st.markdown(
-        f'<div class="mgmt-card"><table class="sup-table">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
+        f'<div class="mgmt-card"><table class="sup-table sup-table-trab">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
         unsafe_allow_html=True,
     )
 
@@ -1050,7 +1055,9 @@ def render_trabajables_recuperacion_churn(farmer_or_list, is_supervisor):
     en AMARILLO (pedido explícito de Sabas: "a excepto de las categorías
     de churn que esas llevan su color rojo y amarillo correspondiente"
     -- el resto de columnas de este tab sí van grises, igual que los
-    otros 3 tabs).
+    otros 3 tabs). Columna GMV: se ORDENA por ella (Churn siempre
+    primero, luego mayor GMV) pero ya NO se MUESTRA (pedido explícito de
+    Sabas, agosto 2026, vigésima tercera vuelta).
     """
     df = dl.trabajables_recuperacion_churn(farmer_or_list)
     if df.empty:
@@ -1067,13 +1074,12 @@ def render_trabajables_recuperacion_churn(farmer_or_list, is_supervisor):
             f"<td>{_trab_pill(row.categoria, cat_color)}</td>"
             f"<td>{_trab_marca_pill(row.brand)}</td>"
             f"{farmer_td}"
-            f'<td>{_trab_pill(dl.fmt_money(row.gmv, "ARS"), "gray")}</td>'
             f'<td>{_trab_pill(html_lib.escape(row.contacto), "gray")}</td>'
             "</tr>"
         )
     thead = _TRAB_THEAD_CHURN_SUP if is_supervisor else _TRAB_THEAD_CHURN
     st.markdown(
-        f'<div class="mgmt-card"><table class="sup-table">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
+        f'<div class="mgmt-card"><table class="sup-table sup-table-trab sup-table-trab-churn">{thead}<tbody>{"".join(filas)}</tbody></table></div>',
         unsafe_allow_html=True,
     )
 

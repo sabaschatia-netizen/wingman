@@ -651,6 +651,37 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .sup-table th:nth-child(8), .sup-table td:nth-child(8) {{ width: 17%; }}
 .sup-table th:nth-child(9), .sup-table td:nth-child(9) {{ width: 17%; }}
 
+/* Tablas de "Trabajables" (agosto 2026, vigésima tercera vuelta --
+   pedido explícito de Sabas: "esa columna y celda de # está demasiado
+   ancha, busca la forma de hacer la tabla simétrica"). Reusan la clase
+   base .sup-table (mismo look de pills/spacing) pero heredaban los
+   anchos por nth-child pensados para Rendimiento País (9 columnas fijas,
+   la 1ra pensada para el correo largo del Farmer -- 13%) -- acá la
+   columna 1 es solo "#" (1-2 dígitos), así que ese 13% la dejaba
+   desproporcionada. .sup-table-trab GANA por especificidad (dos clases
+   combinadas pesan más que una) sobre las reglas de arriba, sin tocar
+   la tabla de Rendimiento País. "#" bien angosta (suficiente para "10"),
+   "Marca" con la mayor parte del espacio (nombre + ID, lo más largo de
+   la fila), el resto del espacio se reparte parejo entre las columnas
+   de datos restantes vía flex en vez de porcentajes fijos por posición
+   -- el número de columnas varía por tab (4 a 7), así que un ancho fijo
+   por nth-child no sirve igual de bien para los 4 tabs a la vez. */
+.sup-table.sup-table-trab {{ table-layout: auto; }}
+.sup-table.sup-table-trab th:nth-child(1),
+.sup-table.sup-table-trab td:nth-child(1) {{ width: 40px; }}
+.sup-table.sup-table-trab th:nth-child(2),
+.sup-table.sup-table-trab td:nth-child(2) {{ width: auto; min-width: 220px; }}
+.sup-table.sup-table-trab th:nth-child(n+3),
+.sup-table.sup-table-trab td:nth-child(n+3) {{ width: auto; white-space: nowrap; }}
+/* Tab Churn: "#" sigue en columna 1, pero "Categoría" pasa a ser la 2da
+   columna (angosta, solo "Churn"/"PW1") y "Marca" se corre a la 3ra --
+   se sobreescribe puntualmente con una clase extra en el <table> de ese
+   tab en vez de intentar detectar el contenido por CSS. */
+.sup-table.sup-table-trab.sup-table-trab-churn th:nth-child(2),
+.sup-table.sup-table-trab.sup-table-trab-churn td:nth-child(2) {{ width: 90px; min-width: 0; }}
+.sup-table.sup-table-trab.sup-table-trab-churn th:nth-child(3),
+.sup-table.sup-table-trab.sup-table-trab-churn td:nth-child(3) {{ width: auto; min-width: 220px; }}
+
 /* Tabla interactiva (Rendimiento País/Farmer): resize de columnas
    arrastrando el borde derecho del header, y ordenar de mayor a menor /
    menor a mayor haciendo click en el header -- pedido explícito de Sabas
