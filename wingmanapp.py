@@ -1732,17 +1732,26 @@ def render_brand_coverage_and_contact(farmer_or_list):
         # Adquisición/Upselling Ads: semáforo propio de 4 niveles
         # (pace_color_ads_upsell -- rojo<80/azul81-90/verde91-105/
         # morado>105, agosto 2026, octava vuelta, pedido explícito de
-        # Sabas). Conversión MD: sigue con el semáforo viejo de 3 niveles
-        # (pace_color) -- Sabas confirmó que el cambio de umbrales es
-        # SOLO para Adquisición/Upselling, Conversión MD y Contactos
-        # Efectivos no se tocan. PW1/PW2/Churn: color fijo, sin emoji.
+        # Sabas). Conversión MD (agosto 2026, vigésima primera vuelta --
+        # CORREGIDO, pedido explícito de Sabas: "la donut debe llevar la
+        # misma regla de coloración que su columna de la tabla"): antes
+        # usaba pace_color (rojo<90/azul90-94/verde>94), una escala
+        # pensada para métricas de RITMO -- pero la columna "Conversión
+        # MD" de la tabla Rendimiento País/Farmer siempre usó
+        # _rend_color_conversion (rojo<10/azul10-20/verde20-30/
+        # morado>30, escala calibrada para valores TÍPICAMENTE bajos de
+        # conversión de Markdown, muy distinta de una escala de ritmo).
+        # Con esas dos escalas distintas, un mismo % podía verse rojo en
+        # el donut y verde/morado en la tabla para el mismo farmer --
+        # ahora ambas usan _rend_color_conversion, así nunca contradicen
+        # entre sí. PW1/Churn: color fijo, sin emoji.
         if k in ("adq_pct", "ups_pct"):
             raw_pct = _donut_pct_raw(k)
             pace_name = dl.pace_color_ads_upsell(raw_pct)
             return _RENDIMIENTO_TEXT_COLOR[pace_name], _RENDIMIENTO_EMOJI.get(pace_name, "")
         if k == "md_pct":
             raw_pct = _donut_pct_raw(k)
-            pace_name = dl.pace_color(raw_pct)
+            pace_name = _rend_color_conversion(raw_pct)
             return _RENDIMIENTO_TEXT_COLOR[pace_name], _RENDIMIENTO_EMOJI.get(pace_name, "")
         return fixed_color, ""
 
