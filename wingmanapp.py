@@ -2610,50 +2610,43 @@ with tab_analytics:
 
 # ── TAB: CAMPAIGN DESIGNER ──
 with tab_campaign:
-    # ── ADS PLAN · 18% del GMV del mes anterior, CPC $950 (agosto 2026:
-    #    ajustado de 12% a 18%, pedido explícito de Sabas -- el % se lee
-    #    de dl.ADS_PRESSURE_PCT en vez de hardcodearlo de nuevo, para que
-    #    un futuro ajuste solo necesite tocar esa constante) ──
-    plan = dl.ads_plan(row.gmv_last, row.bookings, row.cvr, row.aov)
-    pressure_pct_label = f'{dl.ADS_PRESSURE_PCT * 100:.0f}%'
-    mode_color = COLORS["success"] if plan["mode"] == "Adquisición" else COLORS["brand_orange"]
+    # ── ADS PLAN (agosto 2026, septimo ajuste -- reescrito por completo,
+    #    pedido explicito de Sabas). Ya no hay distincion Adquisicion/
+    #    Upselling: siempre se muestra el presupuesto recomendado completo.
+    #    dias_transcurridos_mes_actual() es la misma logica ya validada
+    #    que usa gmv_delta en Home, extraida como funcion reutilizable. ──
+    plan = dl.ads_plan(row.gmv_last, row.gmv, dl.dias_transcurridos_mes_actual(), row.cvr, row.aov)
 
-    if plan["mode"] == "Adquisición":
-        head = f'{dl.fmt_money(plan["monthly"], CURRENCY)}/mes'
-        sub = (f'{pressure_pct_label} del GMV del mes anterior ({dl.fmt_money(row.gmv_last, CURRENCY)}) → '
-               f'<b>{dl.fmt_money(plan["weekly"], CURRENCY)}/semana</b> en 4 semanas · campaña nueva')
-    elif plan["mode"] == "Upselling":
-        head = f'+{dl.fmt_money(plan["inc_weekly"], CURRENCY)}/semana' if plan["inc_weekly"] > 0 else "En el techo del modelo ✓"
-        sub = (f'Booking actual {dl.fmt_money(plan["current_weekly"], CURRENCY)}/sem → objetivo {dl.fmt_money(plan["weekly"], CURRENCY)}/sem '
-               f'({dl.fmt_money(plan["monthly"], CURRENCY)}/mes = {pressure_pct_label} del GMV del mes anterior)')
-    else:
-        head, sub = "—", "Sin GMV del mes anterior para calcular el modelo."
-
-    projection_html = ""
-    if plan["has_projection"]:
-        calc_budget = plan["inc_weekly"] if plan["mode"] == "Upselling" else plan["weekly"]
-        projection_html = (
-            '<div class="campaign-projection">'
-            '<div class="campaign-projection-label">Proyección incremental</div>'
-            f'<div class="campaign-projection-line">'
-            f'{dl.fmt_money(calc_budget, CURRENCY)} ÷ CPC $950 = <b>{plan["visits_w"]:,} visitas/sem</b><br>'.replace(",", ".")
-            + f'× CVR {row.cvr * 100:.1f}% = <b>{plan["orders_w"]:,.0f} pedidos incrementales/sem</b> '
-              f'(≈ {plan["orders_m"]:,.0f}/mes)<br>'.replace(",", ".")
-            + f'× AOV {dl.fmt_money(row.aov, CURRENCY)} = <b style="color:{COLORS["blue"]};">+{dl.fmt_money(plan["gmv_w"], CURRENCY)}/sem</b>'
-            + "</div>"
-            + f'<div class="campaign-projection-total">≈ +{dl.fmt_money(plan["gmv_m"], CURRENCY)} GMV incremental/mes</div>'
-            + "</div>"
+    if row.gmv_last <= 0:
+        ads_card_html = (
+            '<div class="campaign-card lever-ads">'
+            '<div class="card-label">📣 Ads Plan</div>'
+            '<div class="campaign-sub" style="margin-top:8px;">Sin GMV del mes anterior para calcular el modelo.</div>'
+            "</div>"
         )
-
-    ads_card_html = (
-        '<div class="campaign-card lever-ads">'
-        f'<div class="card-label">📣 Ads Plan · {pressure_pct_label} Model</div>'
-        f'<div class="campaign-mode" style="color:{mode_color};">{plan["mode"]}</div>'
-        f'<div class="campaign-headline">{head}</div>'
-        f'<div class="campaign-sub">{sub}</div>'
-        f"{projection_html}"
-        "</div>"
-    )
+    else:
+        pct_label = f'{plan["pct"] * 100:.0f}%'
+        minis = (
+            f'<div class="glass-card"><div class="card-label">ROAS 1 SEMANA</div>'
+            f'<div class="card-value">{plan["roas_1sem"]:.2f}x</div></div>'
+            f'<div class="glass-card"><div class="card-label">ROAS 4 SEMANAS</div>'
+            f'<div class="card-value">{plan["roas_4sem"]:.2f}x</div></div>'
+            f'<div class="glass-card"><div class="card-label">VENTA INCREMENTAL · 1 SEM</div>'
+            f'<div class="card-value">{dl.fmt_money(plan["gmv_inc_1sem"], CURRENCY)}</div>'
+            f'<div class="card-copy">{plan["pedidos_inc_1sem"]:,.0f} pedidos</div></div>'.replace(",", ".")
+            + f'<div class="glass-card"><div class="card-label">VENTA INCREMENTAL · 4 SEM</div>'
+            f'<div class="card-value">{dl.fmt_money(plan["gmv_inc_4sem"], CURRENCY)}</div>'
+            f'<div class="card-copy">{plan["pedidos_inc_4sem"]:,.0f} pedidos</div></div>'.replace(",", ".")
+        )
+        ads_card_html = (
+            '<div class="campaign-card lever-ads">'
+            '<div class="card-label">📣 Ads Plan</div>'
+            f'<div class="campaign-headline">{dl.fmt_money(plan["presupuesto_semana1"], CURRENCY)}<span style="font-size:14px;font-weight:600;"> /semana</span></div>'
+            f'<div class="campaign-sub">Inversión recomendada: el {pct_label} del GMV de la última semana '
+            f'({dl.fmt_money(plan["gmv_semana"], CURRENCY)})</div>'
+            f'<div class="analytics-mini-grid" style="margin-top:14px;">{minis}</div>'
+            "</div>"
+        )
 
     # ── MARKDOWN PLAN · coinversión primero (si aplica) + descuento por tramo de CVR + Top 3 productos ──
     md = dl.markdown_plan_by_cvr(row.cvr)
@@ -2661,7 +2654,7 @@ with tab_campaign:
 
     ladder_html = "".join(
         f'<span class="md-ladder-pill{" active" if pct == md["discount"] else ""}">{pct}%</span>'
-        for pct in (15, 20, 25)
+        for pct in (20, 25, 30)
     )
     tops = tpmap.get(row.key, [])
     medals = ["🥇", "🥈", "🥉"]

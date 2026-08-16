@@ -3614,6 +3614,26 @@ def _portfolio_vacio():
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
+def dias_transcurridos_mes_actual():
+    """
+    Dias calendario transcurridos del mes en curso, contados hasta AYER (no
+    hasta hoy) -- mismo criterio ya usado en portfolio_for() para
+    gmv_delta (pedido explicito de Sabas, agosto 2026: el dia de hoy
+    recien se refleja mañana, cuando ya cerro completo -- evita que un
+    dia EN CURSO, parcialmente cargado, infle o distorsione cualquier
+    proyeccion). Minimo 1, para evitar division por cero el primer dia
+    del mes.
+
+    Extraida como funcion reutilizable (agosto 2026, septimo ajuste) para
+    que Ads Plan (Campaign Designer) use EXACTAMENTE la misma logica que
+    ya usa gmv_delta en portfolio_for(), sin duplicar el calculo -- antes
+    vivia solo inline dentro de portfolio_for.
+    """
+    hoy = pd.Timestamp.now().normalize()
+    ayer = hoy - pd.Timedelta(days=1)
+    return max(ayer.day, 1) if ayer.month == hoy.month else 1
+
+
 def portfolio_for(farmer_email):
     """Cartera de un Farmer con toda la data cruzada.
 
@@ -3758,12 +3778,11 @@ def portfolio_for(farmer_email):
     # CURSO (parcialmente cargado) infle o distorsione la proyección.
     # Mínimo 1 para evitar división por cero el primer día del mes.
     hoy_gmv = pd.Timestamp.now().normalize()
-    ayer_gmv = hoy_gmv - pd.Timedelta(days=1)
     dias_totales_gmv = (hoy_gmv + pd.offsets.MonthEnd(0)).day
-    # Si "ayer" cayó en el mes anterior (hoy es el día 1), no hay ningún
-    # día transcurrido de ESTE mes -- se usa el mínimo de 1 igual, para
-    # no dividir por cero (mismo criterio que el resto del ritmo).
-    dias_transcurridos_gmv = max(ayer_gmv.day, 1) if ayer_gmv.month == hoy_gmv.month else 1
+    # dias_transcurridos_gmv ahora viene de dias_transcurridos_mes_actual()
+    # (extraida arriba, agosto 2026 septimo ajuste) -- misma logica exacta
+    # de antes, ya no duplicada inline aca.
+    dias_transcurridos_gmv = dias_transcurridos_mes_actual()
 
     factor_proyeccion = dias_totales_gmv / dias_transcurridos_gmv
     gmv_proyectado = df["gmv"] * factor_proyeccion
@@ -4018,76 +4037,134 @@ def funnel_diagnosis(cvr, traffic, aov, gmv, bench_cvr, bench_traffic, ordenes_m
 
 
 # ── Campaign Designer ──
-ADS_PRESSURE_PCT = 0.18   # % del GMV del mes anterior que define el presupuesto (agosto 2026: ajustado de 12% a 18%, pedido explícito de Sabas)
-ADS_CPC_ARS = 950         # costo por clic/visita
+ADS_CPC_ARS = 950            # costo por clic/visita
+ADS_EROSION_SEMANAL = 0.08   # erosion de conversion por semana en el blend a 4 semanas -- constante
+                              # INTERNA (agosto 2026, septimo ajuste, pedido explicito de Sabas):
+                              # nunca se muestra en ningun texto/tooltip de la UI.
+
+# % sugerido de inversion segun el rango de ventas mensuales (GMV del mes
+# anterior completo) -- tabla de Sabas (agosto 2026, septimo ajuste),
+# reemplaza el ADS_PRESSURE_PCT fijo del 18% que se usaba antes. Cada
+# tupla es (techo del rango, % sugerido); se recorre de menor a mayor y
+# se usa el primer techo que la marca no supera.
+ADS_PRESSURE_TIERS = [
+    (145_000, 0.20),
+    (725_000, 0.17),
+    (1_450_000, 0.15),
+    (7_250_000, 0.10),
+    (float("inf"), 0.06),
+]
 
 
-def ads_plan(gmv_last, bookings_current, cvr, aov):
+def ads_pressure_pct_for(gmv_last):
+    """% sugerido de inversion para esta marca, segun en que tramo de
+    ADS_PRESSURE_TIERS cae su GMV del mes anterior completo."""
+    for techo, pct in ADS_PRESSURE_TIERS:
+        if gmv_last <= techo:
+            return pct
+    return ADS_PRESSURE_TIERS[-1][1]
+
+
+def gmv_ultima_semana(gmv_mes_actual, dias_transcurridos):
     """
-    Ads Plan · Model (ajustado de Growth OS, que usa 15% y CPC $1.000).
-    Presupuesto = ADS_PRESSURE_PCT del GMV del mes anterior, dividido en
-    4 semanas -- % actual: 18% (agosto 2026, ajustado de 12% a 18%,
-    pedido explícito de Sabas; ver la constante ADS_PRESSURE_PCT arriba,
-    los textos de este docstring y de los "note" abajo usan el valor real
-    de la constante en vez de un número hardcodeado, para que un futuro
-    ajuste no vuelva a desincronizar código y texto).
-      - Sin Ads activo (bookings_current == 0): modo Adquisicion, todo el
-        presupuesto semanal es incremental.
-      - Con Ads activo: modo Upselling, el incremental es lo que falta para
-        llegar al techo del modelo.
-    Proyeccion: presupuesto -> CPC = visitas/semana -> x CVR = pedidos
-    incrementales -> x AOV = GMV incremental.
+    Deriva un GMV semanal a partir del GMV del mes en curso (el mismo dato
+    que ya muestra la card GMV de Home, acumulado 'hasta ayer') -- pedido
+    explicito de Sabas: NO tomar ese acumulado como si ya fuera una
+    semana, sino sacar el promedio diario real (con los dias que
+    efectivamente transcurrieron, mismo criterio ya validado de
+    dias_transcurridos_mes_actual()) y multiplicarlo por 7.
     """
-    out = {"mode": "Sin base", "monthly": 0, "weekly": 0, "inc_weekly": 0,
-           "visits_w": 0, "orders_w": 0.0, "gmv_w": 0.0, "orders_m": 0.0, "gmv_m": 0.0,
-           "current_weekly": bookings_current, "note": "", "has_projection": False}
+    dias = max(dias_transcurridos, 1)
+    return (gmv_mes_actual / dias) * 7 if gmv_mes_actual > 0 else 0.0
+
+
+def ads_plan(gmv_last, gmv_mes_actual, dias_transcurridos, cvr, aov):
+    """
+    Ads Plan (agosto 2026, septimo ajuste -- reescrito por completo,
+    pedido explicito de Sabas; reemplaza el modelo plano de 18% del GMV
+    del mes anterior ÷ 4 semanas).
+
+    Presupuesto semana 1 = % sugerido (ver ads_pressure_pct_for, tabla por
+    GMV del mes anterior completo) x GMV de la ultima semana (ver
+    gmv_ultima_semana, derivado del GMV de Home). Ya NO se distingue
+    Adquisicion vs Upselling -- siempre se devuelve el presupuesto
+    recomendado completo para la marca, tenga o no Ads activo hoy (pedido
+    explicito de Sabas: esa decision queda en criterio del Farmer, no en
+    la formula).
+
+    Proyeccion con erosion (mecanismo NUEVO, no existia antes en
+    Wingman): se asume el MISMO presupuesto semanal sostenido durante 4
+    semanas, con la conversion erosionando ADS_EROSION_SEMANAL cada
+    semana -- constante interna, nunca se muestra en la UI. Semana 1 es
+    la base, sin erosion. El ROAS de 4 semanas es el blend real de las 4
+    (GMV incremental total / presupuesto total de las 4 semanas), por eso
+    sale mas bajo que el ROAS de semana 1 sola.
+
+    Para cada semana n (n=1..4):
+      cvr_n     = cvr x (1 - ADS_EROSION_SEMANAL)^(n-1)
+      visitas_n = presupuesto_semana1 / ADS_CPC_ARS   (mismo presupuesto todas las semanas)
+      pedidos_n = visitas_n x cvr_n
+      gmv_n     = pedidos_n x aov
+    """
+    out = {
+        "pct": 0.0, "gmv_semana": 0.0, "presupuesto_semana1": 0.0,
+        "roas_1sem": 0.0, "roas_4sem": 0.0,
+        "gmv_inc_1sem": 0.0, "pedidos_inc_1sem": 0.0,
+        "gmv_inc_4sem": 0.0, "pedidos_inc_4sem": 0.0,
+        "has_projection": False,
+    }
     if gmv_last <= 0:
-        out["note"] = "Sin GMV del mes anterior para calcular el modelo de presión."
         return out
 
-    pct_label = f"{ADS_PRESSURE_PCT * 100:.0f}%"
-    monthly = round(gmv_last * ADS_PRESSURE_PCT / 1000) * 1000
-    weekly = round(monthly / 4 / 1000) * 1000
-    out["monthly"], out["weekly"] = monthly, weekly
+    pct = ads_pressure_pct_for(gmv_last)
+    gmv_sem = gmv_ultima_semana(gmv_mes_actual, dias_transcurridos)
+    presupuesto = round(pct * gmv_sem / 1000) * 1000
 
-    if bookings_current <= 0:
-        out["mode"] = "Adquisición"
-        calc_w = weekly
-        out["note"] = f"Campaña nueva al modelo de presión del {pct_label} del GMV del mes anterior."
-    else:
-        out["mode"] = "Upselling"
-        inc = max(0, weekly - bookings_current)
-        out["inc_weekly"] = round(inc / 1000) * 1000
-        calc_w = out["inc_weekly"]
-        out["note"] = ("Ya está en el techo del modelo — sostener y optimizar"
-                        if inc <= 0 else f"Subir inversión para llegar al {pct_label} del GMV del mes anterior.")
+    out["pct"] = pct
+    out["gmv_semana"] = gmv_sem
+    out["presupuesto_semana1"] = presupuesto
 
-    out["visits_w"] = int(calc_w / ADS_CPC_ARS) if calc_w > 0 else 0
-    if calc_w > 0 and cvr > 0 and aov > 0:
-        out["orders_w"] = out["visits_w"] * cvr
-        out["gmv_w"] = out["orders_w"] * aov
-        out["orders_m"] = out["orders_w"] * 4
-        out["gmv_m"] = out["gmv_w"] * 4
-        out["has_projection"] = True
-    elif calc_w > 0:
-        out["note"] += " · Falta CVR o AOV para proyectar."
+    if presupuesto <= 0 or cvr <= 0 or aov <= 0:
+        return out
+
+    visitas_semana = presupuesto / ADS_CPC_ARS
+    gmv_total_4sem = 0.0
+    pedidos_total_4sem = 0.0
+    for n in range(1, 5):
+        cvr_n = cvr * ((1 - ADS_EROSION_SEMANAL) ** (n - 1))
+        pedidos_n = visitas_semana * cvr_n
+        gmv_n = pedidos_n * aov
+        if n == 1:
+            out["pedidos_inc_1sem"] = pedidos_n
+            out["gmv_inc_1sem"] = gmv_n
+        gmv_total_4sem += gmv_n
+        pedidos_total_4sem += pedidos_n
+
+    out["gmv_inc_4sem"] = gmv_total_4sem
+    out["pedidos_inc_4sem"] = pedidos_total_4sem
+    out["roas_1sem"] = out["gmv_inc_1sem"] / presupuesto if presupuesto > 0 else 0.0
+    presupuesto_4sem = presupuesto * 4
+    out["roas_4sem"] = gmv_total_4sem / presupuesto_4sem if presupuesto_4sem > 0 else 0.0
+    out["has_projection"] = True
     return out
 
 
 def markdown_plan_by_cvr(cvr):
     """
-    Markdown Plan · regla nueva por tramo de conversion (reemplaza la regla de
-    comision+fotos+CVR de Growth OS):
-      CVR < 10%        -> 25% OFF + 10% PRO
-      10% <= CVR < 15%  -> 20% OFF + 5% PRO
-      CVR >= 15%        -> 15% OFF + 5% PRO
+    Markdown Plan · regla por tramo de conversion (agosto 2026, septimo
+    ajuste: escalera corrida +5 puntos completos, pedido explicito de
+    Sabas -- misma logica de tramos de CVR, solo cambia el % de
+    descuento):
+      CVR < 10%        -> 30% OFF + 10% PRO  (antes 25%)
+      10% <= CVR < 15%  -> 25% OFF + 5% PRO   (antes 20%)
+      CVR >= 15%        -> 20% OFF + 5% PRO   (antes 15%)
     Siempre se muestran los 3 productos principales, sin importar el tramo.
     """
     if cvr < 0.10:
-        return {"discount": 25, "pro_extra": 10, "tramo": "CVR por debajo del 10%"}
+        return {"discount": 30, "pro_extra": 10, "tramo": "CVR por debajo del 10%"}
     if cvr < 0.15:
-        return {"discount": 20, "pro_extra": 5, "tramo": "CVR entre 10% y 15%"}
-    return {"discount": 15, "pro_extra": 5, "tramo": "CVR de 15% o más"}
+        return {"discount": 25, "pro_extra": 5, "tramo": "CVR entre 10% y 15%"}
+    return {"discount": 20, "pro_extra": 5, "tramo": "CVR de 15% o más"}
 
 
 def coinversion_markdown_plan(cvr, coinv_group_key):
