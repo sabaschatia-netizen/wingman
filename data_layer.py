@@ -1520,49 +1520,73 @@ def signals_for_brand(key):
 
 def ops_tactical_card(key, availability_pct, lost_hours, gmv_ars=0, aov_ars=0, ordenes_mes=0, gmv_last_ars=0):
     """
-    Card OPS de 360 Action -- pedido explícito de Sabas (agosto 2026,
-    cuarto ajuste): SIEMPRE 4 ítems, en este orden fijo: Disponibilidad,
-    Reclamos, Cancelaciones, Tiempo de espera.
+    Card OPS de 360 Action -- pedido explicito de Sabas (agosto 2026, quinto
+    ajuste). SIEMPRE 4 items, en este nuevo orden fijo: Disponibilidad,
+    Cancelaciones, Tiempo de espera, Reclamos (antes: Disponibilidad,
+    Reclamos, Cancelaciones, Tiempo de espera).
 
-    Textos de "sin señal" por ítem (pedido explícito, cuarto ajuste):
-      - Disponibilidad: si no hay dato (0/None), "sin datos disponibles"
-        (a diferencia de los otros 3, Disponibilidad SIEMPRE debería
-        tener un valor real si la marca vende algo -- su "sin dato" es
-        un caso distinto, de ausencia real de medición).
-      - Reclamos / Cancelaciones / Tiempo de espera: si no hay fila en
-        Priority Data para ese kind, dice "sin alerta presente" (antes
-        decía "sin datos disponibles" -- pedido explícito de Sabas,
-        cuarto ajuste: para estas 3, la ausencia de fila en Priority Data
-        SÍ es información -- significa que Rappi no detectó nada digno de
-        alerta, no que falte el dato).
+    -- Disponibilidad --
+    Regla de color fija, sin cambios: <80% ALERT, 80-90% WATCH, >=90%
+    HEALTHY. Disponibilidad NUNCA se autoescala por acompañamiento de otras
+    metricas (a diferencia de Cancelaciones/Tiempo de espera/Reclamos) --
+    pero SI cuenta como "señal activa" para escalar a esas otras 3.
 
-    Reclamos y Cancelaciones (cuarto ajuste, pedido explícito): YA NO se
-    calcula ni se muestra el GMV en riesgo/perdido (se sacó el uso de
-    ordenes_mes/aov_ars para esto) -- solo la tasa % real (de Priority
-    Data) + una nota FIJA recordando cuánto absorbe el aliado en cada
-    palanca: Reclamos "el aliado absorbe el 50%", Cancelaciones "el
-    aliado absorbe el 65%" (tasas de negocio reales, no una fórmula
-    calculada). aov_ars/ordenes_mes quedan en la firma por compatibilidad
-    con el call-site pero ya no se usan para Reclamos/Cancelaciones --
-    Disponibilidad sigue usando gmv_ars para el upside estimado.
+    Insight nuevo (reemplaza el calculo viejo basado en gmv_last_ars, que
+    ademas nunca se estaba pasando en el call-site real de wingmanapp.py --
+    bug encontrado en esta misma sesion, por eso el texto de "$ perdido"
+    nunca se mostraba en produccion). Siempre que availability_pct < 90%
+    (cubre WATCH y ALERT), se agrega "Dejaste de captar X pedidos -- eso
+    son $Y que no entraron por no llegar minimo al 90%", calculado asi:
+        pedidos_perdidos = ordenes_mes * (90 / availability_pct - 1)
+        perdida_pesos    = pedidos_perdidos * aov_ars
+    Ancla al 90% (la meta), NO al 100% (eso se probo y se descarto en esta
+    misma sesion) -- decision explicita de Sabas. Si ordenes_mes o aov_ars
+    vienen en 0, la formula ya da 0 pedidos / 0 pesos sola, sin necesitar
+    un caso especial -- confirmado explicitamente por Sabas que ese
+    comportamiento es el deseado. gmv_ars/gmv_last_ars quedan en la firma
+    solo por compatibilidad con el call-site -- ya NO se usan para este
+    calculo.
 
-    Reglas de estado por ítem:
-      - Disponibilidad: HEALTHY si >=90%, WATCH si 80-89%, ALERT si <80%.
-      - Reclamos / Cancelaciones (tasa %): sin fila -> "sin alerta
-        presente" (neutro). Con fila pero tasa 0% -> "Sin
-        reclamos"/"Sin cancelaciones" (HEALTHY). Con tasa >0% -> WATCH;
-        >7% -> ALERT.
-      - Tiempo de espera: sin fila -> "sin alerta presente" (neutro). Con
-        fila -> WATCH si es la ÚNICA señal de riesgo activa entre las 4;
-        ALERT si coincide con cualquier otra (reclamos/cancelaciones con
-        tasa >0%, o disponibilidad <90%).
+    -- Cancelaciones / Reclamos --
+    Paso 1 (color propio, sin mirar a las demas):
+      - Sin fila en Priority Data -> neutral ("sin alerta presente").
+      - Con fila, tasa = 0% -> HEALTHY ("Sin cancelaciones"/"Sin reclamos").
+      - Con fila, tasa >0% hasta 10% -> WATCH.
+      - Con fila, tasa >10% -> ALERT (fijo, no depende de acompañamiento).
+    Paso 2 (escalacion, SOLO si quedo en WATCH tras el Paso 1): si
+    cualquiera de las otras 3 metricas (Disponibilidad, Tiempo de espera, y
+    la otra de Cancelaciones/Reclamos) esta activa (WATCH o ALERT en su
+    propio Paso 1 -- se compara contra el estado BASE de las demas, no el
+    ya escalado, para evitar dependencia circular entre Cancelaciones y
+    Reclamos) -> escala a ALERT. Esto resuelve, por diseño, la duda tecnica
+    que habia quedado pendiente de una sesion anterior sobre si el chequeo
+    de acompañamiento debia depender del orden de renderizado: aca se
+    compara siempre contra el set completo de 4 metricas, nunca solo
+    contra las que ya se armaron antes en la lista.
 
-    Estado de la card completa = el PEOR de los 4 ítems ("un solo rojo
-    domina toda la card"). Los ítems neutros ("sin datos"/"sin alerta")
-    no suman ni restan estado.
+    Insight nuevo (reemplaza las notas fijas de absorcion "el aliado
+    absorbe el 50%/65%", que quedan eliminadas por completo): se agrega
+    siempre que la tasa sea >0% (WATCH o ALERT, con o sin escalar):
+      - Cancelaciones: "Revisa el motivo mas frecuente. Recuerda que es
+        perdida doble: se pierde la venta y se pierde el impuesto y la
+        comision de una venta facturada que nunca entra a la caja."
+      - Reclamos: "Revisa el motivo de las reclamaciones. Recuerda que
+        esto disminuye la posibilidad de recompra del usuario."
 
-    pct siempre None en el retorno -- la card no muestra ningún
-    porcentaje suelto (pedido de sesión anterior, se mantiene).
+    -- Tiempo de espera --
+    Sin fila -> neutral ("sin alerta presente"). Con fila, sola (ninguna
+    otra de las 4 activa) -> WATCH. Con fila, acompañada de cualquier otra
+    activa -> ALERT. Mismo criterio de comparacion contra el set completo
+    de 4 (no solo contra lo ya renderizado antes) que Cancelaciones/
+    Reclamos. Insight nuevo, siempre que haya fila (sin importar si el
+    resultado final es WATCH o ALERT): "Recuerda que cada segundo de
+    retraso altera tu operacion y aumenta tu riesgo de reclamaciones."
+
+    Estado de la card completa = el PEOR de los 4, ya con la escalacion
+    del Paso 2 aplicada ("un solo rojo domina toda la card"). Los items
+    neutros (None) no suman ni restan estado.
+
+    pct siempre None en el retorno -- sin cambio respecto a antes.
     """
     signals = signals_for_brand(key)
     por_kind = {}
@@ -1570,97 +1594,129 @@ def ops_tactical_card(key, availability_pct, lost_hours, gmv_ars=0, aov_ars=0, o
         if s["kind"].startswith("ops") and s["kind"] != "ops_availability":
             por_kind.setdefault(s["kind"], s)  # una fila por kind esperado; si hay mas, la primera
 
-    items = []  # (icono, texto, estado) en el orden final -- se arma en orden fijo abajo.
+    # ── PASO 1: estado base + texto de cada una de las 4, sin mirar a las demas ──
 
-    # ── 1. Disponibilidad ──
+    # 1. Disponibilidad
     if not availability_pct or availability_pct <= 0:
-        items.append(("📶", "Disponibilidad — sin datos disponibles", None))
+        disp_estado, disp_texto = None, "Disponibilidad — sin datos disponibles"
     else:
         if availability_pct >= 90:
-            estado = "HEALTHY"
-            texto = f"Disponibilidad {availability_pct:.0f}% ✅"
+            disp_estado = "HEALTHY"
+            disp_texto = f"Disponibilidad {availability_pct:.0f}% ✅"
         elif availability_pct >= 80:
-            estado = "WATCH"
-            texto = f"Disponibilidad {availability_pct:.0f}% — por debajo del 90%"
+            disp_estado = "WATCH"
+            disp_texto = f"Disponibilidad {availability_pct:.0f}% — por debajo del 90%"
         else:
-            estado = "ALERT"
-            texto = f"Disponibilidad {availability_pct:.0f}% — muy por debajo del 90%"
-        # FÓRMULA CORREGIDA (bug real, agosto 2026, quinto ajuste): la
-        # anterior calculaba el "upside si sube a 100%" tomando como base
-        # gmv_ars = GMV del MES ACTUAL (el mismo numero que la card "GMV
-        # (mes)" de arriba, no el del mes anterior) -- con disponibilidad
-        # muy baja, el factor gap/disponibilidad se dispara (ej. al 25% de
-        # disponibilidad, el factor es 3x el GMV actual como "upside"), y
-        # ademas mezclaba dos problemas distintos: si el GMV actual ya
-        # estaba deprimido por el ritmo de ventas del mes (ver gmv_delta),
-        # el upside calculado sobre esa base deprimida quedaba
-        # artificialmente chico o inconsistente con la realidad de la
-        # marca.
-        #
-        # Fórmula nueva (pedido explícito de Sabas): se usa el GMV del
-        # MES ANTERIOR (gmv_last, el numero que ya se ve en el sparkling
-        # "Anterior" de la card GMV) como el 100% de referencia -- es la
-        # base mas estable, ya demostrada por la marca. El monto que "se
-        # está dejando de ingresar" es directamente ese GMV de referencia
-        # multiplicado por el % de desconexión (100% - disponibilidad
-        # actual), sin ningun factor de amplificación. El texto tambien
-        # cambia: ya no dice "upside estimado si sube a 100%" (sonaba a
-        # proyección optimista) sino "Estás dejando de ingresar $X con
-        # Y% desconectado" (una pérdida real, no una oportunidad futura).
-        if estado != "HEALTHY" and gmv_last_ars > 0:
-            pct_desconexion = max(0, 1.0 - availability_pct / 100)
-            perdido = round(gmv_last_ars * pct_desconexion / 1000) * 1000
-            if perdido > 0:
-                texto += (
-                    f" — Estás dejando de ingresar ~{fmt_ars(perdido)}/mes "
-                    f"con {pct_desconexion * 100:.0f}% desconectado"
-                )
-        items.append(("📶", texto, estado))
+            disp_estado = "ALERT"
+            disp_texto = f"Disponibilidad {availability_pct:.0f}% — muy por debajo del 90%"
 
-    # ── 2. Reclamos, 3. Cancelaciones (misma lógica, distinto kind) ──
-    # Pedido explícito de Sabas (agosto 2026, cuarto ajuste): ya NO se
-    # muestra el cálculo de GMV en riesgo/perdido ni el conteo de órdenes
-    # -- solo la tasa % (de Priority Data) + una nota fija recordando
-    # cuánto absorbe el aliado en cada palanca (Reclamos 50%, Cancelaciones
-    # 65% -- no son la misma fórmula, son las tasas de absorción reales
-    # del negocio, ya no calculadas a partir de ordenes_mes/aov_ars).
-    for kind, icono, nombre, nota_absorcion in [
-        ("ops_claims", "⚠️", "Reclamos", "Recuerda que el aliado absorbe el 50%"),
-        ("ops_cancellations", "🛑", "Cancelaciones", "Recuerda que el aliado absorbe el 65%"),
-    ]:
+        if availability_pct < 90:
+            # Formula ancla al 90% (la meta), no al 100% -- ver docstring.
+            # Se calcula el crudo sin redondear primero y se redondea solo
+            # al final de cada numero mostrado, para no encadenar
+            # redondeos y perder precision en la plata.
+            raw_pedidos = ordenes_mes * (90 / availability_pct - 1)
+            pedidos_perdidos = round(raw_pedidos)
+            perdida_pesos = round(raw_pedidos * aov_ars)
+            disp_texto += (
+                f" Dejaste de captar {pedidos_perdidos} pedidos — eso son "
+                f"{fmt_ars(perdida_pesos)} que no entraron por no llegar mínimo al 90%."
+            )
+
+    # 2. Cancelaciones, 4. Reclamos -- mismo Paso 1, distinto kind/insight
+    def _paso1_tasa(kind):
         s = por_kind.get(kind)
         if s is None:
-            items.append((icono, f"{nombre} — sin alerta presente", None))
-            continue
+            return None, 0.0
         rate = _extract_priority_pct_rate(s.get("descripcion", ""))
         if rate <= 0:
-            items.append((icono, f"Sin {nombre.lower()}", "HEALTHY"))
-            continue
-        estado = "ALERT" if rate > 0.07 else "WATCH"
-        texto = f"{nombre} {rate*100:.0f}% tasa — {nota_absorcion}"
-        items.append((icono, texto, estado))
+            return "HEALTHY", 0.0
+        return ("ALERT" if rate > 0.10 else "WATCH"), rate
 
-    # ── 4. Tiempo de espera ──
+    canc_estado, canc_rate = _paso1_tasa("ops_cancellations")
+    recl_estado, recl_rate = _paso1_tasa("ops_claims")
+
+    # 3. Tiempo de espera -- Paso 1 (sin escalar todavia). Priority Data
+    # solo trae esta fila cuando el tiempo esta elevado -- no hay caso real
+    # de "fila presente pero tiempo normal" confirmado en la fuente, asi
+    # que la sola presencia ya es señal.
     s_wait = por_kind.get("ops_wait_time")
-    if s_wait is None:
-        items.append(("⏱️", "Tiempo de espera del repartidor — sin alerta presente", None))
-    else:
-        # Priority Data solo trae esta fila cuando el tiempo esta elevado
-        # -- no hay un caso real de "fila presente pero tiempo normal"
-        # confirmado en la fuente, así que la sola presencia ya es señal.
-        hay_otra_senal_activa = any(
-            e is not None and e != "HEALTHY"
-            for _, _, e in items
-        )
-        estado = "ALERT" if hay_otra_senal_activa else "WATCH"
-        descr = s_wait.get("descripcion", "")
-        texto = "Tiempo de espera del repartidor elevado"
-        if descr:
-            texto += f" — {descr}"
-        items.append(("⏱️", texto, estado))
+    wait_hay_fila = s_wait is not None
+    wait_descr = s_wait.get("descripcion", "") if s_wait else ""
 
-    # Estado de la card completa: el peor de los 4 -- "sin datos" (None)
-    # es neutro, no cuenta ni para bien ni para mal.
+    # ── PASO 2: escalacion por acompañamiento -- se compara SIEMPRE contra
+    # el estado BASE (Paso 1) de las otras 3, nunca contra el ya escalado
+    # ni contra el orden de renderizado -- evita dependencia circular entre
+    # Cancelaciones y Reclamos, y hace el resultado independiente del orden
+    # en que se muestran los 4 items en la card. ──
+
+    def _activa(estado):
+        return estado in ("WATCH", "ALERT")
+
+    if canc_estado == "WATCH" and (_activa(disp_estado) or wait_hay_fila or _activa(recl_estado)):
+        canc_estado_final = "ALERT"
+    else:
+        canc_estado_final = canc_estado
+
+    if recl_estado == "WATCH" and (_activa(disp_estado) or wait_hay_fila or _activa(canc_estado)):
+        recl_estado_final = "ALERT"
+    else:
+        recl_estado_final = recl_estado
+
+    if wait_hay_fila:
+        otra_activa = _activa(disp_estado) or _activa(canc_estado) or _activa(recl_estado)
+        wait_estado_final = "ALERT" if otra_activa else "WATCH"
+    else:
+        wait_estado_final = None
+
+    # ── Textos finales -- el texto de cada item NO cambia por la
+    # escalacion del Paso 2 (solo cambia el estado usado para el tag
+    # agregado), mismo criterio que ya tenia el codigo viejo para Tiempo
+    # de espera. ──
+
+    if canc_estado is None:
+        canc_texto = "Cancelaciones — sin alerta presente"
+    elif canc_estado == "HEALTHY":
+        canc_texto = "Sin cancelaciones"
+    else:
+        canc_texto = (
+            f"Cancelaciones {canc_rate * 100:.0f}% — Revisa el motivo más frecuente. "
+            f"Recuerda que es pérdida doble: se pierde la venta y se pierde el "
+            f"impuesto y la comisión de una venta facturada que nunca entra a la caja."
+        )
+
+    if recl_estado is None:
+        recl_texto = "Reclamos — sin alerta presente"
+    elif recl_estado == "HEALTHY":
+        recl_texto = "Sin reclamos"
+    else:
+        recl_texto = (
+            f"Reclamos {recl_rate * 100:.0f}% — Revisa el motivo de las reclamaciones. "
+            f"Recuerda que esto disminuye la posibilidad de recompra del usuario."
+        )
+
+    if not wait_hay_fila:
+        wait_texto = "Tiempo de espera del repartidor — sin alerta presente"
+    else:
+        wait_texto = "Tiempo de espera del repartidor elevado"
+        if wait_descr:
+            wait_texto += f" — {wait_descr}"
+        wait_texto += (
+            " Recuerda que cada segundo de retraso altera tu operación y "
+            "aumenta tu riesgo de reclamaciones."
+        )
+
+    # Orden final fijo: Disponibilidad, Cancelaciones, Tiempo de espera, Reclamos.
+    items = [
+        ("📶", disp_texto, disp_estado),
+        ("🛑", canc_texto, canc_estado_final),
+        ("⏱️", wait_texto, wait_estado_final),
+        ("⚠️", recl_texto, recl_estado_final),
+    ]
+
+    # Estado de la card completa: el peor de los 4, ya con la escalacion
+    # del Paso 2 aplicada -- "sin datos"/"sin alerta" (None) es neutro, no
+    # cuenta ni para bien ni para mal.
     estados_reales = [e for _, _, e in items if e is not None]
     if "ALERT" in estados_reales:
         tag = "ALERT"
@@ -1682,46 +1738,68 @@ def ops_tactical_card(key, availability_pct, lost_hours, gmv_ars=0, aov_ars=0, o
         titulo_top = "✅ OPS saludable"
 
     # "items": los mismos 4 bullets pero como LISTA (no un solo string
-    # unido por " · ") -- pedido explícito de Sabas (agosto 2026): la UI
-    # los estaba mostrando en un párrafo corrido, deben verse uno debajo
-    # del otro. "detail" se mantiene por compatibilidad, no se usa mas en
-    # la card de 360 Action pero puede haber otro lugar que lo consuma.
+    # unido por " · ") -- se mantiene igual que antes, la UI los pinta uno
+    # debajo del otro.
     return {"title": titulo_top, "detail": detail, "items": bullets, "tag": tag, "pct": None}
 
 
 def menu_tactical_card(key, perfect_store_pct, photos_pct, purchase_pct, missing_pct):
     """
-    Card Menu de 360 Action -- pedido explícito de Sabas (agosto 2026,
-    tercer ajuste): SIEMPRE 4 ítems, en este orden fijo: Fotos,
-    Experiencia de compra, Missing Products, PDF Menú. La señal de
-    "Catálogo con hallazgos" (Priority Data, distinta de PDF Menú) se
-    sacó por pedido explícito -- solo estos 4 ítems, siempre.
+    Card Menu de 360 Action -- pedido explicito de Sabas (agosto 2026,
+    quinto ajuste). Nuevo orden fijo: Missing Products, Fotos, Experiencia
+    de compra, PDF Menu (antes: Fotos, Experiencia de compra, Missing
+    Products, PDF Menu).
 
-    Reglas de estado por ítem:
-      - Fotos / Experiencia de compra: sin dato (0/None) -> "sin datos
-        disponibles". Con dato: HEALTHY si >=90% (muestra "Métrica sana y
-        competitiva"), WATCH si 70-89%, ALERT si <70% (con nota
-        específica en ambos casos bajos, pedido explícito de Sabas,
-        cuarto ajuste):
-          - Fotos baja: "Ajustar las fotos puede hacer crecer tu
-            conversión hasta en un 30%".
-          - Experiencia de compra baja: "Recuerda que el valor agregado
-            de Rappi y sus marcas es la personalización de la
-            experiencia".
-        Las notas se aplican por métrica INDIVIDUAL, no una sola vez para
-        la card completa (confirmado explícitamente con Sabas).
-      - Missing Products: solo informativo, sin estado propio (pedido
-        explícito de sesión anterior -- su escala real no es 0-100, va
-        de 0 a ~223, "menor a X%" no tiene sentido matemático ahí).
-      - PDF Menú: si Priority Data NO lo pide para esta marca -> "No se
-        necesita" (HEALTHY). Si SÍ lo pide -> el mensaje de alerta
-        (WATCH).
+    Missing Products AHORA SI tiene estado/color propio -- cambio real de
+    comportamiento, pedido explicito de Sabas (antes era puramente
+    informativo, sin estado, porque su escala real es 0-223 y no un
+    porcentaje -- eso no cambio, solo se le agrego una regla de estado
+    sobre esa misma escala de conteo, no de %):
+      - 0 (o sin dato) -> HEALTHY, "Metrica sana y competitiva".
+      - 1 a 10 -> WATCH.
+      - Mas de 10 -> ALERT.
+      Insight (>=1, mismo texto tanto en WATCH como en ALERT): "Ventas y
+      trafico perdido por productos ocultos".
 
-    Estado de la card completa = el PEOR de los ítems con estado real
-    (Fotos, Experiencia, PDF Menú) -- "un solo rojo domina toda la card".
+    Fotos / Experiencia de compra: umbral de ALERT movido de 70% a 75%
+    (cambio real de umbral, pedido explicito de Sabas -- antes 70-89% era
+    WATCH y <70% era ALERT; ahora 75-89% es WATCH y <75% es ALERT):
+      - >=90% -> HEALTHY, "Metrica sana y competitiva".
+      - 75% a 89% -> WATCH.
+          Fotos: "Revisar y optimizar fotografias para mejorar conversión".
+          Experiencia: "Aumenta tu posibilidad de venta cruzada y
+          crecimiento de AOV".
+      - <75% -> ALERT.
+          Fotos: "Corregir urgente, no se le muestra al usuario lo que se
+          está ofreciendo".
+          Experiencia: "Muy bajo rendimiento esperado en venta cruzada y
+          crecimiento de AOV" (sin la frase "aumento de ticket promedio"
+          -- se saco por redundante con "crecimiento de AOV", correccion
+          explicita de Sabas).
+      Sin dato (0/None) sigue neutral ("sin datos disponibles"), SIN
+      cambio -- a diferencia de Missing Products, Sabas no pidio tratar
+      "sin dato" como HEALTHY para estas dos metricas.
 
-    health_score se sigue calculando igual (misma fórmula de Growth OS)
-    pero YA NO se muestra -- pct siempre None en el retorno.
+    PDF Menu: texto reemplazado por completo (ya NO "PDF Menu
+    desactualizado — actualización urgente"):
+      - No se necesita -> HEALTHY, "No se necesita".
+      - Se necesita -> WATCH, "Verifica actualización de catálogo
+        reciente".
+
+    Estado de la card completa (pedido explicito de Sabas, mismo principio
+    de escalacion por acompañamiento que OPS, pero sin el caso especial de
+    Disponibilidad -- las 4 metricas de Menu son simetricas entre si, asi
+    que basta con CONTAR cuantas quedaron en WATCH, no hace falta que cada
+    una "mire" individualmente a las demas):
+      - Cualquiera de las 4 en ALERT -> card ALERT (fijo, un rojo domina).
+      - Ninguna ALERT pero 2 o mas en WATCH -> card ALERT (escalacion).
+      - Exactamente 1 en WATCH -> card WATCH.
+      - Las 4 sanas/sin dato -> card HEALTHY.
+    Igual que en OPS, la escalacion solo afecta el tag agregado de la
+    card -- el texto de cada bullet individual no cambia.
+
+    health_score se sigue calculando igual (misma formula de Growth OS)
+    pero sigue sin mostrarse -- pct siempre None en el retorno.
     """
     _signals = signals_for_brand(key)
     pdf_signal = any(s["kind"] == "menu_pdf" for s in _signals)
@@ -1731,40 +1809,61 @@ def menu_tactical_card(key, perfect_store_pct, photos_pct, purchase_pct, missing
     perfect_bonus = (perfect_store_pct or 0) / 100
     menu_health = max(0, min(100, (photos_frac * 42) + (purchase_frac * 42) + (perfect_bonus * 16)))  # noqa: F841 (se calcula, no se muestra -- ver docstring)
 
-    def _estado_y_texto(nombre, icono, pct, nota_baja):
+    # ── 1. Missing Products (ahora con estado propio, ver docstring) ──
+    mp_count = missing_pct or 0
+    if mp_count <= 0:
+        mp_estado = "HEALTHY"
+        mp_texto = f"Missing Products: {mp_count:.0f} — Métrica sana y competitiva"
+    else:
+        mp_estado = "ALERT" if mp_count > 10 else "WATCH"
+        mp_texto = f"Missing Products: {mp_count:.0f} — Ventas y tráfico perdido por productos ocultos"
+
+    # ── 2. Fotos, 3. Experiencia de compra (umbral 90/75, "sin dato" sin cambio) ──
+    def _estado_y_texto(nombre, pct, nota_watch, nota_alert):
         if not pct or pct <= 0:
-            return icono, f"{nombre} — sin datos disponibles", None
+            return f"{nombre} — sin datos disponibles", None
         if pct >= 90:
-            return icono, f"{nombre} {pct:.0f}% — Métrica sana y competitiva", "HEALTHY"
-        if pct >= 70:
-            return icono, f"{nombre} {pct:.0f}% — por debajo del 90%. {nota_baja}", "WATCH"
-        return icono, f"{nombre} {pct:.0f}% — muy por debajo del 90%. {nota_baja}", "ALERT"
+            return f"{nombre} {pct:.0f}% — Métrica sana y competitiva", "HEALTHY"
+        if pct >= 75:
+            return f"{nombre} {pct:.0f}% — {nota_watch}", "WATCH"
+        return f"{nombre} {pct:.0f}% — {nota_alert}", "ALERT"
 
-    items = []
-    items.append(_estado_y_texto(
-        "Fotos", "📸", photos_pct,
-        "Ajustar las fotos puede hacer crecer tu conversión hasta en un 30%",
-    ))
-    items.append(_estado_y_texto(
-        "Experiencia de compra", "🛒", purchase_pct,
-        "Recuerda que el valor agregado de Rappi y sus marcas es la personalización de la experiencia",
-    ))
+    fotos_texto, fotos_estado = _estado_y_texto(
+        "Fotos", photos_pct,
+        "Revisar y optimizar fotografías para mejorar conversión",
+        "Corregir urgente, no se le muestra al usuario lo que se está ofreciendo",
+    )
+    exp_texto, exp_estado = _estado_y_texto(
+        "Experiencia de compra", purchase_pct,
+        "Aumenta tu posibilidad de venta cruzada y crecimiento de AOV",
+        "Muy bajo rendimiento esperado en venta cruzada y crecimiento de AOV",
+    )
 
-    # Missing Products: informativo, sin estado propio.
-    if missing_pct:
-        items.append(("📦", f"Missing Products: {missing_pct:.0f}", None))
-    else:
-        items.append(("📦", "Missing Products — sin datos disponibles", None))
-
+    # ── 4. PDF Menú (texto reemplazado por completo) ──
     if pdf_signal:
-        items.append(("📄", "PDF Menu desactualizado — actualización urgente", "WATCH"))
+        pdf_estado = "WATCH"
+        pdf_texto = "PDF Menú — Verifica actualización de catálogo reciente"
     else:
-        items.append(("📄", "PDF Menu — no se necesita", "HEALTHY"))
+        pdf_estado = "HEALTHY"
+        pdf_texto = "PDF Menú — No se necesita"
 
+    # Orden final fijo: Missing Products, Fotos, Experiencia de compra, PDF Menú.
+    items = [
+        ("📦", mp_texto, mp_estado),
+        ("📸", fotos_texto, fotos_estado),
+        ("🛒", exp_texto, exp_estado),
+        ("📄", pdf_texto, pdf_estado),
+    ]
+
+    # Estado de la card completa: cualquier ALERT domina; sin ALERT, 2+
+    # en WATCH escala a ALERT; exactamente 1 en WATCH se queda en WATCH.
     estados_reales = [e for _, _, e in items if e is not None]
+    n_watch = estados_reales.count("WATCH")
     if "ALERT" in estados_reales:
         tag = "ALERT"
-    elif "WATCH" in estados_reales:
+    elif n_watch >= 2:
+        tag = "ALERT"
+    elif n_watch == 1:
         tag = "WATCH"
     elif "HEALTHY" in estados_reales:
         tag = "HEALTHY"
@@ -1777,8 +1876,7 @@ def menu_tactical_card(key, perfect_store_pct, photos_pct, purchase_pct, missing
         "Corregir antes de escalar tráfico o activar pauta."
         if tag != "HEALTHY" else "Catálogo saludable, sin issues detectados."
     )
-    # "items": los mismos 4 bullets como LISTA -- pedido explícito de
-    # Sabas (agosto 2026), mismo criterio que OPS.
+    # "items": los mismos 4 bullets como LISTA -- mismo criterio que OPS.
     return {"title": title, "detail": detail, "items": bullets_menu, "tag": tag, "pct": None}
 
 
