@@ -3844,7 +3844,7 @@ def category_benchmarks():
     return out
 
 
-def _funnel_diagnosis_interno(cvr, traffic, aov, gmv, bench_cvr, bench_traffic):
+def _funnel_diagnosis_interno(cvr, traffic, aov, gmv, bench_cvr, bench_traffic, ordenes_mes=0):
     """
     Diagnostico de Funnel Traffic & Conversion vs Benchmark. Mismo arbol de
     decision que Growth OS (bloque _d4_*): tolerancia del 85% del benchmark
@@ -3852,6 +3852,44 @@ def _funnel_diagnosis_interno(cvr, traffic, aov, gmv, bench_cvr, bench_traffic):
 
     Devuelve dict con: headline, color, texto combinado, pitch ("como
     decirselo al aliado"), y los valores de traffic/cvr semanal para mostrar.
+
+    INSIGHT DE INCREMENTAL -- reescrito por completo (agosto 2026, sexto
+    ajuste, pedido explicito de Sabas). Antes se proyectaba con trafico
+    SEMANAL x4 x bench_cvr x aov (metodologia distinta a la que usa el
+    resto de la app), y ademas necesitaba aov>0 para activarse -- por eso
+    en la practica casi nunca se veia en pantalla. Ahora usa exactamente
+    la misma fuente que ya usa Disponibilidad en 360 Action (ordenes_mes +
+    AOV, el mismo par de datos que ya se ve en la card GMV de Home), asi
+    que toda la app queda consistente con una sola metodologia de
+    "pedidos/pesos incrementales": ratio de mejora x ordenes_mes, nunca
+    trafico semanal proyectado.
+
+      - Problema: Conversion (trafico sano, CVR bajo):
+          pedidos_incremental = ordenes_mes x (bench_cvr / cvr - 1)
+          gmv_incremental     = pedidos_incremental x aov
+
+      - Problema: Trafico (CVR sano, trafico bajo) -- ESTE INSIGHT NO
+        EXISTIA ANTES, se agrega nuevo (pedido explicito de Sabas):
+          pedidos_incremental = ordenes_mes x (bench_traffic / traffic - 1)
+          gmv_incremental     = pedidos_incremental x aov
+
+      - Problema doble (ambos frentes rotos) -- insight en 2 pasos, mas
+        largo que los otros dos (pedido explicito de Sabas): primero
+        cuanto se gana arreglando SOLO conversion (manteniendo el trafico
+        actual), y despues cuanto se gana EXTRA si ademas se arregla el
+        trafico:
+          pedidos_A      = ordenes_mes x (bench_cvr / cvr - 1)          # solo conversion
+          gmv_A          = pedidos_A x aov
+          pedidos_ambos  = ordenes_mes x (bench_traffic/traffic) x (bench_cvr/cvr) - ordenes_mes
+          gmv_extra_trafico = (pedidos_ambos x aov) - gmv_A             # lo adicional de tambien arreglar trafico
+
+    Mismo resguardo que ya se aplica en Disponibilidad (360 Action): si
+    ordenes_mes o aov vienen en 0, la formula da 0 pedidos/0 pesos sola,
+    sin necesitar un caso especial -- el insight simplemente no aporta
+    numero, pero el resto del texto (headline, comparacion vs benchmark)
+    se sigue mostrando igual. El parametro "gmv" queda en la firma solo
+    por compatibilidad con el call-site -- ya NO se usa para este calculo
+    (antes alimentaba la formula vieja de gmv_at_bench - gmv).
     """
     traffic_ok = bench_traffic > 0 and traffic > 0 and traffic >= bench_traffic * 0.85
     cvr_ok = bench_cvr > 0 and cvr > 0 and cvr >= bench_cvr * 0.85
@@ -3864,15 +3902,19 @@ def _funnel_diagnosis_interno(cvr, traffic, aov, gmv, bench_cvr, bench_traffic):
     traffic_disp = f"{traffic:,.0f}".replace(",", ".") if has_traffic else "s/d"
     bench_traffic_disp = f"{bench_traffic:,.0f}".replace(",", ".") if bench_traffic > 0 else "s/d"
 
-    # GMV incremental: cuanto sumaria si el CVR llegara al benchmark, con el
-    # trafico mensual real (semanal x4, igual que Growth OS).
-    traffic_monthly = traffic * 4 if has_traffic else 0
-    gmv_incremental = 0.0
-    if traffic_monthly > 0 and aov > 0 and bench_cvr > 0 and not cvr_above_bench:
-        gmv_at_bench = traffic_monthly * bench_cvr * aov
-        gmv_incremental = max(gmv_at_bench - gmv, 0)
+    def _incremental_por_cvr():
+        """pedidos/gmv incremental corrigiendo SOLO conversion (ratio vs bench_cvr)."""
+        if ordenes_mes > 0 and has_cvr and bench_cvr > 0 and cvr > 0:
+            pedidos = ordenes_mes * (bench_cvr / cvr - 1)
+            return pedidos, pedidos * aov
+        return 0.0, 0.0
 
-    lost_orders = round(traffic * max(bench_cvr - cvr, 0)) if (has_traffic and has_cvr and not cvr_ok) else 0
+    def _incremental_por_trafico():
+        """pedidos/gmv incremental corrigiendo SOLO trafico (ratio vs bench_traffic)."""
+        if ordenes_mes > 0 and has_traffic and bench_traffic > 0 and traffic > 0:
+            pedidos = ordenes_mes * (bench_traffic / traffic - 1)
+            return pedidos, pedidos * aov
+        return 0.0, 0.0
 
     if not has_traffic and not has_cvr:
         return {
@@ -3891,31 +3933,43 @@ def _funnel_diagnosis_interno(cvr, traffic, aov, gmv, bench_cvr, bench_traffic):
             "cvr_disp": cvr_disp, "bench_cvr_disp": bench_cvr_disp,
         }
     if not traffic_ok and not cvr_ok:
-        extra = f" Si llegaras al benchmark de conversión con el mismo tráfico, sumarías {fmt_ars(round(gmv_incremental))}/mes." if gmv_incremental > 0 else ""
-        perdidos = f"Combinados, pierdes {lost_orders} pedidos por semana. " if lost_orders > 0 else ""
+        # Problema doble: insight en 2 pasos (mas largo, pedido explicito
+        # de Sabas) -- primero solo conversion, despues el extra de
+        # tambien arreglar trafico.
+        pedidos_a, gmv_a = _incremental_por_cvr()
+        pedidos_ambos = 0.0
+        if ordenes_mes > 0 and has_traffic and has_cvr and bench_traffic > 0 and bench_cvr > 0 and traffic > 0 and cvr > 0:
+            pedidos_ambos = ordenes_mes * (bench_traffic / traffic) * (bench_cvr / cvr) - ordenes_mes
+        gmv_extra_trafico = max((pedidos_ambos * aov) - gmv_a, 0)
+        extra = (
+            f" Podrías acceder a ~{fmt_ars(round(gmv_a))} corrigiendo la conversión, "
+            f"y a ~{fmt_ars(round(gmv_extra_trafico))} más si corriges el tráfico también."
+            if gmv_a > 0 else ""
+        )
         return {
             "headline": "Problema doble", "color": "#EF4444",
             "texto": f"Dos frentes abiertos: tráfico de {traffic_disp} vs benchmark {bench_traffic_disp}, y conversión de {cvr_disp} vs {bench_cvr_disp}.{extra}",
-            "pitch": f"Dos frentes abiertos: tráfico de {traffic_disp} vs benchmark {bench_traffic_disp} y CVR de {cvr_disp} vs {bench_cvr_disp}. {perdidos}La prioridad es primero limpiar la tienda y después escalar tráfico — al revés es tirar plata.",
+            "pitch": f"Dos frentes abiertos: tráfico de {traffic_disp} vs benchmark {bench_traffic_disp} y CVR de {cvr_disp} vs {bench_cvr_disp}.{extra} La prioridad es primero limpiar la tienda y después escalar tráfico — al revés es tirar plata.",
             "traffic_disp": traffic_disp, "bench_traffic_disp": bench_traffic_disp,
             "cvr_disp": cvr_disp, "bench_cvr_disp": bench_cvr_disp,
         }
     if not traffic_ok:
-        extra = f" Si alcanzaras el benchmark de CVR con más tráfico, el incremental estimado sería {fmt_ars(round(gmv_incremental))}/mes." if gmv_incremental > 0 else ""
+        pedidos_t, gmv_t = _incremental_por_trafico()
+        extra = f" Si llegaras al benchmark de tráfico, sumarías ~{round(pedidos_t)} pedidos más al mes — eso son ~{fmt_ars(round(gmv_t))} adicionales." if gmv_t > 0 else ""
         return {
             "headline": "Problema: Tráfico", "color": "#F74D04",
             "texto": f"Tu conversión ({cvr_disp}) está sobre el benchmark ({bench_cvr_disp}), pero el tráfico ({traffic_disp}) está por debajo del benchmark de categoría ({bench_traffic_disp}).{extra}",
-            "pitch": f"Tu tienda convierte al {cvr_disp} — está por encima del promedio de tu categoría. El problema es que ves {traffic_disp} visitas por semana contra un benchmark de {bench_traffic_disp}. Más tráfico con esta tasa de conversión se convierte directo en pedidos.",
+            "pitch": f"Tu tienda convierte al {cvr_disp} — está por encima del promedio de tu categoría. El problema es que ves {traffic_disp} visitas por semana contra un benchmark de {bench_traffic_disp}.{extra}",
             "traffic_disp": traffic_disp, "bench_traffic_disp": bench_traffic_disp,
             "cvr_disp": cvr_disp, "bench_cvr_disp": bench_cvr_disp,
         }
     if not cvr_ok:
-        extra = f" Si llegas al benchmark, sumas {fmt_ars(round(gmv_incremental))}/mes con el mismo tráfico." if gmv_incremental > 0 else ""
-        perdidos = f"Eso son {lost_orders} pedidos por semana que se están perdiendo sin gastar un peso más en pauta." if lost_orders > 0 else "Con mejoras en menú y fotos ese CVR sube sin invertir más en pauta."
+        pedidos_c, gmv_c = _incremental_por_cvr()
+        extra = f" Si llegaras al benchmark de conversión, sumarías ~{round(pedidos_c)} pedidos más al mes — eso son ~{fmt_ars(round(gmv_c))} adicionales." if gmv_c > 0 else ""
         return {
             "headline": "Problema: Conversión", "color": "#F74D04",
             "texto": f"Tu tráfico ({traffic_disp}) está en línea con el benchmark ({bench_traffic_disp}), pero tu conversión ({cvr_disp}) está por debajo del promedio de categoría ({bench_cvr_disp}).{extra}",
-            "pitch": f"Tienes {traffic_disp} visitas por semana — el tráfico no es el problema. Pero tu tienda convierte al {cvr_disp} cuando el promedio de tu categoría es {bench_cvr_disp}. {perdidos}",
+            "pitch": f"Tienes {traffic_disp} visitas por semana — el tráfico no es el problema. Pero tu tienda convierte al {cvr_disp} cuando el promedio de tu categoría es {bench_cvr_disp}.{extra}",
             "traffic_disp": traffic_disp, "bench_traffic_disp": bench_traffic_disp,
             "cvr_disp": cvr_disp, "bench_cvr_disp": bench_cvr_disp,
         }
@@ -3928,7 +3982,7 @@ def _funnel_diagnosis_interno(cvr, traffic, aov, gmv, bench_cvr, bench_traffic):
     }
 
 
-def funnel_diagnosis(cvr, traffic, aov, gmv, bench_cvr, bench_traffic):
+def funnel_diagnosis(cvr, traffic, aov, gmv, bench_cvr, bench_traffic, ordenes_mes=0):
     """
     Wrapper público de _funnel_diagnosis_interno: agrega "cvr_above_bench"
     al resultado -- pedido explícito de Sabas (agosto 2026): la baldosa
@@ -3944,8 +3998,13 @@ def funnel_diagnosis(cvr, traffic, aov, gmv, bench_cvr, bench_traffic):
     (tolera hasta 15% por debajo como "ok"), pero la baldosa puntual de
     conversión debe reflejar la comparación real y exacta contra el
     benchmark, sin margen.
+
+    ordenes_mes (agosto 2026, sexto ajuste): nuevo parámetro, mismo dato
+    que ya usa Disponibilidad en 360 Action (row.ordenes) -- alimenta los
+    insights de incremental de pedidos/pesos, ver docstring de
+    _funnel_diagnosis_interno para el detalle de las 3 fórmulas.
     """
-    resultado = _funnel_diagnosis_interno(cvr, traffic, aov, gmv, bench_cvr, bench_traffic)
+    resultado = _funnel_diagnosis_interno(cvr, traffic, aov, gmv, bench_cvr, bench_traffic, ordenes_mes)
     resultado["cvr_above_bench"] = bool(cvr > 0 and bench_cvr > 0 and cvr >= bench_cvr)
     # traffic_above_bench (agosto 2026, séptima vuelta): mismo criterio
     # exacto (comparación directa, sin la tolerancia del 85% del

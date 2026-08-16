@@ -2487,7 +2487,7 @@ with tab_action:
 # ── TAB: ANALYTICS ──
 with tab_analytics:
     bench_cvr, bench_traffic = benchmarks.get(row.categoria, (0, 0))
-    diag = dl.funnel_diagnosis(row.cvr, row.traffic, row.aov, row.gmv, bench_cvr, bench_traffic)
+    diag = dl.funnel_diagnosis(row.cvr, row.traffic, row.aov, row.gmv, bench_cvr, bench_traffic, row.ordenes)
 
     # ── Funnel SVG: 3 niveles (Traffic benchmark / Traffic marca / Conversión) ──
     # Ajuste de color/mensaje por baldosa (agosto 2026, séptima vuelta,
