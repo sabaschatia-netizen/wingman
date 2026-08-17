@@ -1587,7 +1587,7 @@ def render_login():
         with col_logo:
             st.markdown(
                 f'<div class="login-logo-col">'
-                f'<div class="login-logo">{logo_img(96, full=True)}</div>'
+                f'<div class="login-logo">{logo_img(160, full=True)}</div>'
                 f'<div class="login-sub">Ingresa con tu correo y contraseña<br>de Rappi para ver tu cartera.</div>'
                 f"</div>",
                 unsafe_allow_html=True,

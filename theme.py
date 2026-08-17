@@ -92,7 +92,7 @@ def favicon():
 
 def build_css(login=False):
     LOGIN_CSS = (
-        f'[data-testid="stAppViewContainer"] {{'
+        f'.stApp, [data-testid="stAppViewContainer"] {{'
         f'  background: {COLORS["brand_orange"]} !important;'
         f'  min-height: 100vh; overflow-x: hidden;'
         f'}}'
@@ -107,8 +107,6 @@ def build_css(login=False):
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
 * {{ font-family: 'Poppins', sans-serif; }}
-
-{LOGIN_CSS}
 
 /* ── APP BACKGROUND — dark ── */
 .stApp {{
@@ -401,7 +399,13 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .login-box [data-testid="stHorizontalBlock"] {{
     display: flex !important; align-items: center !important;
 }}
-.login-logo-col, .login-form-col {{ display: flex; flex-direction: column; justify-content: center; }}
+.login-box [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+    display: flex !important; align-items: center !important; align-self: center !important;
+}}
+.login-box [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > div {{
+    width: 100%;
+}}
+.login-logo-col, .login-form-col {{ width: 100%; }}
 .login-logo {{ display: flex; justify-content: flex-start; margin-bottom: 22px; max-width: 100%; }}
 .login-logo img {{ max-width: 100%; height: auto; }}
 .login-title {{
@@ -890,5 +894,13 @@ div[data-testid="stDialog"] {{
 
 /* Ocultar chrome de Streamlit */
 #MainMenu, footer, header {{ visibility: hidden; }}
+
+/* LOGIN_CSS va AL FINAL del documento a propósito: con el mismo
+   !important en ambos lados, gana la regla que aparece ÚLTIMA en el
+   CSS, no la más específica. Antes se inyectaba arriba de todo, así
+   que la regla normal de fondo claro (.stApp / stAppViewContainer, un
+   poco más abajo en el archivo) la pisaba 2 líneas después -- por eso
+   el naranja nunca cubría toda la pantalla en el login. */
+{LOGIN_CSS}
 </style>
 """
