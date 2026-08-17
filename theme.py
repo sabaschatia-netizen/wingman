@@ -92,10 +92,14 @@ def favicon():
 
 def build_css(login=False):
     LOGIN_CSS = (
-        f'[data-testid="stAppViewContainer"] {{ background: {COLORS["brand_orange"]} !important; }}'
-        f'[data-testid="stAppViewContainer"] [data-testid="stMainBlockContainer"] {{'
-        f'  display: flex; align-items: center; min-height: 100vh;'
+        f'[data-testid="stAppViewContainer"] {{'
+        f'  background: {COLORS["brand_orange"]} !important;'
+        f'  min-height: 100vh; overflow-x: hidden;'
         f'}}'
+        f'[data-testid="stAppViewContainer"] [data-testid="stMainBlockContainer"] {{'
+        f'  display: flex; align-items: center; min-height: 100vh; overflow-x: hidden;'
+        f'}}'
+        f'html, body {{ overflow-x: hidden !important; }}'
         if login else ""
     )
     return f"""
@@ -398,7 +402,8 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     display: flex !important; align-items: center !important;
 }}
 .login-logo-col, .login-form-col {{ display: flex; flex-direction: column; justify-content: center; }}
-.login-logo {{ display: flex; justify-content: flex-start; margin-bottom: 22px; }}
+.login-logo {{ display: flex; justify-content: flex-start; margin-bottom: 22px; max-width: 100%; }}
+.login-logo img {{ max-width: 100%; height: auto; }}
 .login-title {{
     font-size: 26px; font-weight: 800; color: {COLORS["brand_white"]};
     letter-spacing: -0.6px; margin-bottom: 6px; text-align: left;
