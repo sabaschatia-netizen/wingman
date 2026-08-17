@@ -90,12 +90,21 @@ def favicon():
 # CSS
 # =========================
 
-def build_css():
+def build_css(login=False):
+    LOGIN_CSS = (
+        f'[data-testid="stAppViewContainer"] {{ background: {COLORS["brand_orange"]} !important; }}'
+        f'[data-testid="stAppViewContainer"] [data-testid="stMainBlockContainer"] {{'
+        f'  display: flex; align-items: center; min-height: 100vh;'
+        f'}}'
+        if login else ""
+    )
     return f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
 * {{ font-family: 'Poppins', sans-serif; }}
+
+{LOGIN_CSS}
 
 /* ── APP BACKGROUND — dark ── */
 .stApp {{
@@ -379,13 +388,52 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .tag-inactive {{ background: {COLORS["card2"]}; color: {COLORS["muted"]}; }}
 
 /* ── PANTALLA DE ENTRADA ── */
-.login-logo {{ display: flex; justify-content: center; margin-bottom: 16px; }}
-.login-title {{
-    font-size: 26px; font-weight: 800; color: {COLORS["text"]};
-    letter-spacing: -0.6px; margin-bottom: 6px;
+/* Fondo naranja sólido de página completa (pedido explícito de Sabas,
+   mismo tratamiento que ya se aplicó en Eagle con violeta): se activa
+   solo con build_css(login=True), ver LOGIN_CSS arriba -- así el resto
+   de la app (Gestión General, Buscador de Marcas, etc.) sigue con su
+   fondo claro normal sin que este bloque se filtre ahí. */
+.login-box {{ width: 100%; }}
+.login-box [data-testid="stHorizontalBlock"] {{
+    display: flex !important; align-items: center !important;
 }}
-.login-sub {{ font-size: 13px; color: {COLORS["muted"]}; line-height: 1.55; margin-bottom: 4px; }}
-.login-foot {{ font-size: 11.5px; color: {COLORS["text_disabled"]}; margin-top: 18px; line-height: 1.5; }}
+.login-logo-col, .login-form-col {{ display: flex; flex-direction: column; justify-content: center; }}
+.login-logo {{ display: flex; justify-content: flex-start; margin-bottom: 22px; }}
+.login-title {{
+    font-size: 26px; font-weight: 800; color: {COLORS["brand_white"]};
+    letter-spacing: -0.6px; margin-bottom: 6px; text-align: left;
+}}
+.login-sub {{ font-size: 15px; color: rgba(255,255,255,0.78); line-height: 1.6;
+    margin-bottom: 4px; text-align: left; max-width: 380px; }}
+.login-foot {{ font-size: 11.5px; color: rgba(255,255,255,0.55); margin-top: 18px; line-height: 1.5; }}
+/* Inputs y botones sobre fondo naranja -- fondo translúcido blanco, no
+   blanco sólido, para no competir visualmente con el logo (mismo
+   criterio que ya usa el sidebar de Wingman con su propio naranja).
+   Se agrandan (altura y tipografía) para que los campos tengan más
+   presencia junto al logo grande, igual que en Eagle. */
+.login-box .stTextInput input {{
+    background: rgba(255,255,255,0.14) !important; color: {COLORS["brand_white"]} !important;
+    border: 1px solid rgba(255,255,255,0.30) !important; border-radius: 10px !important;
+    padding: 14px 16px !important; font-size: 16px !important;
+}}
+.login-box .stTextInput label {{ color: {COLORS["brand_white"]} !important; font-size: 14px !important; }}
+.login-box .stButton button {{
+    background: {COLORS["brand_white"]} !important; color: {COLORS["brand_orange"]} !important;
+    border: none !important; font-weight: 700 !important;
+    padding: 12px 0 !important; font-size: 16px !important;
+}}
+.login-box .stButton button:hover {{ background: {COLORS["card2"]} !important; }}
+/* Los botones secundarios (type="secondary", el toggle Farmer/
+   Supervisor cuando no está activo) necesitan su propio contraste --
+   blanco translúcido, no blanco sólido, para distinguirse del botón
+   primario "Entrar". */
+.login-box .stButton button[kind="secondary"] {{
+    background: rgba(255,255,255,0.14) !important; color: {COLORS["brand_white"]} !important;
+    border: 1px solid rgba(255,255,255,0.30) !important;
+}}
+.login-box [data-testid="stAlert"] {{
+    background: rgba(255,255,255,0.14) !important; color: {COLORS["brand_white"]} !important;
+}}
 
 /* ── PILL DE SESIÓN EN SIDEBAR (estilo Growth OS) ── */
 /* OJO: .st-key-wingman-sidebar * fuerza color blanco a TODO lo que hay

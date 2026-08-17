@@ -26,7 +26,15 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-st.markdown(build_css(), unsafe_allow_html=True)
+# NOTA: build_css() se movió más abajo, después del gate de login (ver
+# `if "farmer" not in st.session_state: render_login(); st.stop()`).
+# Antes se llamaba acá arriba SIEMPRE, incondicional -- con el login
+# ahora inyectando su propio build_css(login=True) más abajo, quedaban
+# dos bloques <style> compitiendo (fondo claro normal + fondo naranja
+# de login) al mismo tiempo, y cuál "ganaba" dependía del orden de
+# aplicación en el DOM, no de una regla explícita. Ahora solo se carga
+# UN build_css() por render: el de login mientras no hay sesión, el
+# normal una vez adentro -- igual que ya se resolvió en Eagle.
 
 
 # =========================
@@ -1570,90 +1578,103 @@ if not VALID_EMAILS:
 
 
 def render_login():
-    _, mid, _ = st.columns([1, 1.15, 1])
+    st.markdown(build_css(login=True), unsafe_allow_html=True)
+    _, mid, _ = st.columns([1, 4, 1])
     with mid:
-        st.markdown(
-            f'<div style="text-align:center;padding-top:6vh;">'
-            f'<div class="login-logo">{logo_img(64, full=True)}</div>'
-            f'<div class="login-sub">Ingresa con tu correo y contraseña<br>de Rappi para ver tu cartera.</div>'
-            f"</div>",
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+        col_logo, col_form = st.columns([1.15, 1], gap="large")
 
-        # Selector de rol (agosto 2026): Fabián es supervisor de todo Cono
-        # Sur (AR+CL+UY juntos, ver SUPERVISOR_EMAILS), y solo entra como
-        # Supervisor -- no necesita tambien ver una cartera individual de
-        # Farmer (pedido explicito de Sabas). El resto del equipo solo ve
-        # el boton Farmer.
-        st.session_state.setdefault("login_role", "farmer")
-        rc1, rc2 = st.columns(2)
-        with rc1:
-            if st.button("👤 Farmer", use_container_width=True,
-                         type="primary" if st.session_state["login_role"] == "farmer" else "secondary"):
-                st.session_state["login_role"] = "farmer"
-                st.rerun()
-        with rc2:
-            if st.button("🧭 Supervisor", use_container_width=True,
-                         type="primary" if st.session_state["login_role"] == "supervisor" else "secondary"):
-                st.session_state["login_role"] = "supervisor"
-                st.rerun()
-
-        role = st.session_state["login_role"]
-
-        if role == "farmer":
-            email = st.text_input("Correo", placeholder="nombre.apellido@rappi.com")
-            password = st.text_input("Contraseña", type="password", placeholder="••••••••")
-            entrar = st.button("Entrar", type="primary", use_container_width=True)
-
-            if entrar:
-                clean = email.strip().lower()
-                if not clean or not password:
-                    st.warning("Completa correo y contraseña para continuar.")
-                elif clean not in VALID_EMAILS:
-                    st.error("Correo o contraseña incorrectos.")
-                elif not dl.check_password(clean, password):
-                    st.error("Correo o contraseña incorrectos.")
-                else:
-                    st.session_state["farmer"] = clean
-                    st.session_state["role"] = "farmer"
-                    st.session_state["view"] = "landing"
-                    dl.registrar_login(clean)
-                    st.rerun()
-        else:
-            # Supervisor: un solo correo autorizado (SUPERVISOR_EMAILS), sin
-            # selector libre de email -- evita que alguien intente entrar
-            # como "supervisor" con otro correo del equipo.
+        with col_logo:
             st.markdown(
-                '<div style="font-size:12.5px;color:var(--muted, #6B7280);margin:-4px 0 10px;">'
-                "Acceso de supervisor · todo Cono Sur (AR · CL · UY)</div>",
+                f'<div class="login-logo-col">'
+                f'<div class="login-logo">{logo_img(320, full=True)}</div>'
+                f'<div class="login-sub">Ingresa con tu correo y contraseña<br>de Rappi para ver tu cartera.</div>'
+                f"</div>",
                 unsafe_allow_html=True,
             )
-            password = st.text_input("Contraseña", type="password", placeholder="••••••••", key="sup_pw")
-            entrar_sup = st.button("Entrar como Supervisor", type="primary", use_container_width=True)
 
-            if entrar_sup:
-                sup_email = next(iter(dl.SUPERVISOR_EMAILS))
-                if not password:
-                    st.warning("Completa la contraseña para continuar.")
-                elif not dl.check_password(sup_email, password):
-                    st.error("Contraseña incorrecta.")
-                else:
-                    st.session_state["farmer"] = sup_email
-                    st.session_state["role"] = "supervisor"
-                    st.session_state["view"] = "landing"
-                    dl.registrar_login(sup_email)
+        with col_form:
+            st.markdown('<div class="login-form-col">', unsafe_allow_html=True)
+
+            # Selector de rol (agosto 2026): Fabián es supervisor de todo Cono
+            # Sur (AR+CL+UY juntos, ver SUPERVISOR_EMAILS), y solo entra como
+            # Supervisor -- no necesita tambien ver una cartera individual de
+            # Farmer (pedido explicito de Sabas). El resto del equipo solo ve
+            # el boton Farmer.
+            st.session_state.setdefault("login_role", "farmer")
+            rc1, rc2 = st.columns(2)
+            with rc1:
+                if st.button("👤 Farmer", use_container_width=True,
+                             type="primary" if st.session_state["login_role"] == "farmer" else "secondary"):
+                    st.session_state["login_role"] = "farmer"
+                    st.rerun()
+            with rc2:
+                if st.button("🧭 Supervisor", use_container_width=True,
+                             type="primary" if st.session_state["login_role"] == "supervisor" else "secondary"):
+                    st.session_state["login_role"] = "supervisor"
                     st.rerun()
 
-        st.markdown(
-            f'<div class="login-foot" style="text-align:center;">'
-            f"{len(VALID_EMAILS)} Farmers con cartera activa · Datos de julio 2026</div>",
-            unsafe_allow_html=True,
-        )
+            role = st.session_state["login_role"]
+
+            if role == "farmer":
+                email = st.text_input("Correo", placeholder="nombre.apellido@rappi.com")
+                password = st.text_input("Contraseña", type="password", placeholder="••••••••")
+                entrar = st.button("Entrar", type="primary", use_container_width=True)
+
+                if entrar:
+                    clean = email.strip().lower()
+                    if not clean or not password:
+                        st.warning("Completa correo y contraseña para continuar.")
+                    elif clean not in VALID_EMAILS:
+                        st.error("Correo o contraseña incorrectos.")
+                    elif not dl.check_password(clean, password):
+                        st.error("Correo o contraseña incorrectos.")
+                    else:
+                        st.session_state["farmer"] = clean
+                        st.session_state["role"] = "farmer"
+                        st.session_state["view"] = "landing"
+                        dl.registrar_login(clean)
+                        st.rerun()
+            else:
+                # Supervisor: un solo correo autorizado (SUPERVISOR_EMAILS), sin
+                # selector libre de email -- evita que alguien intente entrar
+                # como "supervisor" con otro correo del equipo.
+                st.markdown(
+                    '<div style="font-size:12.5px;color:rgba(255,255,255,0.65);margin:-4px 0 10px;">'
+                    "Acceso de supervisor · todo Cono Sur (AR · CL · UY)</div>",
+                    unsafe_allow_html=True,
+                )
+                password = st.text_input("Contraseña", type="password", placeholder="••••••••", key="sup_pw")
+                entrar_sup = st.button("Entrar como Supervisor", type="primary", use_container_width=True)
+
+                if entrar_sup:
+                    sup_email = next(iter(dl.SUPERVISOR_EMAILS))
+                    if not password:
+                        st.warning("Completa la contraseña para continuar.")
+                    elif not dl.check_password(sup_email, password):
+                        st.error("Contraseña incorrecta.")
+                    else:
+                        st.session_state["farmer"] = sup_email
+                        st.session_state["role"] = "supervisor"
+                        st.session_state["view"] = "landing"
+                        dl.registrar_login(sup_email)
+                        st.rerun()
+
+            st.markdown(
+                f'<div class="login-foot">'
+                f"{len(VALID_EMAILS)} Farmers con cartera activa · Datos de julio 2026</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 if "farmer" not in st.session_state:
     render_login()
     st.stop()
+
+st.markdown(build_css(), unsafe_allow_html=True)
 
 selected = st.session_state["farmer"]
 st.session_state.setdefault("view", "landing")
