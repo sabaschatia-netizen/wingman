@@ -2237,11 +2237,33 @@ def _effective_start_of_month(d):
     return latest.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
-def _pace_dias_habiles(start_of_month):
+# Feriados NACIONALES que caen en día hábil (L-V) y por lo tanto hay que
+# restar del conteo -- pedido explícito de Sabas (agosto 2026, séptimo
+# ajuste): "17 de agosto fue feriado en Argentina, no hábil, rompe las
+# cuentas". Por país -- Wingman opera Cono Sur (AR/CL/UY) y NO todos
+# comparten el mismo feriado el mismo día (confirmado explícito: "rómpelo
+# SOLO para Argentina"). Si en algún momento hace falta un feriado de
+# CL o UY, se agrega como una clave más de este mismo dict, sin tocar
+# la lógica de _pace_dias_habiles.
+FERIADOS_POR_PAIS = {
+    "AR": {
+        pd.Timestamp("2026-08-17"),  # Paso a la Inmortalidad del Gral. San Martín (trasladado)
+    },
+}
+
+
+def _pace_dias_habiles(start_of_month, pais=None):
     """
-    Días hábiles (lunes a viernes) transcurridos y totales del mes de
-    start_of_month -- para la barra de "Pace" de Contact Performance
-    (pedido explícito de Sabas, agosto 2026).
+    Días hábiles (lunes a viernes, menos feriados nacionales de
+    FERIADOS_POR_PAIS) transcurridos y totales del mes de start_of_month
+    -- para la barra de "Pace" de Contact Performance (pedido explícito
+    de Sabas, agosto 2026).
+
+    `pais` (nuevo, séptimo ajuste): si se pasa, se restan del conteo los
+    feriados de FERIADOS_POR_PAIS[pais] que caigan en el rango. Sin
+    `pais` (default None), el comportamiento es igual que antes de este
+    ajuste -- L-V puro, sin feriados -- para no romper ningún call-site
+    que todavía no pasa el país explícito.
 
     "Transcurridos" cuenta hasta AYER, no hasta hoy -- pedido explícito
     de Sabas (agosto 2026, sexto ajuste): "el día de hoy no cuenta como
@@ -2274,10 +2296,18 @@ def _pace_dias_habiles(start_of_month):
     fin_mes = (start_of_month + pd.offsets.MonthEnd(0)).normalize()
     es_mes_actual = start_of_month.year == hoy.year and start_of_month.month == hoy.month
 
-    totales = len(pd.bdate_range(start_of_month, fin_mes))
+    feriados = FERIADOS_POR_PAIS.get(pais, set()) if pais else set()
+
+    def _bdate_range_sin_feriados(desde, hasta):
+        rango = pd.bdate_range(desde, hasta)
+        if feriados:
+            rango = rango[~rango.isin(feriados)]
+        return rango
+
+    totales = len(_bdate_range_sin_feriados(start_of_month, fin_mes))
     if es_mes_actual:
         limite = min(ayer, fin_mes)
-        transcurridos = len(pd.bdate_range(start_of_month, limite)) if limite >= start_of_month else 0
+        transcurridos = len(_bdate_range_sin_feriados(start_of_month, limite)) if limite >= start_of_month else 0
         transcurridos = max(transcurridos, 1)  # minimo 1 -- evita division por cero el primer dia habil del mes
     else:
         transcurridos = totales
@@ -2457,7 +2487,7 @@ def _dias_habiles_totales_mes():
     segundo valor (totales), no el de transcurridos.
     """
     inicio_mes = pd.Timestamp.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    _, totales = _pace_dias_habiles(inicio_mes)
+    _, totales = _pace_dias_habiles(inicio_mes, pais=PAIS)
     return totales
 
 
@@ -2892,7 +2922,9 @@ def adquisicion_ads_for(farmer_emails):
         adq_n = _checkout_count_for(farmer_emails, "adquisicion")
 
         inicio_mes = pd.Timestamp.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        transcurridos, totales = _pace_dias_habiles(inicio_mes)
+        primer_email = farmer_emails if isinstance(farmer_emails, str) else next(iter(farmer_emails), None)
+        pais = farmer_pais(primer_email) if primer_email else PAIS
+        transcurridos, totales = _pace_dias_habiles(inicio_mes, pais=pais)
         adq_pct = (adq_n / transcurridos) * totales / target * 100 if target > 0 else 0.0
 
         return {"adq_n": adq_n, "adq_target": target, "adq_pct": adq_pct}
@@ -2927,7 +2959,9 @@ def upselling_ads_for(farmer_emails):
         ups_n = _checkout_count_for(farmer_emails, "upsell")
 
         inicio_mes = pd.Timestamp.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        transcurridos, totales = _pace_dias_habiles(inicio_mes)
+        primer_email = farmer_emails if isinstance(farmer_emails, str) else next(iter(farmer_emails), None)
+        pais = farmer_pais(primer_email) if primer_email else PAIS
+        transcurridos, totales = _pace_dias_habiles(inicio_mes, pais=pais)
         ups_pct = (ups_n / transcurridos) * totales / target * 100 if target > 0 else 0.0
 
         return {"ups_n": ups_n, "ups_target": target, "ups_pct": ups_pct}
@@ -3321,7 +3355,7 @@ def comision_ads_proyectada_for(farmer_email):
         d_prod = prod[prod["farmer"] == email_norm] if not prod.empty else prod
         if not d_prod.empty:
             start_of_month = _effective_start_of_month(d_prod)
-            dias_transcurridos, dias_totales = _pace_dias_habiles(start_of_month)
+            dias_transcurridos, dias_totales = _pace_dias_habiles(start_of_month, pais=farmer_pais(farmer_email))
             if dias_transcurridos > 0:
                 proyeccion_contactos = cp["total_effective"] / dias_transcurridos * dias_totales
                 contactos_pace_pct = proyeccion_contactos / target_contactos * 100
@@ -3472,7 +3506,9 @@ def contact_performance_for(farmer_emails):
         meets = int(eff["medio"].str.contains("videoconferencia|videoconf|video", na=False).sum())
 
         total_effective = len(eff)
-        dias_transcurridos, dias_totales = _pace_dias_habiles(start_of_month)
+        primer_email = farmer_emails if isinstance(farmer_emails, str) else next(iter(farmer_emails), None)
+        pais = farmer_pais(primer_email) if primer_email else PAIS
+        dias_transcurridos, dias_totales = _pace_dias_habiles(start_of_month, pais=pais)
         target = target_for(farmer_emails)
         pace_pct = None
         if target > 0 and dias_transcurridos > 0:
