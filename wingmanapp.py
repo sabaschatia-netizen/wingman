@@ -1619,7 +1619,7 @@ def render_login():
             if role == "farmer":
                 email = st.text_input("Correo", placeholder="nombre.apellido@rappi.com")
                 password = st.text_input("Contraseña", type="password", placeholder="••••••••")
-                entrar = st.button("Entrar", type="primary", use_container_width=True)
+                entrar = st.button("Entrar", type="primary", use_container_width=True, key="login_submit")
 
                 if entrar:
                     clean = email.strip().lower()
@@ -1645,7 +1645,7 @@ def render_login():
                     unsafe_allow_html=True,
                 )
                 password = st.text_input("Contraseña", type="password", placeholder="••••••••", key="sup_pw")
-                entrar_sup = st.button("Entrar como Supervisor", type="primary", use_container_width=True)
+                entrar_sup = st.button("Entrar como Supervisor", type="primary", use_container_width=True, key="login_submit_sup")
 
                 if entrar_sup:
                     sup_email = next(iter(dl.SUPERVISOR_EMAILS))

@@ -466,6 +466,24 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     background: {COLORS["brand_purple_soft"]} !important;
     color: {COLORS["brand_white"]} !important;
 }}
+
+/* Botón de submit del login ("Entrar" / "Entrar como Supervisor") --
+   pedido explícito de Sabas: blanco, no naranja (con el naranja
+   genérico, quedaba casi invisible contra el fondo también naranja del
+   login). Mismo criterio de key específica que el toggle, para no
+   afectar el resto de los botones primary de la app (ej. el de
+   Gestión General, que sigue naranja). */
+.st-key-login_submit .stButton button[kind="primary"],
+.st-key-login_submit_sup .stButton button[kind="primary"] {{
+    background: {COLORS["brand_white"]} !important;
+    color: {COLORS["brand_orange"]} !important;
+    border: none !important; font-weight: 800 !important;
+}}
+.st-key-login_submit .stButton button[kind="primary"]:hover,
+.st-key-login_submit_sup .stButton button[kind="primary"]:hover {{
+    background: {COLORS["card2"]} !important;
+    color: {COLORS["brand_orange"]} !important;
+}}
 .login-box [data-testid="stAlert"] {{
     background: rgba(255,255,255,0.14) !important; color: {COLORS["brand_white"]} !important;
 }}
