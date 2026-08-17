@@ -1604,12 +1604,12 @@ def render_login():
             st.session_state.setdefault("login_role", "farmer")
             rc1, rc2 = st.columns(2)
             with rc1:
-                if st.button("👤 Farmer", use_container_width=True,
+                if st.button("👤 Farmer", use_container_width=True, key="login_toggle_farmer",
                              type="primary" if st.session_state["login_role"] == "farmer" else "secondary"):
                     st.session_state["login_role"] = "farmer"
                     st.rerun()
             with rc2:
-                if st.button("🧭 Supervisor", use_container_width=True,
+                if st.button("🧭 Supervisor", use_container_width=True, key="login_toggle_supervisor",
                              type="primary" if st.session_state["login_role"] == "supervisor" else "secondary"):
                     st.session_state["login_role"] = "supervisor"
                     st.rerun()

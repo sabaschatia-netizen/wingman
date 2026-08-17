@@ -397,10 +397,10 @@ section[data-testid="stMain"] .stMainBlockContainer {{
    fondo claro normal sin que este bloque se filtre ahí. */
 .login-box {{ width: 100%; }}
 .login-box [data-testid="stHorizontalBlock"] {{
-    display: flex !important; align-items: center !important;
+    display: flex !important; align-items: flex-start !important;
 }}
 .login-box [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
-    display: flex !important; align-items: center !important; align-self: center !important;
+    display: flex !important; align-items: flex-start !important; align-self: flex-start !important;
 }}
 .login-box [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > div {{
     width: 100%;
@@ -436,9 +436,35 @@ section[data-testid="stMain"] .stMainBlockContainer {{
    Supervisor cuando no está activo) necesitan su propio contraste --
    blanco translúcido, no blanco sólido, para distinguirse del botón
    primario "Entrar". */
-.login-box .stButton button[kind="secondary"] {{
-    background: rgba(255,255,255,0.14) !important; color: {COLORS["brand_white"]} !important;
-    border: 1px solid rgba(255,255,255,0.30) !important;
+/* Toggle Farmer/Supervisor: pedido explícito de Sabas -- BLANCO cuando
+   está seleccionado (kind="primary"), MORADO cuando no (kind=
+   "secondary") -- antes se veía al revés (morado sólido cuando activo).
+   Apunta a las keys específicas del toggle (.st-key-login_toggle_*), NO
+   a ".login-box .stButton button[kind=...]" en general -- el botón
+   "Entrar" TAMBIÉN es kind="primary" y vive en la misma .login-box; una
+   regla genérica lo hubiera pintado blanco también, sin que se pidiera.
+   Con la key, el cambio queda aislado al toggle. */
+.st-key-login_toggle_farmer .stButton button[kind="primary"],
+.st-key-login_toggle_supervisor .stButton button[kind="primary"] {{
+    background: {COLORS["brand_white"]} !important;
+    color: {COLORS["brand_orange"]} !important;
+    border: none !important; font-weight: 800 !important;
+}}
+.st-key-login_toggle_farmer .stButton button[kind="primary"]:hover,
+.st-key-login_toggle_supervisor .stButton button[kind="primary"]:hover {{
+    background: {COLORS["card2"]} !important;
+    color: {COLORS["brand_orange"]} !important;
+}}
+.st-key-login_toggle_farmer .stButton button[kind="secondary"],
+.st-key-login_toggle_supervisor .stButton button[kind="secondary"] {{
+    background: {COLORS["brand_purple"]} !important;
+    color: {COLORS["brand_white"]} !important;
+    border: 1px solid {COLORS["brand_purple"]} !important;
+}}
+.st-key-login_toggle_farmer .stButton button[kind="secondary"]:hover,
+.st-key-login_toggle_supervisor .stButton button[kind="secondary"]:hover {{
+    background: {COLORS["brand_purple_soft"]} !important;
+    color: {COLORS["brand_white"]} !important;
 }}
 .login-box [data-testid="stAlert"] {{
     background: rgba(255,255,255,0.14) !important; color: {COLORS["brand_white"]} !important;
