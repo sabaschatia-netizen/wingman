@@ -2604,6 +2604,52 @@ with tab_analytics:
         for label, val, color, _, _ in levels
     )
 
+    # ── Comparativo vs mes anterior (Tráfico arriba / Conversión abajo) ──
+    # Nuevo (septiembre 2026, pedido explícito de Sabas): la otra mitad de
+    # la super-card, junto al funnel. Usa cvr_delta/traffic_delta -- la
+    # columna "vs LM (%)" que las hojas CVR%/TRAFFIC ya traían y portfolio_
+    # for() ya cargaba en row.cvr_delta/row.traffic_delta, pero que hasta
+    # ahora ningún lugar de la UI mostraba. "Mes anterior" es tal cual lo
+    # que diga esa columna del Excel (LM = Last Month respecto al mes que
+    # esa hoja tenga cargado) -- no se valida ni se muestra qué mes
+    # calendario es, decision explicita de Sabas.
+    def _mini_delta_bar(icon, label, valor_disp, delta_frac, tiene_dato):
+        if not tiene_dato:
+            return (
+                f'<div class="mini-delta-row">'
+                f'<div class="mini-delta-head"><span>{icon} {label}</span>'
+                f'<span class="mini-delta-val">s/d</span></div>'
+                f'<div class="mini-delta-sub">Sin dato para comparar.</div>'
+                f"</div>"
+            )
+        color = COLORS["success"] if delta_frac >= 0 else COLORS["danger"]
+        arrow = "▲" if delta_frac >= 0 else "▼"
+        # Barra: 50% = sin cambio: crece a la derecha si sube, a la
+        # izquierda si baja, con +-50% como magnitud maxima visual (un
+        # cambio mayor solo satura la barra, no la desborda).
+        pct_visual = max(-50, min(50, delta_frac * 100))
+        bar_w = abs(pct_visual)
+        bar_left = 50 if delta_frac >= 0 else 50 - bar_w
+        return (
+            f'<div class="mini-delta-row">'
+            f'<div class="mini-delta-head"><span>{icon} {label}</span>'
+            f'<span class="mini-delta-val" style="color:{color};">{arrow} {abs(delta_frac) * 100:.0f}%</span></div>'
+            f'<div class="mini-delta-track">'
+            f'<div class="mini-delta-mid"></div>'
+            f'<div class="mini-delta-fill" style="left:{bar_left:.1f}%;width:{bar_w:.1f}%;background:{color};"></div>'
+            f"</div>"
+            f'<div class="mini-delta-sub">{valor_disp} actual · vs mes anterior</div>'
+            f"</div>"
+        )
+
+    comparativo_html = (
+        '<div class="comparativo-card">'
+        '<div class="funnel-label">📊 Tráfico &amp; Conversión vs mes anterior</div>'
+        + _mini_delta_bar("🚦", "Tráfico", diag["traffic_disp"] + "/sem", row.traffic_delta, row.traffic > 0)
+        + _mini_delta_bar("🎯", "Conversión", diag["cvr_disp"], row.cvr_delta, row.cvr > 0)
+        + "</div>"
+    )
+
     # ── Dato Ancla + Benchmark: se calculan por GMV, no por AOV (mismo criterio
     # que Growth OS: percentil = cuantas marcas de la cartera tienen menos GMV;
     # benchmark = la marca con mayor GMV de la categoria). ──
@@ -2643,13 +2689,16 @@ with tab_analytics:
 
     st.markdown(
         f'<div class="analytics-supercard">'
-        f'<div class="funnel-card">'
+        f'<div class="funnel-comparativo-grid">'
+        f'<div class="funnel-card" style="margin-bottom:0;">'
         f'<div class="funnel-label">🔍 Funnel Tráfico &amp; Conversión vs Benchmark</div>'
         f'<div class="funnel-headline" style="color:{diag["color"]};">{diag["headline"]}</div>'
         f'<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;">'
         f'<div>{funnel_svg}</div><div>{funnel_legend}</div>'
         f"</div>"
         f'<div class="funnel-texto">{diag["texto"]}</div>'
+        f"</div>"
+        f"{comparativo_html}"
         f"</div>"
         f"{ancla_html}"
         f"</div>",

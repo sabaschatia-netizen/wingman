@@ -702,6 +702,41 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 
 .analytics-mini-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }}
 
+/* ── ANALYTICS: grid funnel (izq) + comparativo vs mes anterior (der) ──
+   Nuevo (septiembre 2026, pedido explícito de Sabas): la super-card ya
+   no es solo el funnel apilado sobre Dato Ancla/Benchmark -- ahora tiene
+   2 mitades lado a lado: funnel a la izquierda, comparativo de Tráfico/
+   Conversión vs mes anterior a la derecha. En pantallas angostas colapsa
+   a 1 columna (mobile / sidebar abierto), igual criterio que el resto de
+   grids de la app. */
+.funnel-comparativo-grid {{
+    display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px;
+    align-items: stretch; margin-bottom: 14px;
+}}
+@media (max-width: 900px) {{
+    .funnel-comparativo-grid {{ grid-template-columns: 1fr; }}
+}}
+.comparativo-card {{
+    background: {COLORS["card2"]}; border-radius: 14px; padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 16px; justify-content: center;
+}}
+.mini-delta-row {{ display: flex; flex-direction: column; gap: 5px; }}
+.mini-delta-head {{
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; font-weight: 700; color: {COLORS["text"]};
+}}
+.mini-delta-val {{ font-size: 13px; font-weight: 800; }}
+.mini-delta-track {{
+    position: relative; height: 7px; border-radius: 999px;
+    background: {COLORS["border"]}; overflow: hidden;
+}}
+.mini-delta-mid {{
+    position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px;
+    background: {COLORS["text_disabled"]}; z-index: 1;
+}}
+.mini-delta-fill {{ position: absolute; top: 0; bottom: 0; border-radius: 999px; }}
+.mini-delta-sub {{ font-size: 10.5px; color: {COLORS["muted"]}; }}
+
 /* ── 360° ACTION: card de contexto + super-card de 4 palancas ── */
 .action-context-card {{
     background: {COLORS["card2"]};

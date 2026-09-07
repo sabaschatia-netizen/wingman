@@ -3934,18 +3934,41 @@ def portfolio_for(farmer_email):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def category_benchmarks():
-    """{categoria: (cvr_promedio, traffic_promedio)} sobre marcas con categoria."""
-    asig, ltor = load_asignacion(), load_ltor()
-    if asig.empty or ltor.empty:
+    """
+    {categoria: (cvr_promedio, traffic_promedio)} sobre marcas con categoria.
+
+    Reescrita por completo (septiembre 2026, bug real corregido): antes
+    cruzaba ASIGNACION + LTOR (categoria via load_ltor(), que lee la hoja
+    MD NAMES buscando columnas "Brand Name"/"LTOR Class"/"Category"). El
+    export de MD NAMES cambio de formato -- ya no trae esas columnas (hoy
+    trae Country/Category/Campaign ID/Name/Segment/Tier Classification,
+    donde "Name" es el nombre de la CAMPAÑA de MD, no el de la marca) --
+    asi que load_ltor() venia devolviendo SIEMPRE vacio, y category_
+    benchmarks() cortaba en el primer if devolviendo {} para TODAS las
+    categorias (reportado por Sabas: "Tráfico benchmark categoría: s/d"
+    en una marca que sí tenía tráfico real cargado).
+
+    Fix: usa la categoria de DETALLE (via brand_name_detalle -> nkey), la
+    misma fuente que portfolio_for() ya usa como "mas confiable" para
+    categoria (ver comentario en portfolio_for: "DETALLE trae categoria
+    mas confiable -- mismo mes que GMV -- que MD NAMES"). Bench sobre
+    TODO el universo de marcas con dato (no solo la cartera de un
+    farmer), igual que antes.
+    """
+    det = load_detalle()
+    if det.empty or "categoria_detalle" not in det.columns:
         return {}
 
-    df = asig.merge(ltor, on="nkey", how="inner")
+    df = det[det["brand_name_detalle"].astype(str).str.strip() != ""].copy()
+    df["nkey"] = df["brand_name_detalle"].apply(name_key)
+    df = df[df["nkey"] != ""]
+
     for src in (load_cvr(), load_traffic()):
         if not src.empty:
             df = df.merge(src, on="nkey", how="left")
 
     out = {}
-    for cat, g in df.groupby("categoria"):
+    for cat, g in df.groupby("categoria_detalle"):
         if not str(cat).strip():
             continue
         c = g["cvr"][g["cvr"] > 0] if "cvr" in g else pd.Series(dtype=float)
