@@ -4151,6 +4151,64 @@ def funnel_diagnosis(cvr, traffic, aov, gmv, bench_cvr, bench_traffic, ordenes_m
     return resultado
 
 
+def incremental_vs_mes_anterior(traffic, traffic_delta, cvr, cvr_delta, aov, ordenes_mes):
+    """
+    Pedidos/GMV incremental si NO se hubiera perdido tráfico y/o conversión
+    vs el MES ANTERIOR (no vs benchmark de categoría -- para eso está
+    _incremental_por_trafico/_incremental_por_cvr dentro de
+    _funnel_diagnosis_interno, que alimentan la card del Funnel).
+
+    Mismo mecanismo exacto que esas dos funciones (mismo resguardo: si
+    ordenes_mes o aov vienen en 0, o no hay delta valido, da 0 sin caso
+    especial), pero la referencia es el valor de HACE UN MES (derivado de
+    traffic_delta/cvr_delta, que ya vienen del "vs LM (%)" de las hojas
+    TRAFFIC/CVR%), no el benchmark de categoria (pedido explicito de
+    Sabas, septiembre 2026 -- card "Tráfico & Conversión vs mes
+    anterior").
+
+    Solo tiene sentido corregir una caida (delta < 0) -- si el mes subio,
+    no hay "pedidos perdidos" que recuperar, ese caso da 0 pesos/pedidos
+    (la card ya muestra la suba en verde, no necesita ademas un numero
+    de incremental que no aplica).
+
+    valor_anterior se despeja de: valor_actual = valor_anterior * (1 + delta)
+    -> valor_anterior = valor_actual / (1 + delta). Si delta <= -1 (caida
+    del 100% o mas, ej. cvr_delta=-1.0 cuando la marca se quedo sin CVR
+    esta semana), el despeje no es fiable (division por cero o valor
+    anterior negativo) -- se resguarda devolviendo 0 en vez de un numero
+    inventado.
+
+    Devuelve dict: pedidos_trafico, gmv_trafico, pedidos_cvr, gmv_cvr,
+    traffic_anterior, cvr_anterior (estos dos ultimos, 0.0 si no se
+    pudieron calcular -- ver resguardo arriba).
+    """
+    def _valor_anterior(valor_actual, delta):
+        if valor_actual > 0 and delta is not None and delta > -1:
+            return valor_actual / (1 + delta)
+        return 0.0
+
+    def _incremental(valor_actual, valor_anterior):
+        if ordenes_mes > 0 and valor_actual > 0 and valor_anterior > valor_actual:
+            pedidos = ordenes_mes * (valor_anterior / valor_actual - 1)
+            return pedidos, pedidos * aov
+        return 0.0, 0.0
+
+    traffic_anterior = _valor_anterior(traffic, traffic_delta)
+    cvr_anterior = _valor_anterior(cvr, cvr_delta)
+
+    pedidos_trafico, gmv_trafico = _incremental(traffic, traffic_anterior)
+    pedidos_cvr, gmv_cvr = _incremental(cvr, cvr_anterior)
+
+    return {
+        "traffic_anterior": traffic_anterior,
+        "cvr_anterior": cvr_anterior,
+        "pedidos_trafico": pedidos_trafico,
+        "gmv_trafico": gmv_trafico,
+        "pedidos_cvr": pedidos_cvr,
+        "gmv_cvr": gmv_cvr,
+    }
+
+
 # ── Campaign Designer ──
 ADS_CPC_ARS = 950            # costo por clic/visita
 ADS_EROSION_SEMANAL = 0.08   # erosion de conversion por semana en el blend a 4 semanas -- constante

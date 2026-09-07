@@ -736,6 +736,10 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 }}
 .mini-delta-fill {{ position: absolute; top: 0; bottom: 0; border-radius: 999px; }}
 .mini-delta-sub {{ font-size: 10.5px; color: {COLORS["muted"]}; }}
+.mini-delta-incremental {{
+    font-size: 10.5px; color: {COLORS["brand_orange"]}; font-weight: 600;
+    line-height: 1.4; margin-top: 2px;
+}}
 
 /* ── 360° ACTION: card de contexto + super-card de 4 palancas ── */
 .action-context-card {{

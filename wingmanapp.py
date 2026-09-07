@@ -2613,7 +2613,7 @@ with tab_analytics:
     # que diga esa columna del Excel (LM = Last Month respecto al mes que
     # esa hoja tenga cargado) -- no se valida ni se muestra qué mes
     # calendario es, decision explicita de Sabas.
-    def _mini_delta_bar(icon, label, valor_disp, delta_frac, tiene_dato):
+    def _mini_delta_bar(icon, label, valor_disp, delta_frac, tiene_dato, valor_anterior_disp="", incremental_texto=""):
         if not tiene_dato:
             return (
                 f'<div class="mini-delta-row">'
@@ -2630,6 +2630,16 @@ with tab_analytics:
         pct_visual = max(-50, min(50, delta_frac * 100))
         bar_w = abs(pct_visual)
         bar_left = 50 if delta_frac >= 0 else 50 - bar_w
+        # Subtitulo: agosto 2026 solo mostraba "245/sem actual · vs mes
+        # anterior", sin decir cuanto fue el mes anterior -- pedido
+        # explicito de Sabas (septiembre 2026): agregar el valor anterior
+        # calculado (ver dl.incremental_vs_mes_anterior).
+        sub = f"{valor_disp} actual"
+        if valor_anterior_disp:
+            sub += f" · {valor_anterior_disp} mes anterior"
+        incremental_html = (
+            f'<div class="mini-delta-incremental">{incremental_texto}</div>' if incremental_texto else ""
+        )
         return (
             f'<div class="mini-delta-row">'
             f'<div class="mini-delta-head"><span>{icon} {label}</span>'
@@ -2638,15 +2648,41 @@ with tab_analytics:
             f'<div class="mini-delta-mid"></div>'
             f'<div class="mini-delta-fill" style="left:{bar_left:.1f}%;width:{bar_w:.1f}%;background:{color};"></div>'
             f"</div>"
-            f'<div class="mini-delta-sub">{valor_disp} actual · vs mes anterior</div>'
+            f'<div class="mini-delta-sub">{sub}</div>'
+            f"{incremental_html}"
             f"</div>"
         )
+
+    # Incremental vs mes anterior (septiembre 2026, pedido explicito de
+    # Sabas): "cuanto hubieramos tenido en pedidos si no hubieramos
+    # perdido ese trafico/esa conversion" -- espejo de los insights del
+    # Funnel (_incremental_por_trafico/_incremental_por_cvr), pero contra
+    # el mes anterior en vez del benchmark de categoria.
+    inc = dl.incremental_vs_mes_anterior(row.traffic, row.traffic_delta, row.cvr, row.cvr_delta, row.aov, row.ordenes)
+
+    traffic_anterior_disp = (
+        f"{inc['traffic_anterior']:,.0f}".replace(",", ".") + "/sem" if inc["traffic_anterior"] > 0 else ""
+    )
+    cvr_anterior_disp = f"{inc['cvr_anterior'] * 100:.1f}%" if inc["cvr_anterior"] > 0 else ""
+
+    traffic_incremental_txt = (
+        f"Si no hubieras perdido tráfico, ~{round(inc['pedidos_trafico'])} pedidos más "
+        f"({dl.fmt_money(round(inc['gmv_trafico']), CURRENCY)}) este mes."
+        if inc["gmv_trafico"] > 0 else ""
+    )
+    cvr_incremental_txt = (
+        f"Si no hubieras perdido conversión, ~{round(inc['pedidos_cvr'])} pedidos más "
+        f"({dl.fmt_money(round(inc['gmv_cvr']), CURRENCY)}) este mes."
+        if inc["gmv_cvr"] > 0 else ""
+    )
 
     comparativo_html = (
         '<div class="comparativo-card">'
         '<div class="funnel-label">📊 Tráfico &amp; Conversión vs mes anterior</div>'
-        + _mini_delta_bar("🚦", "Tráfico", diag["traffic_disp"] + "/sem", row.traffic_delta, row.traffic > 0)
-        + _mini_delta_bar("🎯", "Conversión", diag["cvr_disp"], row.cvr_delta, row.cvr > 0)
+        + _mini_delta_bar("🚦", "Tráfico", diag["traffic_disp"] + "/sem", row.traffic_delta, row.traffic > 0,
+                           valor_anterior_disp=traffic_anterior_disp, incremental_texto=traffic_incremental_txt)
+        + _mini_delta_bar("🎯", "Conversión", diag["cvr_disp"], row.cvr_delta, row.cvr > 0,
+                           valor_anterior_disp=cvr_anterior_disp, incremental_texto=cvr_incremental_txt)
         + "</div>"
     )
 
