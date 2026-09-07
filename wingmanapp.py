@@ -338,31 +338,49 @@ def gauge_card(pct, name, tag, sub=""):
     )
 
 
-def _trend_sparkline(prev, curr):
-    """Mini grafico SVG de 2 puntos: Anterior -> Actual. Mismo lenguaje visual
-    que Growth OS (linea con puntos), pero con solo 2 periodos reales -- no se
-    inventa un tercer punto ("Mayo") que no existe en la data disponible."""
-    prev, curr = max(prev, 0), max(curr, 0)
-    top = max(prev, curr, 1)
+def _trend_sparkline(prev2, prev, curr):
+    """
+    Mini grafico SVG de 3 puntos: hace-2-meses -> mes-pasado -> mes-en-curso.
+    Mismo lenguaje visual que Growth OS (linea con puntos). Reemplaza al
+    sparkline viejo de 2 puntos (Anterior/Actual) -- ahora son 3 meses
+    reales, ya no 2 periodos genericos (pedido explicito de Sabas,
+    septiembre 2026, hoja PREVIOUS GMV nueva en el Excel).
+    """
+    prev2, prev, curr = max(prev2, 0), max(prev, 0), max(curr, 0)
+    top = max(prev2, prev, curr, 1)
+    y_prev2 = 34 - (prev2 / top) * 24
     y_prev = 34 - (prev / top) * 24
     y_curr = 34 - (curr / top) * 24
     color = COLORS["brand_orange"]
     return (
-        f'<svg width="96" height="44" viewBox="0 0 96 44" style="overflow:visible;">'
-        f'<line x1="14" y1="{y_prev:.1f}" x2="82" y2="{y_curr:.1f}" '
+        f'<svg width="130" height="44" viewBox="0 0 130 44" style="overflow:visible;">'
+        f'<line x1="10" y1="{y_prev2:.1f}" x2="65" y2="{y_prev:.1f}" '
         f'stroke="{color}" stroke-width="2" stroke-linecap="round"/>'
-        f'<circle cx="14" cy="{y_prev:.1f}" r="3" fill="{color}"/>'
-        f'<circle cx="82" cy="{y_curr:.1f}" r="3" fill="{color}"/>'
+        f'<line x1="65" y1="{y_prev:.1f}" x2="120" y2="{y_curr:.1f}" '
+        f'stroke="{color}" stroke-width="2" stroke-linecap="round"/>'
+        f'<circle cx="10" cy="{y_prev2:.1f}" r="3" fill="{color}"/>'
+        f'<circle cx="65" cy="{y_prev:.1f}" r="3" fill="{color}"/>'
+        f'<circle cx="120" cy="{y_curr:.1f}" r="3" fill="{color}"/>'
         f'</svg>'
     )
 
 
-def metric_trend_card(icon, label, value_ars, delta_frac, sub_left, prev_ars=0, currency="ARS", es_ritmo=False):
+def metric_trend_card(icon, label, value_ars, delta_frac, sub_left, prev_ars=0, prev2_ars=0,
+                       currency="ARS", es_ritmo=False):
     """
     Card de GMV/AOV al estilo Growth OS: icono + label arriba, monto grande
     (en la moneda nativa del farmer -- currency), % de variacion vs mes
-    anterior, y sparkline Anterior->Actual a la derecha (solo si hay dato
+    anterior, y sparkline de 3 meses reales a la derecha (solo si hay dato
     de mes anterior).
+
+    prev2_ars (nuevo, septiembre 2026): dato de hace DOS meses (hoja
+    PREVIOUS GMV), para completar la comparativa de 3 meses reales --
+    antes el sparkline solo tenia 2 puntos genericos ("Anterior"/
+    "Actual"); ahora son 3 meses nombrados por su mes calendario real
+    (ej. Jul/Ago/Sep), que rota solo cada mes via
+    dl.etiquetas_3_meses() -- pedido explicito de Sabas: que el proximo
+    mes (octubre) el grafico se actualice solo, sin tocar codigo, para
+    mostrar Ago/Sep/Oct.
 
     El "USD $ X" de referencia chiquito que antes iba debajo del monto se
     elimino (pedido explicito de Sabas, agosto 2026): dependia de una tasa
@@ -392,16 +410,18 @@ def metric_trend_card(icon, label, value_ars, delta_frac, sub_left, prev_ars=0, 
         )
     trend_html = ""
     if prev_ars > 0:
+        mes_prev2, mes_prev, mes_curr = dl.etiquetas_3_meses()
         trend_html = (
-            '<div style="text-align:center;min-width:120px;">'
-            f'{_trend_sparkline(prev_ars, value_ars)}'
-            f'<div style="display:flex;justify-content:space-between;width:110px;margin:0 auto;'
+            '<div style="text-align:center;min-width:150px;">'
+            f'{_trend_sparkline(prev2_ars, prev_ars, value_ars)}'
+            f'<div style="display:flex;justify-content:space-between;width:140px;margin:0 auto;'
             f'font-size:9px;color:{COLORS["muted"]};margin-top:2px;">'
-            f"<span>Anterior</span><span>Actual</span></div>"
-            f'<div style="display:flex;justify-content:space-between;width:110px;margin:2px auto 0;'
+            f"<span>{mes_prev2}</span><span>{mes_prev}</span><span>{mes_curr}</span></div>"
+            f'<div style="display:flex;justify-content:space-between;width:140px;margin:2px auto 0;'
             f'font-size:9.5px;font-weight:400;color:{COLORS["muted"]};line-height:1.35;">'
-            f'<span style="max-width:52px;white-space:normal;word-break:break-word;">{dl.fmt_money(prev_ars, currency)}</span>'
-            f'<span style="max-width:52px;white-space:normal;word-break:break-word;">{dl.fmt_money(value_ars, currency)}</span></div>'
+            f'<span style="max-width:46px;white-space:normal;word-break:break-word;">{dl.fmt_money(prev2_ars, currency)}</span>'
+            f'<span style="max-width:46px;white-space:normal;word-break:break-word;">{dl.fmt_money(prev_ars, currency)}</span>'
+            f'<span style="max-width:46px;white-space:normal;word-break:break-word;">{dl.fmt_money(value_ars, currency)}</span></div>'
             "</div>"
         )
     return (
@@ -2303,13 +2323,15 @@ with tab_home:
             ordenes_sub = f'📦 {row.ordenes:,.0f} órdenes'.replace(",", ".")
             st.markdown(
                 metric_trend_card("📈", "GMV (mes)", row.gmv, row.gmv_delta,
-                                   ordenes_sub, prev_ars=row.gmv_last, currency=CURRENCY, es_ritmo=True),
+                                   ordenes_sub, prev_ars=row.gmv_last, prev2_ars=row.gmv_prev2,
+                                   currency=CURRENCY, es_ritmo=True),
                 unsafe_allow_html=True,
             )
         with g2:
             st.markdown(
                 metric_trend_card("🛒", "AOV", row.aov, row.aov_delta,
-                                   "Ticket promedio", prev_ars=row.aov_last, currency=CURRENCY),
+                                   "Ticket promedio", prev_ars=row.aov_last, prev2_ars=row.aov_prev2,
+                                   currency=CURRENCY),
                 unsafe_allow_html=True,
             )
     else:

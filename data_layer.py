@@ -169,6 +169,7 @@ SHEETS = {
     "seasonal":   "SEASONAL EVENTS",
     "churn":      "CHURN",
     "last_gmv":   "LAST GMV",
+    "previous_gmv": "PREVIOUS GMV",
     "export_ads": "EXPORT ADS",
     "productivity": "PRODUCTIVITY",
     "detalle":    "DETALLE",
@@ -950,6 +951,46 @@ def load_detalle():
 def load_last_gmv():
     """GMV/AOV del mes anterior, para calcular variacion vs mes actual."""
     return _load_detalle_like("last_gmv")
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_previous_gmv():
+    """
+    GMV/AOV de hace DOS meses (no del mes anterior -- ese es LAST GMV).
+    Ej.: si DETALLE es septiembre, LAST GMV es agosto y PREVIOUS GMV es
+    julio. Usada junto con LAST GMV y DETALLE para armar la comparativa
+    de 3 meses reales en las cards de GMV/AOV (pedido explicito de
+    Sabas, septiembre 2026): antes esas cards solo mostraban 2 puntos
+    (Anterior/Actual = mes pasado vs mes en curso); ahora muestran 3
+    meses reales nombrados por el mes calendario que representan.
+    """
+    return _load_detalle_like("previous_gmv")
+
+
+_MESES_ES = {
+    1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun",
+    7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic",
+}
+
+
+def etiquetas_3_meses():
+    """
+    Nombres cortos en español de los 3 meses que arma la comparativa de
+    GMV/AOV: (mes de PREVIOUS GMV, mes de LAST GMV, mes de DETALLE) --
+    hace-2-meses, mes-pasado, mes-en-curso, en ese orden.
+
+    Se derivan del mes calendario REAL de hoy (pedido explicito de
+    Sabas, septiembre 2026), no de un valor fijo en el codigo ni de una
+    columna de fecha en el Excel (ninguna de las 3 hojas trae una) --
+    asi el proximo mes, sin tocar nada, la comparativa rota sola: hoy
+    (septiembre) muestra Jul/Ago/Sep: el 1 de octubre, con el mismo
+    codigo sin cambios, va a mostrar Ago/Sep/Oct.
+    """
+    hoy = pd.Timestamp.now().normalize()
+    mes_actual = hoy.month
+    mes_last = mes_actual - 1 if mes_actual > 1 else 12
+    mes_previous = mes_last - 1 if mes_last > 1 else 12
+    return _MESES_ES[mes_previous], _MESES_ES[mes_last], _MESES_ES[mes_actual]
 
 
 def load_detalle_portfolio(farmer_email):
@@ -3785,6 +3826,21 @@ def portfolio_for(farmer_email):
         df = df.merge(last_slim, on="key", how="left")
     df["gmv_last"] = df["gmv_last"].fillna(0)
     df["aov_last"] = df["aov_last"].fillna(0)
+
+    # PREVIOUS GMV: mismo GMV/AOV pero de hace DOS meses (no confundir con
+    # LAST GMV, que es el mes inmediato anterior) -- para la comparativa de
+    # 3 meses reales en las cards de GMV/AOV (septiembre 2026).
+    previous_gmv = load_previous_gmv()
+    if previous_gmv.empty:
+        df["gmv_prev2"] = 0.0
+        df["aov_prev2"] = 0.0
+    else:
+        previous_slim = previous_gmv[["key", "gmv", "aov"]].rename(
+            columns={"gmv": "gmv_prev2", "aov": "aov_prev2"}
+        )
+        df = df.merge(previous_slim, on="key", how="left")
+    df["gmv_prev2"] = df["gmv_prev2"].fillna(0)
+    df["aov_prev2"] = df["aov_prev2"].fillna(0)
 
     # gmv_delta: RITMO, no acumulado crudo (bug real corregido, agosto
     # 2026). Antes comparaba GMV acumulado del mes en curso contra el GMV
