@@ -353,14 +353,14 @@ def _trend_sparkline(prev2, prev, curr):
     y_curr = 34 - (curr / top) * 24
     color = COLORS["brand_orange"]
     return (
-        f'<svg width="130" height="44" viewBox="0 0 130 44" style="overflow:visible;">'
-        f'<line x1="10" y1="{y_prev2:.1f}" x2="65" y2="{y_prev:.1f}" '
+        f'<svg width="250" height="44" viewBox="0 0 250 44" style="overflow:visible;">'
+        f'<line x1="20" y1="{y_prev2:.1f}" x2="125" y2="{y_prev:.1f}" '
         f'stroke="{color}" stroke-width="2" stroke-linecap="round"/>'
-        f'<line x1="65" y1="{y_prev:.1f}" x2="120" y2="{y_curr:.1f}" '
+        f'<line x1="125" y1="{y_prev:.1f}" x2="230" y2="{y_curr:.1f}" '
         f'stroke="{color}" stroke-width="2" stroke-linecap="round"/>'
-        f'<circle cx="10" cy="{y_prev2:.1f}" r="3" fill="{color}"/>'
-        f'<circle cx="65" cy="{y_prev:.1f}" r="3" fill="{color}"/>'
-        f'<circle cx="120" cy="{y_curr:.1f}" r="3" fill="{color}"/>'
+        f'<circle cx="20" cy="{y_prev2:.1f}" r="3" fill="{color}"/>'
+        f'<circle cx="125" cy="{y_prev:.1f}" r="3" fill="{color}"/>'
+        f'<circle cx="230" cy="{y_curr:.1f}" r="3" fill="{color}"/>'
         f'</svg>'
     )
 
@@ -412,16 +412,22 @@ def metric_trend_card(icon, label, value_ars, delta_frac, sub_left, prev_ars=0, 
     if prev_ars > 0:
         mes_prev2, mes_prev, mes_curr = dl.etiquetas_3_meses()
         trend_html = (
-            '<div style="text-align:center;min-width:150px;">'
+            '<div style="text-align:center;min-width:260px;">'
             f'{_trend_sparkline(prev2_ars, prev_ars, value_ars)}'
-            f'<div style="display:flex;justify-content:space-between;width:140px;margin:0 auto;'
-            f'font-size:9px;color:{COLORS["muted"]};margin-top:2px;">'
-            f"<span>{mes_prev2}</span><span>{mes_prev}</span><span>{mes_curr}</span></div>"
-            f'<div style="display:flex;justify-content:space-between;width:140px;margin:2px auto 0;'
-            f'font-size:9.5px;font-weight:400;color:{COLORS["muted"]};line-height:1.35;">'
-            f'<span style="max-width:46px;white-space:normal;word-break:break-word;">{dl.fmt_money(prev2_ars, currency)}</span>'
-            f'<span style="max-width:46px;white-space:normal;word-break:break-word;">{dl.fmt_money(prev_ars, currency)}</span>'
-            f'<span style="max-width:46px;white-space:normal;word-break:break-word;">{dl.fmt_money(value_ars, currency)}</span></div>'
+            f'<div style="display:flex;gap:14px;width:250px;margin:4px auto 0;">'
+            f'<div style="flex:1;text-align:left;min-width:0;">'
+            f'<div style="font-size:9px;color:{COLORS["muted"]};">{mes_prev2}</div>'
+            f'<div style="font-size:10.5px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;">{dl.fmt_money(prev2_ars, currency)}</div>'
+            f'</div>'
+            f'<div style="flex:1;text-align:center;min-width:0;">'
+            f'<div style="font-size:9px;color:{COLORS["muted"]};">{mes_prev}</div>'
+            f'<div style="font-size:10.5px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;">{dl.fmt_money(prev_ars, currency)}</div>'
+            f'</div>'
+            f'<div style="flex:1;text-align:right;min-width:0;">'
+            f'<div style="font-size:9px;color:{COLORS["muted"]};">{mes_curr}</div>'
+            f'<div style="font-size:10.5px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;">{dl.fmt_money(value_ars, currency)}</div>'
+            f'</div>'
+            f'</div>'
             "</div>"
         )
     return (
