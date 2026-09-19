@@ -11,6 +11,7 @@ Analytics, Campaign Designer, Outreach).
 
 import html as html_lib
 import json
+import re
 import time
 
 import pandas as pd
@@ -2201,14 +2202,26 @@ if ficha_query.strip():
         st.info("Escribe un ID válido (ej. AR97338 o simplemente 97338).")
 
 # ── Franja fija: Nombre, ID centrados + los 5 datos (Teléfono, Correo,
-# Categoría, Local, Estado de conexión) en una sola fila centrada --
-# rediseño décima primera vuelta, pedido explícito de Sabas, aprobado
-# como mockup visual antes de escribir el código: el Estado de Churn
-# (ahora "Estado de conexión") deja de ser una pill aparte arriba de
-# los datos de contacto y pasa a ser un dato más de la misma fila. ──
+# Categoría, Buscar en Google, Estado de conexión) en una sola fila
+# centrada -- rediseño décima primera/segunda vuelta, pedido explícito
+# de Sabas, aprobado como mockup visual antes de escribir el código: el
+# Estado de Churn (ahora "Estado de conexión") deja de ser una pill
+# aparte arriba de los datos de contacto y pasa a ser un dato más de la
+# misma fila. Segunda vuelta: más espacio entre columnas, título/ID más
+# grandes, ID con guión separando letras de números, "Local" renombrado
+# a "Buscar en Google" con solo el ícono de lupa como link (antes decía
+# "Buscar" en texto). ──
 search_url = dl.google_search_url(row.brand_name, row.categoria, row.ciudad)
 tel_btn_id, telefono_copy = (_copy_button_html(row.telefono) if row.telefono else (None, ""))
 mail_btn_id, mail_copy = (_copy_button_html(row.mail) if row.mail else (None, ""))
+
+# ID con guión entre el prefijo de país (letras) y el número -- pedido
+# explícito de Sabas: "AR16516" -> "AR-16516". Regex en vez de asumir
+# siempre 2 letras fijas, por si algún ID viene con otro largo de
+# prefijo; si no matchea el patrón letras+dígitos (dato sucio o vacío),
+# se muestra tal cual sin romper.
+_id_match = re.match(r"^([A-Za-z]+)(\d+)$", str(row.brand_id or "").strip())
+brand_id_display = f"{_id_match.group(1)}-{_id_match.group(2)}" if _id_match else row.brand_id
 
 # Estado de conexión (antes "Estado de Churn") -- mismo criterio de
 # color por severidad que ya existía, solo cambia el label visible y el
@@ -2223,9 +2236,10 @@ contact_html = (
     f'<div><div class="stat-label">TELÉFONO</div><div class="stat-value">{row.telefono or "?"}{telefono_copy}</div></div>'
     f'<div><div class="stat-label">CORREO</div><div class="stat-value" style="font-size:13px;">{row.mail or "?"}{mail_copy}</div></div>'
     f'<div><div class="stat-label">CATEGORÍA</div><div class="stat-value"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_CATEGORIA}</span>{row.categoria or "?"}</div></div>'
-    f'<div><div class="stat-label">LOCAL</div><div class="stat-value">'
+    f'<div><div class="stat-label">BUSCAR EN GOOGLE</div><div class="stat-value">'
     f'<a href="{search_url}" target="_blank" rel="noopener noreferrer" '
-    f'style="color:{COLORS["brand_purple"]};text-decoration:none;font-weight:700;">🔎 Buscar</a>'
+    f'title="Buscar en Google" aria-label="Buscar en Google" '
+    f'style="color:{COLORS["brand_purple"]};text-decoration:none;font-size:18px;display:inline-block;margin-top:2px;">🔎</a>'
     "</div></div>"
     f'<div><div class="stat-label">ESTADO DE CONEXIÓN</div>'
     f'<div class="conn-status-pill {churn_class}">{churn_icon} {row.churn_status}</div></div>'
@@ -2235,7 +2249,7 @@ contact_html = (
 st.markdown(
     f'<div class="brand-sticky">'
     f'<div class="brand-title">{row.brand_name}</div>'
-    f'<div class="brand-id">{row.brand_id}</div>'
+    f'<div class="brand-id">{brand_id_display}</div>'
     f"{contact_html}"
     f"</div>",
     unsafe_allow_html=True,

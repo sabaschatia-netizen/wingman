@@ -753,19 +753,20 @@ section[data-testid="stMain"] .stMainBlockContainer {{
    ser una pill aparte arriba y pasa a ser un dato más de la fila, con
    su label renombrado a "Estado de conexión". */
 .brand-title {{
-    font-size: 32px; font-weight: 800; color: {COLORS["text"]};
-    letter-spacing: -0.8px; line-height: 1.1; margin-bottom: 4px;
+    font-size: 40px; font-weight: 800; color: {COLORS["text"]};
+    letter-spacing: -0.8px; line-height: 1.1; margin-bottom: 6px;
     text-align: center;
 }}
 .brand-id {{
-    font-size: 14px; font-weight: 700; color: {COLORS["text_disabled"]};
+    font-size: 16px; font-weight: 700; color: {COLORS["text_disabled"]};
     letter-spacing: 0.5px; text-align: center;
 }}
 .brand-stats-row {{
     display: flex; justify-content: center; align-items: flex-start;
-    gap: 36px; flex-wrap: wrap; margin-top: 28px; text-align: center;
+    gap: 48px; flex-wrap: wrap; margin-top: 36px; text-align: center;
 }}
-.brand-stats-row .stat-label {{ text-transform: uppercase; letter-spacing: 0.5px; }}
+.brand-stats-row > div {{ min-width: 160px; }}
+.brand-stats-row .stat-label {{ text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }}
 .stat-box {{
     background: {COLORS["card2"]}; border-radius: 12px;
     padding: 11px 15px; margin-bottom: 9px;
@@ -966,7 +967,7 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 /* ── FRANJA FIJA DE MARCA ── */
 .brand-sticky {{
     background: {COLORS["card"]}; border: 1px solid {COLORS["border"]};
-    border-radius: 18px; padding: 20px 24px; margin-bottom: 14px;
+    border-radius: 18px; padding: 32px 24px; margin-bottom: 14px;
     box-shadow: 0 4px 18px rgba(154,84,246,0.10);
     transition: border-color .18s, box-shadow .18s;
 }}
