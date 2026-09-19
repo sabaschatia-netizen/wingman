@@ -359,11 +359,26 @@ ICON_TROFEO = _icon(
     '<path d="M12 12v4M9 20h6M10 16h4v4h-4z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>'
 )
 ICON_CUADRADO = _icon(
-    '<rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>'
+    # Reemplaza el cuadrado relleno (🟥) por una X -- pedido explícito de
+    # Sabas (tercera vuelta, después de probarlo en la app real): el
+    # cuadrado se veía "negro y feo" en pantalla. Mantiene el mismo
+    # nombre de constante (ICON_CUADRADO) porque _RENDIMIENTO_ICON en
+    # wingmanapp.py referencia este símbolo por su rol semántico ("red"
+    # dentro del semáforo de rendimiento), no por su forma literal.
+    '<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'
 )
 ICON_FUEGO = _icon(
-    '<path d="M12 2.5c.8 2.3-1.8 3.2-1.8 5.8a1.8 1.8 0 003.6 0c1 1.5 1.7 3 1.7 4.7a5.5 5.5 0 01-11 0c0-3.5 2.2-5 3-7.3.6.8 1.2 1.2 1.5.6.3-.6 0-2.3 3-3.8z" '
-    'fill="currentColor"/>'
+    # Reemplaza la llama de fuego por un cohete -- pedido explícito de
+    # Sabas (tercera vuelta): mismo criterio que arriba, mantiene el
+    # nombre ICON_FUEGO porque _RENDIMIENTO_ICON lo referencia por su
+    # rol ("purple", el nivel más alto del semáforo), no por la forma.
+    '<path d="M12 2c3 2 4.5 5.5 4.5 9 0 2-.5 3.8-1.3 5.3L12 19l-3.2-2.7C8 14.8 7.5 13 7.5 11c0-3.5 1.5-7 4.5-9z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+    '<circle cx="12" cy="9.5" r="1.6" stroke="currentColor" stroke-width="1.4" fill="none"/>'
+    '<path d="M8.5 14.5L6 17l1-3.5M15.5 14.5L18 17l-1-3.5" '
+    'stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+    '<path d="M10.3 18.3c0 1 .7 2.2 1.7 2.7 1-.5 1.7-1.7 1.7-2.7" '
+    'stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>'
 )
 ICON_BILLETE = _icon(
     '<rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" stroke-width="1.6" fill="none"/>'
@@ -1209,37 +1224,6 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .sup-table th:nth-child(7), .sup-table td:nth-child(7) {{ width: 8%; }}
 .sup-table th:nth-child(8), .sup-table td:nth-child(8) {{ width: 17%; }}
 .sup-table th:nth-child(9), .sup-table td:nth-child(9) {{ width: 17%; }}
-
-/* Tablas de "Trabajables" (agosto 2026, vigésima tercera vuelta --
-   pedido explícito de Sabas: "esa columna y celda de # está demasiado
-   ancha, busca la forma de hacer la tabla simétrica"). Reusan la clase
-   base .sup-table (mismo look de pills/spacing) pero heredaban los
-   anchos por nth-child pensados para Rendimiento País (9 columnas fijas,
-   la 1ra pensada para el correo largo del Farmer -- 13%) -- acá la
-   columna 1 es solo "#" (1-2 dígitos), así que ese 13% la dejaba
-   desproporcionada. .sup-table-trab GANA por especificidad (dos clases
-   combinadas pesan más que una) sobre las reglas de arriba, sin tocar
-   la tabla de Rendimiento País. "#" bien angosta (suficiente para "10"),
-   "Marca" con la mayor parte del espacio (nombre + ID, lo más largo de
-   la fila), el resto del espacio se reparte parejo entre las columnas
-   de datos restantes vía flex en vez de porcentajes fijos por posición
-   -- el número de columnas varía por tab (4 a 7), así que un ancho fijo
-   por nth-child no sirve igual de bien para los 4 tabs a la vez. */
-.sup-table.sup-table-trab {{ table-layout: auto; }}
-.sup-table.sup-table-trab th:nth-child(1),
-.sup-table.sup-table-trab td:nth-child(1) {{ width: 40px; }}
-.sup-table.sup-table-trab th:nth-child(2),
-.sup-table.sup-table-trab td:nth-child(2) {{ width: auto; min-width: 220px; }}
-.sup-table.sup-table-trab th:nth-child(n+3),
-.sup-table.sup-table-trab td:nth-child(n+3) {{ width: auto; white-space: nowrap; }}
-/* Tab Churn: "#" sigue en columna 1, pero "Categoría" pasa a ser la 2da
-   columna (angosta, solo "Churn"/"PW1") y "Marca" se corre a la 3ra --
-   se sobreescribe puntualmente con una clase extra en el <table> de ese
-   tab en vez de intentar detectar el contenido por CSS. */
-.sup-table.sup-table-trab.sup-table-trab-churn th:nth-child(2),
-.sup-table.sup-table-trab.sup-table-trab-churn td:nth-child(2) {{ width: 90px; min-width: 0; }}
-.sup-table.sup-table-trab.sup-table-trab-churn th:nth-child(3),
-.sup-table.sup-table-trab.sup-table-trab-churn td:nth-child(3) {{ width: auto; min-width: 220px; }}
 
 /* Tabla interactiva (Rendimiento País/Farmer): resize de columnas
    arrastrando el borde derecho del header, y ordenar de mayor a menor /
