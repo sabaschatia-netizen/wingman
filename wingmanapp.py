@@ -47,6 +47,7 @@ from theme import (
     ICON_MENU,
     ICON_OPS,
     ICON_ORDENES,
+    ICON_RENDIMIENTO,
     ICON_TENDENCIA,
     ICON_TRAFICO,
     build_css,
@@ -727,15 +728,15 @@ def _rend_color_md(att_pct):
 
 def _correo_corto(email):
     """
-    "alejandro.guerrero@rappi.com" -> "alejandro.guerrero@..." -- pedido
-    explícito de Sabas (agosto 2026): con que se vea el usuario y el
-    arroba alcanza, no hace falta el dominio completo. Se usa en
-    Rendimiento Farmer/País en vez de mostrar el correo entero (que
-    forzaba el ancho de toda la fila con correos largos como
-    luisfernando.hernandez@rappi.com).
+    "alejandro.guerrero@rappi.com" -> "alejandro.guerrero" -- pedido
+    explícito de Sabas (segunda vuelta, septiembre 2026): antes se
+    mostraba "usuario@..." (arroba + puntos suspensivos); ahora se
+    corta directo en el "@", sin dejar rastro del dominio ni del
+    símbolo. Se usa en Rendimiento Farmer/País en vez de mostrar el
+    correo entero (que forzaba el ancho de toda la fila con correos
+    largos como luisfernando.hernandez@rappi.com).
     """
-    usuario = str(email).split("@")[0]
-    return f"{usuario}@..."
+    return str(email).split("@")[0]
 
 
 def _fila_rendimiento_html(row):
@@ -1042,7 +1043,7 @@ def render_tabla_farmers_supervisor(pais):
     fs_flag_key = f"fs_open_pais_{pais}"
 
     st.markdown(
-        '<div class="mgmt-card-title" style="margin:18px 0 8px;">📊 Rendimiento País</div>',
+        f'<div class="mgmt-card-title" style="margin:18px 0 8px;"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_RENDIMIENTO}</span>Rendimiento País</div>',
         unsafe_allow_html=True,
     )
     if st.button("⛶ Pantalla completa", key=f"fs-btn-{pais}"):
@@ -1359,7 +1360,7 @@ def render_rendimiento_farmer(farmer_email):
     fs_flag_key = f"fs_open_farmer_{abs(hash(farmer_email))}"
 
     st.markdown(
-        '<div class="mgmt-card-title" style="margin:18px 0 8px;">📊 Rendimiento Farmer</div>',
+        f'<div class="mgmt-card-title" style="margin:18px 0 8px;"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_RENDIMIENTO}</span>Rendimiento Farmer</div>',
         unsafe_allow_html=True,
     )
     if st.button("⛶ Pantalla completa", key=f"fs-btn-{table_id}"):

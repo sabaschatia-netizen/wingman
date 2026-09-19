@@ -311,6 +311,23 @@ def icon_medalla_numero(n):
     )
 
 
+# ── Gestión General (décima vuelta, pedido explícito de Sabas) ──
+# Gráfico de barras -- reemplaza 📊 en "Rendimiento País" / "Rendimiento
+# Farmer".
+ICON_RENDIMIENTO = _icon(
+    '<rect x="4" y="14" width="4" height="6" rx="1" stroke="currentColor" stroke-width="1.6" fill="none"/>'
+    '<rect x="10" y="9" width="4" height="11" rx="1" stroke="currentColor" stroke-width="1.6" fill="none"/>'
+    '<rect x="16" y="4" width="4" height="16" rx="1" stroke="currentColor" stroke-width="1.6" fill="none"/>'
+)
+# Expandir/pantalla completa -- reemplaza ⛶ en el botón "Pantalla
+# completa".
+ICON_EXPANDIR = _icon(
+    '<path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6" '
+    'stroke="currentColor" stroke-width="1.8" fill="none" '
+    'stroke-linecap="round" stroke-linejoin="round"/>'
+)
+
+
 # Íconos de los 6 grupos de coinversión (COINV_GROUPS en data_layer.py,
 # antes 🎯🌱🚫🛡️⭐📦) -- diferenciados entre sí porque cada grupo es un
 # concepto de negocio distinto, no variaciones de un mismo ícono.
