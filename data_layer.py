@@ -2733,6 +2733,32 @@ def upselling_ads_target_for(farmer_emails):
     return max(necesarias, _dias_habiles_totales_mes())
 
 
+def _checkout_count_for(farmer_emails, tipo):
+    """
+    Cuenta filas de CHECKOUT para un farmer/lista de farmers y un `tipo`
+    ("adquisicion" o "upsell") -- función compartida por
+    adquisicion_ads_for y upselling_ads_for para no duplicar el filtro.
+
+    RECONSTRUIDA (correctivo, pedido explícito de Sabas tras detectar
+    que "Adquisición Ads" y "Upselling Ads" mostraban 0/22-0% para casi
+    todos los farmers en la tabla real): esta función se perdió en el
+    mismo incidente de eliminación de Trabajables que rompió
+    wingmanapp.py -- el try/except de adquisicion_ads_for/
+    upselling_ads_for capturaba el NameError resultante en silencio y
+    devolvía adq_n=0/ups_n=0 en cada llamada, sin traceback visible (a
+    diferencia del NameError de wingmanapp.py, que sí rompía la
+    pantalla). Recuperada tal cual del archivo de referencia que Sabas
+    volvió a subir.
+    """
+    chk = load_checkout()
+    if chk.empty:
+        return 0
+    emails = [farmer_emails] if isinstance(farmer_emails, str) else list(farmer_emails)
+    emails = {str(e).strip().lower() for e in emails}
+    d = chk[chk["farmer"].isin(emails) & (chk["tipo"] == tipo)]
+    return len(d)
+
+
 def adquisicion_ads_for(farmer_emails):
     """
     "Adquisición Ads": reemplaza a "Conversión Ads" en Rendimiento
