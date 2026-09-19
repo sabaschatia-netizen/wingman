@@ -339,8 +339,14 @@ def mini_card(label, value, copy="", lever="", chip="", chip_color="", corner_ba
     icon_svg = ICON_ADS_LEVER if lever == "ads" else ICON_MARKDOWN_LEVER
     icon_class = "lever-icon icon-purple" if active else "lever-icon"
     icon_html = f'<span class="{icon_class}">{icon_svg}</span>'
+    # Card "apagada" cuando la palanca está inactiva -- tercera vuelta,
+    # pedido explícito de Sabas: la card entera pasa a fondo gris (no
+    # blanco brillante), sin borde lateral de color, y el corner-badge
+    # también se desatura (ver .is-inactive en theme.py, con !important
+    # para ganarle al color inline del badge).
+    card_class = "business-mini-card lever-{}".format(lever) if active else "business-mini-card lever-{} is-inactive".format(lever)
     return (
-        f'<div class="business-mini-card lever-{lever}">'
+        f'<div class="{card_class}">'
         f"{badge_html}"
         f'<div class="card-label">{icon_html}{label}</div>'
         f'<div class="card-value">{value}{chip_html}</div>'

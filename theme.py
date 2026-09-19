@@ -139,13 +139,18 @@ ICON_CATEGORIA = _icon(
     'stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
 )
 
-# Palanca ADS — megáfono sólido (color por currentColor vía fill)
+# Palanca ADS — megáfono sólido (forma clásica: cuerpo cónico ancho a la
+# derecha + mango rectangular abajo-izquierda + 2 líneas de sonido rectas).
+# Corrección (segunda vuelta, pedido explícito de Sabas): la versión
+# anterior usaba curvas concéntricas tipo "ícono de audio/parlante" y no
+# se leía como megáfono -- esta va con la silueta trapezoidal clásica del
+# emoji de megáfono (cuerpo sólido, sin curvas de onda).
 ICON_ADS_LEVER = _icon(
-    '<path d="M3 10v4a1 1 0 001 1h2l7 4V5L6 9H4a1 1 0 00-1 1z" fill="currentColor"/>'
-    '<path d="M13 8.5a3.5 3.5 0 010 7" stroke="currentColor" stroke-width="1.8" '
-    'stroke-linecap="round" fill="none"/>'
-    '<path d="M18 6a7.5 7.5 0 010 12" stroke="currentColor" stroke-width="1.6" '
-    'stroke-linecap="round" fill="none" opacity="0.6"/>'
+    '<path d="M2 9.5v5a1.2 1.2 0 001.2 1.2h1.3l1 3.3a1 1 0 00.96.7h1.1'
+    'a1 1 0 00.94-1.34L7.7 15.7'
+    'l8.8 3.4a1 1 0 001.36-.93V5.83a1 1 0 00-1.36-.93l-8.8 3.4H3.2A1.2 1.2 0 002 9.5z" '
+    'fill="currentColor"/>'
+    '<path d="M19.5 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
 )
 
 # Palanca Markdown / Markdown Pro — círculo relleno con símbolo de % en
@@ -406,6 +411,24 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .business-mini-card.lever-md    {{ border-left: 3px solid {COLORS["blue"]} !important; }}
 .business-mini-card.lever-pro   {{ border-left: 3px solid {COLORS["brand_purple"]} !important; }}
 .business-mini-card.lever-menu  {{ border-left: 3px solid #6B7280 !important; }}
+
+/* Estado "apagado" de la tarjeta cuando la palanca está inactiva --
+   pedido explícito de Sabas (septiembre 2026, segunda vuelta): la card
+   entera debe verse gris/apagada (no blanca brillante como las activas),
+   sin perder legibilidad del texto, y sin el borde lateral de color de
+   marca (ese color solo tiene sentido si la palanca está viva). El
+   corner-badge (ej. "Penetración X%") también se desatura a gris. */
+.business-mini-card.is-inactive {{
+    background: {COLORS["card2"]} !important;
+    border-left: 3px solid {COLORS["border"]} !important;
+    box-shadow: none;
+}}
+.business-mini-card.is-inactive:hover {{
+    transform: none; box-shadow: 0 2px 10px rgba(154,84,246,0.06);
+}}
+.business-mini-card.is-inactive .corner-badge {{
+    background: {COLORS["border"]} !important; color: {COLORS["muted"]} !important;
+}}
 
 .corner-badge {{
     position: absolute; top: 12px; right: 14px;
