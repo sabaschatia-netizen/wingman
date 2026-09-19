@@ -1808,10 +1808,13 @@ def ops_tactical_card(key, availability_pct, lost_hours, gmv_ars=0, aov_ars=0, o
     else:
         titulo_top = "OPS saludable"
 
-    # "items": los mismos 4 bullets pero como LISTA (no un solo string
-    # unido por " · ") -- se mantiene igual que antes, la UI los pinta uno
-    # debajo del otro.
-    return {"title": titulo_top, "detail": detail, "items": bullets, "tag": tag, "pct": None}
+    # "items": ahora una lista de (texto, estado) -- antes solo texto
+    # plano, sin el estado individual de cada bullet (sexta vuelta,
+    # pedido explícito de Sabas: el render necesita saber cuál de los 4
+    # está en ALERT/WATCH para ponerlo en negrita y cuál está sano/sin
+    # dato para dejarlo en texto normal, igual que el Insight de
+    # Markdown/Ads).
+    return {"title": titulo_top, "detail": detail, "items": items, "tag": tag, "pct": None}
 
 
 def menu_tactical_card(key, perfect_store_pct, photos_pct, purchase_pct, missing_pct):
@@ -1950,8 +1953,9 @@ def menu_tactical_card(key, perfect_store_pct, photos_pct, purchase_pct, missing
         "Corregir antes de escalar tráfico o activar pauta."
         if tag != "HEALTHY" else "Catálogo saludable, sin issues detectados."
     )
-    # "items": los mismos 4 bullets como LISTA -- mismo criterio que OPS.
-    return {"title": title, "detail": detail, "items": bullets_menu, "tag": tag, "pct": None}
+    # "items": ahora (texto, estado) por bullet -- mismo criterio que
+    # ops_tactical_card (ver comentario ahí, sexta vuelta).
+    return {"title": title, "detail": detail, "items": items, "tag": tag, "pct": None}
 
 
 def _priority_descripcion_for(key, kind):

@@ -20,7 +20,6 @@ import streamlit.components.v1 as st_components
 import data_layer as dl
 from theme import (
     COLORS,
-    ICON_ADS,
     ICON_ADS_LEVER,
     ICON_AOV,
     ICON_CATEGORIA,
@@ -2610,10 +2609,27 @@ with tab_action:
         # circular monocromático (gris u "icon_purple" según la card),
         # reemplazando el emoji Unicode que antes iba concatenado al
         # texto en data_layer.py.
+        #
+        # Negrita condicional (séptima vuelta, pedido explícito de
+        # Sabas): cada item ahora es (texto, estado) en vez de solo
+        # texto -- ALERT/WATCH van en negrita ("action-card-item-alert",
+        # lo importante), HEALTHY/None (sin alerta, "sin alerta
+        # presente"/"Métrica sana y competitiva") van en texto normal
+        # ("action-card-item-normal"), igual peso que el Insight de
+        # Markdown/Ads.
         if items:
-            cuerpo_html = "".join(
-                f'<div class="action-card-item"><span class="{bullet_class}"></span>{item}</div>' for item in items
-            )
+            item_divs = []
+            for item_texto, item_estado in items:
+                peso_class = (
+                    "action-card-item-alert"
+                    if item_estado in ("ALERT", "WATCH")
+                    else "action-card-item-normal"
+                )
+                item_divs.append(
+                    f'<div class="action-card-item {peso_class}">'
+                    f'<span class="{bullet_class}"></span>{item_texto}</div>'
+                )
+            cuerpo_html = "".join(item_divs)
         else:
             cuerpo_html = (
                 f'<div class="action-card-title"><span class="{bullet_class}"></span>{title}</div>'
@@ -2636,8 +2652,8 @@ with tab_action:
         '<div class="action-supercard"><div class="action-grid">'
         + _action_mini(ICON_OPS, "OPS General", ops["pct"], ops["tag"], ops["title"], ops["detail"], items=ops.get("items"))
         + _action_mini(ICON_MENU, "Menú", menu["pct"], menu["tag"], menu["title"], menu["detail"], items=menu.get("items"))
-        + _action_mini(ICON_MARKDOWN, "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"], icon_purple=True)
-        + _action_mini(ICON_ADS, "Ads", None, ads_c["tag"], ads_c["title"], ads_c["detail"], icon_purple=True)
+        + _action_mini(ICON_MARKDOWN, "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"])
+        + _action_mini(ICON_ADS_LEVER, "Ads", None, ads_c["tag"], ads_c["title"], ads_c["detail"])
         + "</div></div>",
         unsafe_allow_html=True,
     )

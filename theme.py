@@ -106,17 +106,21 @@ def _icon(paths, view_box="0 0 24 24"):
 
 # OPS General — engranaje simplificado (6 dientes + centro hueco)
 ICON_OPS = _icon(
-    '<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>'
-    '<path d="M12 3v2.4M12 18.6V21M21 12h-2.4M5.4 12H3'
-    'M18.36 5.64l-1.7 1.7M7.34 16.66l-1.7 1.7'
-    'M18.36 18.36l-1.7-1.7M7.34 7.34l-1.7-1.7" '
-    'stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+    '<path d="M8.82,4.33 L9.71,1.75 L14.29,1.75 L15.18,4.33 L17.63,3.13 L20.87,6.37 '
+    'L19.67,8.82 L22.25,9.71 L22.25,14.29 L19.67,15.18 L20.87,17.63 L17.63,20.87 '
+    'L15.18,19.67 L14.29,22.25 L9.71,22.25 L8.82,19.67 L6.37,20.87 L3.13,17.63 '
+    'L4.33,15.18 L1.75,14.29 L1.75,9.71 L4.33,8.82 L3.13,6.37 L6.37,3.13 Z" '
+    'fill="currentColor" fill-rule="evenodd"/>'
+    '<circle cx="12" cy="12" r="3.3" fill="{}"/>'.format(COLORS["card2"])
 )
 
 # Menú — 3 líneas horizontales tipo lista
 ICON_MENU = _icon(
-    '<path d="M4 7h16M4 12h16M4 17h10" '
-    'stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+    '<path d="M12 5.5c-1.8-1.3-4-2-6.2-2-1 0-1.8.8-1.8 1.8v11.4c0 1 .8 1.8 1.8 1.8 '
+    '2.2 0 4.4.7 6.2 2 1.8-1.3 4-2 6.2-2 1 0 1.8-.8 1.8-1.8V5.3c0-1-.8-1.8-1.8-1.8-'
+    '2.2 0-4.4.7-6.2 2z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+    '<path d="M12 5.5v14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
 )
 
 # Markdown — símbolo de porcentaje en trazo
@@ -1160,7 +1164,9 @@ div[data-testid="stDialog"] {{
 .action-card-name {{ font-size: 12.5px; font-weight: 700; color: {COLORS["text"]}; margin-top: 2px; }}
 .action-card-title {{ font-size: 12px; font-weight: 700; color: {COLORS["text"]}; margin-top: 10px; line-height: 1.4; }}
 .action-card-detail {{ font-size: 11px; color: {COLORS["muted"]}; margin-top: 6px; line-height: 1.5; }}
-.action-card-item {{ font-size: 11.5px; font-weight: 600; color: {COLORS["text"]}; margin-top: 8px; line-height: 1.4; }}
+.action-card-item {{ font-size: 11.5px; margin-top: 8px; line-height: 1.4; }}
+.action-card-item-alert {{ font-weight: 700; color: {COLORS["text"]}; }}
+.action-card-item-normal {{ font-weight: 400; color: {COLORS["muted"]}; }}
 .action-card-healthy {{ border-top-color: {COLORS["success"]}; }}
 .action-card-watch   {{ border-top-color: {COLORS["warning"]}; }}
 .action-card-alert   {{ border-top-color: {COLORS["danger"]}; }}
