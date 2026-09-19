@@ -2432,7 +2432,7 @@ with tab_home:
         with g3:
             st.markdown(
                 metric_trend_card(ICON_GMV, "GMV (mes)", row.gmv, row.gmv_delta,
-                                   "", prev=row.gmv_last, prev2=row.gmv_prev2,
+                                   "Facturación bruta del mes", prev=row.gmv_last, prev2=row.gmv_prev2,
                                    currency=CURRENCY, es_ritmo=True,
                                    fmt_spark_fn=lambda v: dl.fmt_money_compact(v, CURRENCY)),
                 unsafe_allow_html=True,
