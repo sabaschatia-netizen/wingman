@@ -357,6 +357,32 @@ def fmt_money(v, currency="ARS"):
     return f"{currency} $ {to_num(v):,.0f}".replace(",", ".")
 
 
+def fmt_money_compact(v, currency="ARS"):
+    """
+    Version abreviada de fmt_money para espacios chicos (los 3 puntos de
+    mes del sparkline en metric_trend_card) -- "ARS $ 10.644.881" (16+
+    caracteres, se corta con "..." en 1/3 de card) pasa a "$10,6M" (6
+    caracteres). Pedido explícito de Sabas (septiembre 2026, quinta
+    vuelta): con 3 cards por fila (Órdenes/AOV/GMV) el monto completo ya
+    no entra legible en el pie del sparkline.
+
+    Umbrales: >=1.000.000 -> "X,XM"; >=1.000 -> "X,XK"; si no, el numero
+    entero tal cual (sin prefijo de moneda -- el simbolo "$" solo alcanza
+    para identificarlo como monto, la moneda especifica ya se ve en el
+    valor grande de la card).
+    """
+    n = to_num(v)
+    sign = "-" if n < 0 else ""
+    n = abs(n)
+    if n >= 1_000_000:
+        texto = f"{n / 1_000_000:.1f}M".replace(".", ",")
+    elif n >= 1_000:
+        texto = f"{n / 1_000:.1f}K".replace(".", ",")
+    else:
+        texto = f"{n:,.0f}".replace(",", ".")
+    return f"{sign}${texto}"
+
+
 def fmt_ars(v):
     """Wrapper de compatibilidad: todo el codigo viejo que ya llama fmt_ars
     (16+ lugares en wingmanapp.py, mas usos internos aca) sigue funcionando

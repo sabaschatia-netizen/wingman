@@ -417,7 +417,7 @@ def _trend_sparkline(prev2, prev, curr):
 
 
 def metric_trend_card(icon, label, value, delta_frac, sub_left, prev=0, prev2=0,
-                       currency="ARS", es_ritmo=False, fmt_fn=None):
+                       currency="ARS", es_ritmo=False, fmt_fn=None, fmt_spark_fn=None):
     """
     Card de GMV/AOV/Órdenes al estilo Growth OS: icono + label arriba,
     valor grande (moneda nativa del farmer -- currency -- salvo que
@@ -429,9 +429,18 @@ def metric_trend_card(icon, label, value, delta_frac, sub_left, prev=0, prev2=0,
     Sabas: "Órdenes" pasa a tener su propia card, con el mismo sparkline
     de 3 meses que GMV/AOV, pero mostrando un CONTEO ("73 órdenes"), no
     un monto en ARS): funcion opcional value -> str que reemplaza a
-    dl.fmt_money() en el valor grande y en los 3 puntos del sparkline.
-    None (default) mantiene el comportamiento de siempre (fmt_money con
-    currency) -- GMV/AOV no cambian su firma de llamada.
+    dl.fmt_money() en el valor grande. None (default) mantiene el
+    comportamiento de siempre (fmt_money con currency) -- GMV/AOV no
+    cambian su firma de llamada.
+
+    fmt_spark_fn (nuevo, quinta vuelta -- pedido explícito de Sabas): el
+    formateador de los 3 puntos chicos del pie del sparkline puede ser
+    DISTINTO del de arriba -- ej. GMV muestra "ARS $ 4.028.558" arriba
+    pero "$4,0M" abajo (dl.fmt_money_compact, abrevia a K/M porque con 3
+    cards por fila el monto completo no entra legible); Órdenes muestra
+    "73 órdenes" arriba pero solo "73" abajo (sin la palabra, para que
+    quepa). None (default) usa el mismo formateador que el valor grande
+    (fmt_fn o fmt_money).
 
     prev/prev2 (renombrados de prev_ars/prev2_ars en esta misma vuelta,
     ya no son necesariamente ARS): dato de mes anterior y de hace DOS
@@ -461,6 +470,7 @@ def metric_trend_card(icon, label, value, delta_frac, sub_left, prev=0, prev2=0,
     en DETALLE, no parcial por dia).
     """
     _fmt = fmt_fn if fmt_fn else (lambda v: dl.fmt_money(v, currency))
+    _fmt_spark = fmt_spark_fn if fmt_spark_fn else _fmt
     delta_html = ""
     if delta_frac:
         color = COLORS["success"] if delta_frac > 0 else COLORS["danger"]
@@ -480,15 +490,15 @@ def metric_trend_card(icon, label, value, delta_frac, sub_left, prev=0, prev2=0,
             f'<div style="display:flex;gap:8px;width:100%;margin:4px auto 0;">'
             f'<div style="flex:1;text-align:left;min-width:0;">'
             f'<div style="font-size:9px;color:{COLORS["muted"]};">{mes_prev2}</div>'
-            f'<div style="font-size:10px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_fmt(prev2)}</div>'
+            f'<div style="font-size:10px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_fmt_spark(prev2)}</div>'
             f'</div>'
             f'<div style="flex:1;text-align:center;min-width:0;">'
             f'<div style="font-size:9px;color:{COLORS["muted"]};">{mes_prev}</div>'
-            f'<div style="font-size:10px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_fmt(prev)}</div>'
+            f'<div style="font-size:10px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_fmt_spark(prev)}</div>'
             f'</div>'
             f'<div style="flex:1;text-align:right;min-width:0;">'
             f'<div style="font-size:9px;color:{COLORS["muted"]};">{mes_curr}</div>'
-            f'<div style="font-size:10px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_fmt(value)}</div>'
+            f'<div style="font-size:10px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_fmt_spark(value)}</div>'
             f'</div>'
             f'</div>'
             "</div>"
@@ -2400,24 +2410,31 @@ with tab_home:
         g1, g2, g3 = st.columns(3)
         with g1:
             fmt_ordenes = lambda v: f'{v:,.0f} órdenes'.replace(",", ".")
+            # fmt_spark_fn solo-número (sin la palabra "órdenes") -- pedido
+            # explícito de Sabas (septiembre 2026, quinta vuelta): el pie
+            # del sparkline necesita quedar corto para que quepa en 1/3
+            # de card.
+            fmt_ordenes_spark = lambda v: f'{v:,.0f}'.replace(",", ".")
             st.markdown(
                 metric_trend_card(ICON_ORDENES, "ÓRDENES", row.ordenes, row.ordenes_delta,
                                    "Órdenes del mes", prev=row.ordenes_last, prev2=row.ordenes_prev2,
-                                   fmt_fn=fmt_ordenes, es_ritmo=True),
+                                   fmt_fn=fmt_ordenes, fmt_spark_fn=fmt_ordenes_spark, es_ritmo=True),
                 unsafe_allow_html=True,
             )
         with g2:
             st.markdown(
                 metric_trend_card(ICON_AOV, "AOV", row.aov, row.aov_delta,
                                    "Ticket promedio", prev=row.aov_last, prev2=row.aov_prev2,
-                                   currency=CURRENCY),
+                                   currency=CURRENCY,
+                                   fmt_spark_fn=lambda v: dl.fmt_money_compact(v, CURRENCY)),
                 unsafe_allow_html=True,
             )
         with g3:
             st.markdown(
                 metric_trend_card(ICON_GMV, "GMV (mes)", row.gmv, row.gmv_delta,
                                    "", prev=row.gmv_last, prev2=row.gmv_prev2,
-                                   currency=CURRENCY, es_ritmo=True),
+                                   currency=CURRENCY, es_ritmo=True,
+                                   fmt_spark_fn=lambda v: dl.fmt_money_compact(v, CURRENCY)),
                 unsafe_allow_html=True,
             )
     else:
