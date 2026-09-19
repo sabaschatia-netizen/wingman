@@ -28,7 +28,6 @@ from theme import (
     ICON_BULLET_CHECK,
     ICON_BULLET_EYE,
     ICON_BULLET_WARNING,
-    ICON_CATEGORIA,
     ICON_CHAT,
     ICON_CLIPBOARD,
     ICON_COINV_CHURN,
@@ -63,6 +62,7 @@ from theme import (
     ICON_TROFEO,
     build_css,
     favicon,
+    icon_categoria_for,
     icon_medalla_numero,
     logo_img,
 )
@@ -2237,7 +2237,7 @@ contact_html = (
     f'<div class="conn-status-pill {churn_class}">{churn_icon} {row.churn_status}</div></div>'
     f'<div><div class="stat-label">TELÉFONO</div><div class="stat-value">{row.telefono or "?"}{telefono_copy}</div></div>'
     f'<div><div class="stat-label">CORREO</div><div class="stat-value" style="font-size:13px;">{row.mail or "?"}{mail_copy}</div></div>'
-    f'<div><div class="stat-label">CATEGORÍA</div><div class="stat-value"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_CATEGORIA}</span>{row.categoria or "?"}</div></div>'
+    f'<div><div class="stat-label">CATEGORÍA</div><div class="stat-value">{row.categoria or "?"}</div></div>'
     f'<div><div class="stat-label">BUSCAR EN GOOGLE</div><div class="stat-value">'
     f'<a href="{search_url}" target="_blank" rel="noopener noreferrer" '
     f'title="Buscar en Google" aria-label="Buscar en Google" '
@@ -2246,9 +2246,27 @@ contact_html = (
     "</div>"
 )
 
+# Ícono de categoría como "primera letra" del título -- rediseño décima
+# tercera vuelta, pedido explícito de Sabas, aprobado como mockup visual
+# antes de escribir el código: el círculo con el dibujo de la categoría
+# (Peruana, Asado, Sushi, etc. -- ver icon_categoria_for en theme.py) ya
+# no va junto al dato "CATEGORÍA" de la fila de abajo (que ahora es solo
+# texto plano) -- pasa a ir INMEDIATAMENTE antes del nombre de la marca,
+# ambos centrados como un solo bloque, como si el ícono fuera la
+# primera letra del título.
+brand_title_html = (
+    '<div style="display:flex;align-items:center;justify-content:center;gap:16px;">'
+    f'<div style="width:52px;height:52px;border-radius:50%;background:{COLORS["card2"]};'
+    f'display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:11px;box-sizing:border-box;">'
+    f'{icon_categoria_for(row.categoria)}'
+    f'</div>'
+    f'<div class="brand-title" style="margin-bottom:0;">{row.brand_name}</div>'
+    f'</div>'
+)
+
 st.markdown(
     f'<div class="brand-sticky">'
-    f'<div class="brand-title">{row.brand_name}</div>'
+    f"{brand_title_html}"
     f'<div class="brand-id">{brand_id_display}</div>'
     f"{contact_html}"
     f"</div>",
