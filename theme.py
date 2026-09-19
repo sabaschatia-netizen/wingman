@@ -275,6 +275,69 @@ ICON_TENDENCIA = _icon(
     'stroke-linecap="round" stroke-linejoin="round"/>'
 )
 
+# ── Campaign Designer / Outreach (novena vuelta, pedido explícito de
+# Sabas): reemplazan los emojis Unicode de Apple por el mismo sistema
+# monocromático del resto del rediseño.
+ICON_ADS_PLAN = ICON_ADS_LEVER  # megáfono, ya definido arriba -- "Ads Plan" reusa el mismo ícono de la palanca Ads
+ICON_MD_PLAN = ICON_MARKDOWN_LEVER  # círculo con %, ya definido arriba -- "Markdown Plan" reusa el de la palanca Markdown
+
+ICON_CLIPBOARD = _icon(
+    '<rect x="6" y="4" width="12" height="17" rx="2" stroke="currentColor" stroke-width="1.7" fill="none"/>'
+    '<path d="M9 4V3a1 1 0 011-1h4a1 1 0 011 1v1" stroke="currentColor" stroke-width="1.7" fill="none"/>'
+    '<path d="M9 11h6M9 15h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>'
+)
+ICON_ENVELOPE = _icon(
+    '<rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.7" fill="none"/>'
+    '<path d="M4 6.5l8 6 8-6" stroke="currentColor" stroke-width="1.7" fill="none" '
+    'stroke-linecap="round" stroke-linejoin="round"/>'
+)
+ICON_CHAT = _icon(
+    '<path d="M4 5h16a1 1 0 011 1v10a1 1 0 01-1 1H9l-4 4v-4H4a1 1 0 01-1-1V6a1 1 0 011-1z" '
+    'stroke="currentColor" stroke-width="1.7" fill="none" stroke-linejoin="round"/>'
+)
+
+
+def icon_medalla_numero(n):
+    """
+    Círculo relleno con el número (1/2/3) adentro -- reemplaza los
+    emojis 🥇🥈🥉 del Top 3 productos en Campaign Designer. Un solo
+    generador en vez de 3 constantes, mismo patrón que ICON_GMV (círculo
+    con "S" adentro).
+    """
+    return _icon(
+        f'<circle cx="12" cy="12" r="10" fill="currentColor"/>'
+        f'<text x="12" y="16.5" font-family="Arial, sans-serif" font-size="12" '
+        f'font-weight="700" fill="white" text-anchor="middle">{n}</text>'
+    )
+
+
+# Íconos de los 6 grupos de coinversión (COINV_GROUPS en data_layer.py,
+# antes 🎯🌱🚫🛡️⭐📦) -- diferenciados entre sí porque cada grupo es un
+# concepto de negocio distinto, no variaciones de un mismo ícono.
+ICON_COINV_NEW_HUNTERS = ICON_CONVERSION  # diana, ya definido arriba
+ICON_COINV_NEW_REST = _icon(
+    '<path d="M12 21V11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+    '<path d="M12 11C12 11 7 11 7 6c5 0 5 5 5 5z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+    '<path d="M12 14c0 0 5 0 5-5c-5 0-5 5-5 5z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+)
+ICON_COINV_CHURN = _icon(
+    '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" fill="none"/>'
+    '<line x1="5.7" y1="5.7" x2="18.3" y2="18.3" stroke="currentColor" stroke-width="1.8"/>'
+)
+ICON_COINV_CHURN_PREVENTION = _icon(
+    '<path d="M12 3l7 3v6c0 5-3 8-7 9-4-1-7-4-7-9V6l7-3z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+)
+ICON_COINV_PRIORITIZED = ICON_ESTRELLA
+ICON_COINV_REST = _icon(
+    '<path d="M12 2.5l8.5 4.9v9.2L12 21.5l-8.5-4.9V7.4L12 2.5z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+    '<path d="M3.5 7.4L12 12.2l8.5-4.8M12 12.2v9.3" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+)
+
 
 # =========================
 # CSS

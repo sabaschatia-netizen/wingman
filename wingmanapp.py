@@ -21,17 +21,28 @@ import data_layer as dl
 from theme import (
     COLORS,
     ICON_ADS_LEVER,
+    ICON_ADS_PLAN,
     ICON_AOV,
     ICON_BULLET_CHECK,
     ICON_BULLET_EYE,
     ICON_BULLET_WARNING,
     ICON_CATEGORIA,
+    ICON_CHAT,
+    ICON_CLIPBOARD,
+    ICON_COINV_CHURN,
+    ICON_COINV_CHURN_PREVENTION,
+    ICON_COINV_NEW_HUNTERS,
+    ICON_COINV_NEW_REST,
+    ICON_COINV_PRIORITIZED,
+    ICON_COINV_REST,
     ICON_CONVERSION,
     ICON_CORONA,
+    ICON_ENVELOPE,
     ICON_FUNNEL,
     ICON_GMV,
     ICON_MARKDOWN,
     ICON_MARKDOWN_LEVER,
+    ICON_MD_PLAN,
     ICON_MEDALLA,
     ICON_MENU,
     ICON_OPS,
@@ -40,6 +51,7 @@ from theme import (
     ICON_TRAFICO,
     build_css,
     favicon,
+    icon_medalla_numero,
     logo_img,
 )
 
@@ -64,7 +76,7 @@ st.set_page_config(
 # RENDER HELPERS
 # =========================
 
-def _copy_button_html(texto, label="📋", tamano="chico"):
+def _copy_button_html(texto, label=None, tamano="chico"):
     """
     Devuelve SOLO el <button> (sin onclick) para insertar dentro de un
     st.markdown -- el onclick se ata aparte, ver _render_copy_script.
@@ -85,8 +97,15 @@ def _copy_button_html(texto, label="📋", tamano="chico"):
     Este helper es el paso 1 (el botón visual). Se necesita SIEMPRE
     junto con una llamada a _render_copy_script(texto, mismo_id) para que
     el click funcione -- no sirve solo.
+
+    label (novena vuelta, pedido explícito de Sabas): default None usa
+    el ícono de portapapeles SVG monocromático (ICON_CLIPBOARD) en vez
+    del emoji 📋 -- pasar un label explícito (ej. el botón "grande" con
+    texto "Copiar") sigue funcionando igual que antes.
     """
     btn_id = f"copy-{abs(hash(texto))}"
+    if label is None:
+        label = f'<span class="lever-icon" style="margin:0;">{ICON_CLIPBOARD}</span>'
     if tamano == "grande":
         style = (
             f"background:{COLORS['brand_purple_soft']};color:{COLORS['brand_purple']};"
@@ -101,13 +120,23 @@ def _copy_button_html(texto, label="📋", tamano="chico"):
     return btn_id, f'<button id="{btn_id}" style="{style}" title="Copiar">{label}</button>'
 
 
-def _render_copy_script(texto, btn_id, label_original="📋"):
+def _render_copy_script(texto, btn_id, label_original=None):
     """
     Paso 2 del botón de copiar: st_components.html() que busca el botón
     por su id en window.parent.document y le asigna el onclick real
     (navigator.clipboard.writeText con fallback a execCommand('copy'),
     igual que Growth OS). Se llama SIEMPRE junto a _copy_button_html.
+
+    label_original / ícono de confirmación (novena vuelta, pedido
+    explícito de Sabas): el emoji ✅ de "copiado" que antes iba
+    hardcodeado en el JS pasa a ICON_BULLET_CHECK (SVG monocromático);
+    label_original default None usa el mismo ICON_CLIPBOARD que
+    _copy_button_html para que el botón vuelva a su ícono normal tras
+    el timeout.
     """
+    if label_original is None:
+        label_original = f'<span class="lever-icon" style="margin:0;">{ICON_CLIPBOARD}</span>'
+    check_html_js = json.dumps(f'<span class="lever-icon" style="margin:0;color:{COLORS["success"]};">{ICON_BULLET_CHECK}</span>')
     texto_js = json.dumps(str(texto))
     label_js = json.dumps(str(label_original))
     st_components.html(
@@ -116,13 +145,14 @@ def _render_copy_script(texto, btn_id, label_original="📋"):
         (function() {{
           var texto = {texto_js};
           var labelOriginal = {label_js};
+          var checkHtml = {check_html_js};
           function findBtn() {{
             try {{
               var btn = window.parent.document.getElementById({json.dumps(btn_id)});
               if (!btn) return;
               btn.onclick = function() {{
                 function marcarCopiado() {{
-                  btn.innerHTML = '✅';
+                  btn.innerHTML = checkHtml;
                   setTimeout(function() {{ btn.innerHTML = labelOriginal; }}, 1500);
                 }}
                 if (navigator.clipboard && navigator.clipboard.writeText) {{
@@ -2975,8 +3005,8 @@ with tab_campaign:
 
     if row.gmv_last <= 0:
         ads_card_html = (
-            '<div class="campaign-card lever-ads">'
-            '<div class="card-label">📣 Ads Plan</div>'
+            '<div class="campaign-card">'
+            f'<div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_ADS_PLAN}</span>Ads Plan</div>'
             '<div class="campaign-sub" style="margin-top:8px;">Sin GMV del mes anterior para calcular el modelo.</div>'
             "</div>"
         )
@@ -2995,8 +3025,8 @@ with tab_campaign:
             f'<div class="card-copy">{plan["pedidos_inc_4sem"]:,.0f} pedidos</div></div>'.replace(",", ".")
         )
         ads_card_html = (
-            '<div class="campaign-card lever-ads">'
-            '<div class="card-label">📣 Ads Plan</div>'
+            '<div class="campaign-card">'
+            f'<div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_ADS_PLAN}</span>Ads Plan</div>'
             f'<div class="campaign-headline">{dl.fmt_money(plan["presupuesto_semana1"], CURRENCY)}<span style="font-size:14px;font-weight:600;"> /semana</span></div>'
             f'<div class="campaign-sub">Inversión recomendada: el {pct_label} del GMV de la última semana '
             f'({dl.fmt_money(plan["gmv_semana"], CURRENCY)})</div>'
@@ -3013,10 +3043,9 @@ with tab_campaign:
         for pct in (20, 25, 30)
     )
     tops = tpmap.get(row.key, [])
-    medals = ["🥇", "🥈", "🥉"]
     if tops:
         tops_html = "".join(
-            f'<div class="top3-row"><span style="font-size:16px;">{medals[i]}</span>'
+            f'<div class="top3-row"><span class="lever-icon">{icon_medalla_numero(i + 1)}</span>'
             f'<span class="pf-name">{p}</span>'
             f'<span class="pf-meta">VPD {v:,.0f} · CVR {c * 100:.1f}%</span></div>'.replace(",", ".")
             for i, (p, v, c) in enumerate(tops)
@@ -3024,14 +3053,28 @@ with tab_campaign:
     else:
         tops_html = '<div class="card-copy">Sin productos rankeados para esta marca.</div>'
 
+    # Ícono del grupo de coinversión -- grupo_icon ahora es la CLAVE del
+    # grupo (ver COINV_GROUPS en data_layer.py), no un emoji; se resuelve
+    # acá al ícono SVG monocromático correspondiente (novena vuelta,
+    # pedido explícito de Sabas).
+    COINV_ICON_MAP = {
+        "new hunters": ICON_COINV_NEW_HUNTERS,
+        "new rest": ICON_COINV_NEW_REST,
+        "churn": ICON_COINV_CHURN,
+        "churn prevention": ICON_COINV_CHURN_PREVENTION,
+        "prioritized": ICON_COINV_PRIORITIZED,
+        "rest": ICON_COINV_REST,
+    }
+
     if coinv_plan:
         # Con coinversión: la campaña principal es 30% + PRO, con el desglose
         # del ratio Aliado:Rappi sobre el descuento total combinado. La regla
         # por defecto (15/20/25 según CVR) queda como pill debajo, no como
         # recomendación principal -- pedido explicito de Sabas.
+        coinv_icon_svg = COINV_ICON_MAP.get(coinv_plan["grupo_icon"], ICON_COINV_REST)
         coinv_html = (
             '<div class="coinv-block">'
-            f'<span class="coinv-badge">{coinv_plan["grupo_icon"]} Coinversión activa · {coinv_plan["grupo_label"]} · ratio {coinv_plan["ratio"]}</span>'
+            f'<span class="coinv-badge"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{coinv_icon_svg}</span>Coinversión activa · {coinv_plan["grupo_label"]} · ratio {coinv_plan["ratio"]}</span>'
             f'<div class="campaign-headline" style="font-size:26px;margin-top:8px;">'
             f'{coinv_plan["discount"]}% OFF <span style="font-size:15px;color:{COLORS["success"]};">+ {coinv_plan["pro_extra"]}% PRO</span></div>'
             f'<div class="coinv-split">'
@@ -3048,8 +3091,8 @@ with tab_campaign:
             "</div>"
         )
         md_card_html = (
-            '<div class="campaign-card lever-md">'
-            '<div class="card-label">🏷️ Markdown Plan</div>'
+            '<div class="campaign-card">'
+            f'<div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_MD_PLAN}</span>Markdown Plan</div>'
             f'<div style="margin-top:10px;">{coinv_html}</div>'
             f"{default_pill_html}"
             '<div class="section-title" style="margin:14px 0 8px 0;">TOP 3 PRODUCTOS</div>'
@@ -3058,8 +3101,8 @@ with tab_campaign:
         )
     else:
         md_card_html = (
-            '<div class="campaign-card lever-md">'
-            '<div class="card-label">🏷️ Markdown Plan</div>'
+            '<div class="campaign-card">'
+            f'<div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_MD_PLAN}</span>Markdown Plan</div>'
             f'<div class="campaign-headline" style="font-size:26px;">'
             f'{md["discount"]}% OFF <span style="font-size:15px;color:{COLORS["success"]};">+ {md["pro_extra"]}% PRO</span></div>'
             f'<div class="md-ladder">{ladder_html}</div>'
@@ -3126,17 +3169,18 @@ with tab_outreach:
 
     oc1, oc2 = st.columns(2)
     with oc1:
-        email_btn_id, email_copy_btn = _copy_button_html(email_body, label="📋 Copiar", tamano="grande")
+        email_copy_label = f'<span class="lever-icon" style="margin:0 6px 0 0;">{ICON_CLIPBOARD}</span>Copiar'
+        email_btn_id, email_copy_btn = _copy_button_html(email_body, label=email_copy_label, tamano="grande")
         st.markdown(
             f'<div class="glass-card"><div style="display:flex;justify-content:space-between;align-items:center;">'
-            f'<div class="card-label">📧 EMAIL</div>{email_copy_btn}</div>'
+            f'<div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_ENVELOPE}</span>EMAIL</div>{email_copy_btn}</div>'
             f'<div style="margin-top:10px;font-size:12.5px;white-space:pre-wrap;line-height:1.6;">{email_body}</div></div>',
             unsafe_allow_html=True,
         )
-        _render_copy_script(email_body, email_btn_id, label_original="📋 Copiar")
+        _render_copy_script(email_body, email_btn_id, label_original=email_copy_label)
     with oc2:
         st.markdown(
-            f'<div class="glass-card"><div class="card-label">💬 WHATSAPP</div>'
+            f'<div class="glass-card"><div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_CHAT}</span>WHATSAPP</div>'
             f'<div style="margin-top:10px;font-size:12.5px;white-space:pre-wrap;line-height:1.6;">{whatsapp_body}</div></div>',
             unsafe_allow_html=True,
         )

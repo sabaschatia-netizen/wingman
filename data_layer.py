@@ -34,13 +34,21 @@ ARS_PER_USD = 1400  # misma referencia que Growth OS -- EXPORT ADS viene en USD
 # real Aliado:Rappi. Churn es el UNICO grupo sin coinversion habilitada.
 # ratio_aliado / ratio_rappi son las partes del ratio ya separadas para
 # calcular el % que pone cada uno sobre un descuento total.
+#
+# "icon" (novena vuelta, pedido explícito de Sabas): ya NO es un emoji
+# Unicode -- ahora es la CLAVE del propio grupo (idéntica a la key del
+# diccionario), que wingmanapp.py usa para elegir el ícono SVG
+# monocromático correspondiente (ICON_COINV_* en theme.py). data_layer.py
+# no importa theme.py a propósito (capa de datos, no de presentación),
+# así que el emoji no puede vivir acá -- el mapeo real ocurre en el
+# render.
 COINV_GROUPS = {
-    "new hunters":      {"ratio": "4:1", "ratio_aliado": 4, "ratio_rappi": 1, "label": "New Hunters", "icon": "🎯", "has_coinv": True},
-    "new rest":         {"ratio": "2:1", "ratio_aliado": 2, "ratio_rappi": 1, "label": "New Rest", "icon": "🌱", "has_coinv": True},
-    "churn":            {"ratio": None, "ratio_aliado": None, "ratio_rappi": None, "label": "Churn (Sin Coinv.)", "icon": "🚫", "has_coinv": False},
-    "churn prevention": {"ratio": "2:3", "ratio_aliado": 2, "ratio_rappi": 3, "label": "Churn Prevention", "icon": "🛡️", "has_coinv": True},
-    "prioritized":      {"ratio": "2:1", "ratio_aliado": 2, "ratio_rappi": 1, "label": "Prioritized", "icon": "⭐", "has_coinv": True},
-    "rest":             {"ratio": "3:1", "ratio_aliado": 3, "ratio_rappi": 1, "label": "Rest", "icon": "📦", "has_coinv": True},
+    "new hunters":      {"ratio": "4:1", "ratio_aliado": 4, "ratio_rappi": 1, "label": "New Hunters", "icon": "new hunters", "has_coinv": True},
+    "new rest":         {"ratio": "2:1", "ratio_aliado": 2, "ratio_rappi": 1, "label": "New Rest", "icon": "new rest", "has_coinv": True},
+    "churn":            {"ratio": None, "ratio_aliado": None, "ratio_rappi": None, "label": "Churn (Sin Coinv.)", "icon": "churn", "has_coinv": False},
+    "churn prevention": {"ratio": "2:3", "ratio_aliado": 2, "ratio_rappi": 3, "label": "Churn Prevention", "icon": "churn prevention", "has_coinv": True},
+    "prioritized":      {"ratio": "2:1", "ratio_aliado": 2, "ratio_rappi": 1, "label": "Prioritized", "icon": "prioritized", "has_coinv": True},
+    "rest":             {"ratio": "3:1", "ratio_aliado": 3, "ratio_rappi": 1, "label": "Rest", "icon": "rest", "has_coinv": True},
 }
 
 
