@@ -21,12 +21,13 @@ import data_layer as dl
 from theme import (
     COLORS,
     ICON_ADS,
+    ICON_ADS_LEVER,
     ICON_CATEGORIA,
     ICON_ESTRELLA,
     ICON_MARKDOWN,
+    ICON_MARKDOWN_LEVER,
     ICON_MENU,
     ICON_OPS,
-    ICON_PALANCA,
     build_css,
     favicon,
     logo_img,
@@ -331,8 +332,13 @@ def mini_card(label, value, copy="", lever="", chip="", chip_color="", corner_ba
     # Ícono de palanca (morado si activa, gris si inactiva) -- rediseño
     # septiembre 2026, pedido explícito de Sabas: reemplaza el label de
     # texto suelto por un ícono circular chico + el nombre de la palanca.
+    # Corrección (segunda vuelta, mismo pedido): el ícono es específico
+    # por palanca -- megáfono para ADS, círculo-con-% para Markdown y
+    # Markdown Pro (ambas comparten glifo, solo cambia el color) -- no un
+    # rayo genérico como se había puesto antes.
+    icon_svg = ICON_ADS_LEVER if lever == "ads" else ICON_MARKDOWN_LEVER
     icon_class = "lever-icon icon-purple" if active else "lever-icon"
-    icon_html = f'<span class="{icon_class}">{ICON_PALANCA}</span>'
+    icon_html = f'<span class="{icon_class}">{icon_svg}</span>'
     return (
         f'<div class="business-mini-card lever-{lever}">'
         f"{badge_html}"
@@ -358,10 +364,17 @@ def gauge_card(pct, name, tag, sub=""):
 def _trend_sparkline(prev2, prev, curr):
     """
     Mini grafico SVG de 3 puntos: hace-2-meses -> mes-pasado -> mes-en-curso.
-    Mismo lenguaje visual que Growth OS (linea con puntos). Reemplaza al
-    sparkline viejo de 2 puntos (Anterior/Actual) -- ahora son 3 meses
-    reales, ya no 2 periodos genericos (pedido explicito de Sabas,
-    septiembre 2026, hoja PREVIOUS GMV nueva en el Excel).
+    Mismo lenguaje visual que Growth OS (linea con puntos huecos + area
+    sombreada degradada debajo). Reemplaza al sparkline viejo de 2 puntos
+    (Anterior/Actual) -- ahora son 3 meses reales, ya no 2 periodos
+    genericos (pedido explicito de Sabas, septiembre 2026, hoja PREVIOUS
+    GMV nueva en el Excel).
+
+    Fix (septiembre 2026, segunda vuelta -- pedido explícito de Sabas):
+    los puntos deben ser HUECOS (relleno blanco/card, borde naranja), no
+    sólidos, y debe haber un área sombreada con degradado por debajo de
+    la línea (se desvanece hacia abajo) -- antes faltaban ambos detalles,
+    esto es lo que se ve en la referencia visual de Growth OS.
     """
     prev2, prev, curr = max(prev2, 0), max(prev, 0), max(curr, 0)
     top = max(prev2, prev, curr, 1)
@@ -369,15 +382,22 @@ def _trend_sparkline(prev2, prev, curr):
     y_prev = 34 - (prev / top) * 24
     y_curr = 34 - (curr / top) * 24
     color = COLORS["brand_orange"]
+    fill_id = f"sparkfill-{abs(hash((prev2, prev, curr))) % 100000}"
     return (
         f'<svg width="250" height="44" viewBox="0 0 250 44" style="overflow:visible;">'
+        f'<defs><linearGradient id="{fill_id}" x1="0" y1="0" x2="0" y2="1">'
+        f'<stop offset="0%" stop-color="{color}" stop-opacity="0.35"/>'
+        f'<stop offset="100%" stop-color="{color}" stop-opacity="0"/>'
+        f'</linearGradient></defs>'
+        f'<path d="M20,{y_prev2:.1f} L125,{y_prev:.1f} L230,{y_curr:.1f} L230,44 L20,44 Z" '
+        f'fill="url(#{fill_id})" stroke="none"/>'
         f'<line x1="20" y1="{y_prev2:.1f}" x2="125" y2="{y_prev:.1f}" '
         f'stroke="{color}" stroke-width="2" stroke-linecap="round"/>'
         f'<line x1="125" y1="{y_prev:.1f}" x2="230" y2="{y_curr:.1f}" '
         f'stroke="{color}" stroke-width="2" stroke-linecap="round"/>'
-        f'<circle cx="20" cy="{y_prev2:.1f}" r="3" fill="{color}"/>'
-        f'<circle cx="125" cy="{y_prev:.1f}" r="3" fill="{color}"/>'
-        f'<circle cx="230" cy="{y_curr:.1f}" r="3" fill="{color}"/>'
+        f'<circle cx="20" cy="{y_prev2:.1f}" r="4" fill="{COLORS["card"]}" stroke="{color}" stroke-width="2.5"/>'
+        f'<circle cx="125" cy="{y_prev:.1f}" r="4" fill="{COLORS["card"]}" stroke="{color}" stroke-width="2.5"/>'
+        f'<circle cx="230" cy="{y_curr:.1f}" r="4" fill="{COLORS["card"]}" stroke="{color}" stroke-width="2.5"/>'
         f'</svg>'
     )
 
@@ -2334,7 +2354,7 @@ if mail_btn_id:
     _render_copy_script(row.mail, mail_btn_id)
 
 tab_home, tab_action, tab_analytics, tab_campaign, tab_outreach = st.tabs(
-    ["🏠 Home", "🎯 360° Action", "📊 Analytics", "🚀 Campaign Designer", "📧 Outreach"]
+    ["Home", "360° Action", "Analytics", "Campaign Designer", "Outreach"]
 )
 
 

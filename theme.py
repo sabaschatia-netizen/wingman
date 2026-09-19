@@ -139,10 +139,23 @@ ICON_CATEGORIA = _icon(
     'stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
 )
 
-# Palanca genérica (Ads/Markdown/Markdown Pro en Home) — rayo
-ICON_PALANCA = _icon(
-    '<path d="M13 3L5 14h5l-1 7 8-11h-5l1-7z" '
-    'stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>'
+# Palanca ADS — megáfono sólido (color por currentColor vía fill)
+ICON_ADS_LEVER = _icon(
+    '<path d="M3 10v4a1 1 0 001 1h2l7 4V5L6 9H4a1 1 0 00-1 1z" fill="currentColor"/>'
+    '<path d="M13 8.5a3.5 3.5 0 010 7" stroke="currentColor" stroke-width="1.8" '
+    'stroke-linecap="round" fill="none"/>'
+    '<path d="M18 6a7.5 7.5 0 010 12" stroke="currentColor" stroke-width="1.6" '
+    'stroke-linecap="round" fill="none" opacity="0.6"/>'
+)
+
+# Palanca Markdown / Markdown Pro — círculo relleno con símbolo de % en
+# blanco adentro (mismo ícono para ambas palancas, difieren solo en
+# color de fondo: morado activo / gris inactivo, ver icon-purple en CSS)
+ICON_MARKDOWN_LEVER = _icon(
+    '<circle cx="12" cy="12" r="10" fill="currentColor"/>'
+    '<circle cx="9" cy="9" r="1.6" fill="white"/>'
+    '<circle cx="15" cy="15" r="1.6" fill="white"/>'
+    '<path d="M8 16L16 8" stroke="white" stroke-width="1.6" stroke-linecap="round"/>'
 )
 
 # Dato Ancla — estrella (imagen 2)
