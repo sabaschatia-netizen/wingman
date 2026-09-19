@@ -2594,13 +2594,23 @@ with tab_action:
     def _bullet_icon_for_estado(estado):
         # Ícono dentro del bullet según estado -- séptima vuelta, pedido
         # explícito de Sabas: ALERT -> triángulo de warning, WATCH -> ojo,
-        # HEALTHY -> chulito, sin dato/no aplica (None o cualquier otro
-        # valor, ej. INACTIVE) -> el punto simple de siempre (sin ícono).
+        # HEALTHY -> chulito.
+        #
+        # Fix (misma sesión, octava vuelta -- pedido explícito de Sabas):
+        # estado None ("Cancelaciones — sin alerta presente", "Tiempo de
+        # espera — sin alerta presente") también lleva CHULITO, no el
+        # punto simple -- confirmado explícitamente: "sin alerta
+        # presente" ES estar sano (no hay fila en Priority Data para esa
+        # métrica, pero eso significa que no hay problema reportado, así
+        # que cuenta como saludable). El punto simple queda sin uso real
+        # hoy (ningún estado actual lo dispara), pero se mantiene el
+        # fallback por si en el futuro aparece un estado genuinamente
+        # distinto de los 3 conocidos.
         if estado == "ALERT":
             return ICON_BULLET_WARNING
         if estado == "WATCH":
             return ICON_BULLET_EYE
-        if estado == "HEALTHY":
+        if estado in ("HEALTHY", None):
             return ICON_BULLET_CHECK
         return None
 
