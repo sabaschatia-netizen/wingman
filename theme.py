@@ -205,6 +205,33 @@ ICON_ESTRELLA = _icon(
     'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>'
 )
 
+# ── Bullets de estado de los items en 360° Action (OPS/Menú/Markdown/
+# Ads) -- séptima vuelta, pedido explícito de Sabas: reemplaza el
+# punto simple dentro del círculo gris por un ícono según el estado del
+# item -- ALERT: triángulo de warning; WATCH: ojo; HEALTHY: chulito;
+# sin dato (None, "no la está pidiendo"): se queda el punto simple de
+# siempre (ICON_BULLET_DOT). Todos con stroke="currentColor" para
+# heredar el mismo gris del círculo contenedor.
+ICON_BULLET_DOT = (
+    '<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg" '
+    'style="display:block;"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>'
+)
+ICON_BULLET_WARNING = _icon(
+    '<path d="M12 3.5 L21.5 20 L2.5 20 Z" stroke="currentColor" stroke-width="2" '
+    'stroke-linejoin="round" fill="none"/>'
+    '<line x1="12" y1="9.5" x2="12" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
+    '<circle cx="12" cy="16.8" r="1.1" fill="currentColor"/>'
+)
+ICON_BULLET_EYE = _icon(
+    '<path d="M2 12c2.5-5 7-8 10-8s7.5 3 10 8c-2.5 5-7 8-10 8s-7.5-3-10-8z" '
+    'stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>'
+    '<circle cx="12" cy="12" r="3" fill="currentColor"/>'
+)
+ICON_BULLET_CHECK = _icon(
+    '<path d="M4 12.5l5.5 5.5L20 6" stroke="currentColor" stroke-width="2.6" '
+    'stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
+)
+
 
 # =========================
 # CSS
@@ -1182,13 +1209,19 @@ div[data-testid="stDialog"] {{
     display: inline-flex; align-items: center; justify-content: center;
     width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
     background: {COLORS["card2"]}; margin-right: 8px; vertical-align: -4px;
+    color: {COLORS["muted"]};
 }}
 .action-bullet::after {{
     content: ""; display: block; width: 8px; height: 8px; border-radius: 50%;
     background: {COLORS["muted"]};
 }}
-.action-bullet.icon-purple {{ background: {COLORS["brand_purple_soft"]}; }}
+.action-bullet.icon-purple {{ background: {COLORS["brand_purple_soft"]}; color: {COLORS["brand_purple"]}; }}
 .action-bullet.icon-purple::after {{ background: {COLORS["brand_purple"]}; }}
+/* Cuando el bullet lleva un ícono de estado (warning/eye/check, séptima
+   vuelta) en vez del punto simple, el punto CSS (::after) se anula --
+   el ícono ya viene como SVG hijo en el HTML. */
+.action-bullet.has-icon::after {{ content: none; }}
+.action-bullet.has-icon svg {{ width: 10px; height: 10px; }}
 
 /* ── TABS (Home / 360 Action / Analytics / Campaign Designer / Outreach) ── */
 .stTabs [data-baseweb="tab-list"] {{

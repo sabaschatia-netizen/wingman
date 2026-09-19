@@ -22,6 +22,9 @@ from theme import (
     COLORS,
     ICON_ADS_LEVER,
     ICON_AOV,
+    ICON_BULLET_CHECK,
+    ICON_BULLET_EYE,
+    ICON_BULLET_WARNING,
     ICON_CATEGORIA,
     ICON_ESTRELLA,
     ICON_GMV,
@@ -2588,11 +2591,30 @@ with tab_action:
             "ALERT": "action-card-alert", "INACTIVE": "action-card-inactive",
         }[tag]
 
+    def _bullet_icon_for_estado(estado):
+        # Ícono dentro del bullet según estado -- séptima vuelta, pedido
+        # explícito de Sabas: ALERT -> triángulo de warning, WATCH -> ojo,
+        # HEALTHY -> chulito, sin dato/no aplica (None o cualquier otro
+        # valor, ej. INACTIVE) -> el punto simple de siempre (sin ícono).
+        if estado == "ALERT":
+            return ICON_BULLET_WARNING
+        if estado == "WATCH":
+            return ICON_BULLET_EYE
+        if estado == "HEALTHY":
+            return ICON_BULLET_CHECK
+        return None
+
+    def _bullet_html(estado, icon_purple):
+        base_class = "action-bullet icon-purple" if icon_purple else "action-bullet"
+        icon_svg_bullet = _bullet_icon_for_estado(estado)
+        if icon_svg_bullet:
+            return f'<span class="{base_class} has-icon">{icon_svg_bullet}</span>'
+        return f'<span class="{base_class}"></span>'
+
     def _action_mini(icon_svg, name, pct, tag, title, detail, items=None, icon_purple=False):
         color = _tag_color(tag)
         border_class = _tag_border_class(tag)
         icon_class = "action-card-icon icon-purple" if icon_purple else "action-card-icon"
-        bullet_class = "action-bullet icon-purple" if icon_purple else "action-bullet"
         pct_html = f'<div class="action-card-pct" style="color:{color};">{pct:.0f}%</div>' if pct is not None else ""
         tag_class = {
             "HEALTHY": "tag-healthy", "WATCH": "tag-watch",
@@ -2617,6 +2639,12 @@ with tab_action:
         # presente"/"Métrica sana y competitiva") van en texto normal
         # ("action-card-item-normal"), igual peso que el Insight de
         # Markdown/Ads.
+        #
+        # Ícono dentro del bullet (séptima vuelta, misma sesión, pedido
+        # explícito de Sabas): el punto simple se reemplaza por
+        # warning/eye/check según el estado -- tanto en cada item de
+        # OPS/Menú como en el bullet único de Markdown/Ads (ahí no hay
+        # "items", se usa el `tag` general de la card completa).
         if items:
             item_divs = []
             for item_texto, item_estado in items:
@@ -2627,12 +2655,12 @@ with tab_action:
                 )
                 item_divs.append(
                     f'<div class="action-card-item {peso_class}">'
-                    f'<span class="{bullet_class}"></span>{item_texto}</div>'
+                    f'{_bullet_html(item_estado, icon_purple)}{item_texto}</div>'
                 )
             cuerpo_html = "".join(item_divs)
         else:
             cuerpo_html = (
-                f'<div class="action-card-title"><span class="{bullet_class}"></span>{title}</div>'
+                f'<div class="action-card-title">{_bullet_html(tag, icon_purple)}{title}</div>'
                 f'<div class="action-card-detail">{detail}</div>'
             )
         return (
