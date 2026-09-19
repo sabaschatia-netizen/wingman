@@ -2550,16 +2550,15 @@ with tab_action:
     # concepto DISTINTO: el listado completo y sin recortar de todas las
     # métricas con prioridad para esta marca puntual.
     lever_pills = "".join(
-        f'<span class="action-lever-pill">{lb} · {v:.2f}</span>'
+        f'<span class="action-lever-pill">{lb} <span class="action-lever-pill-value">{v:.2f}</span></span>'
         for lb, v in pmap.get(row.key, [])
     )
     st.markdown(
         f'<div class="action-context-card">'
-        f'<div class="action-context-grid" style="grid-template-columns:1fr;">'
-        f'<div><div class="action-mini-label">Coinversión MD</div>'
+        f'<div class="action-context-label-block">'
+        f'<div class="action-mini-label">Coinversión MD</div>'
         f'<div class="action-mini-value">{row.coinv_md_label}</div></div>'
-        f"</div>"
-        f"{lever_pills}"
+        f'<div class="action-context-pills">{lever_pills}</div>'
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -2594,6 +2593,7 @@ with tab_action:
         color = _tag_color(tag)
         border_class = _tag_border_class(tag)
         icon_class = "action-card-icon icon-purple" if icon_purple else "action-card-icon"
+        bullet_class = "action-bullet icon-purple" if icon_purple else "action-bullet"
         pct_html = f'<div class="action-card-pct" style="color:{color};">{pct:.0f}%</div>' if pct is not None else ""
         tag_class = {
             "HEALTHY": "tag-healthy", "WATCH": "tag-watch",
@@ -2604,12 +2604,21 @@ with tab_action:
         # "detail" -- pedido explícito de Sabas (agosto 2026): las 4
         # señales de OPS/Menú deben verse una debajo de la otra, no
         # unidas con " · " en un solo bloque de texto.
+        #
+        # Bullet circular (sexta vuelta, pedido explícito de Sabas): cada
+        # item de OPS/Menú y el title de Markdown/Ads llevan un bullet
+        # circular monocromático (gris u "icon_purple" según la card),
+        # reemplazando el emoji Unicode que antes iba concatenado al
+        # texto en data_layer.py.
         if items:
             cuerpo_html = "".join(
-                f'<div class="action-card-item">{item}</div>' for item in items
+                f'<div class="action-card-item"><span class="{bullet_class}"></span>{item}</div>' for item in items
             )
         else:
-            cuerpo_html = f'<div class="action-card-title">{title}</div><div class="action-card-detail">{detail}</div>'
+            cuerpo_html = (
+                f'<div class="action-card-title"><span class="{bullet_class}"></span>{title}</div>'
+                f'<div class="action-card-detail">{detail}</div>'
+            )
         return (
             f'<div class="action-card {border_class}">'
             f'<div class="action-card-head"><span class="{icon_class}">{icon_svg}</span></div>'

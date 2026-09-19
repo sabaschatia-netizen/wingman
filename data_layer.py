@@ -1669,7 +1669,7 @@ def ops_tactical_card(key, availability_pct, lost_hours, gmv_ars=0, aov_ars=0, o
     else:
         if availability_pct >= 90:
             disp_estado = "HEALTHY"
-            disp_texto = f"Disponibilidad {availability_pct:.0f}% ✅"
+            disp_texto = f"Disponibilidad {availability_pct:.0f}%"
         elif availability_pct >= 80:
             disp_estado = "WATCH"
             disp_texto = f"Disponibilidad {availability_pct:.0f}% — por debajo del 90%"
@@ -1774,17 +1774,21 @@ def ops_tactical_card(key, availability_pct, lost_hours, gmv_ars=0, aov_ars=0, o
         )
 
     # Orden final fijo: Disponibilidad, Cancelaciones, Tiempo de espera, Reclamos.
+    # Sin emoji concatenado al texto (sexta vuelta, pedido explícito de
+    # Sabas): el bullet circular monocromático se agrega en el render
+    # (wingmanapp.py, _action_mini), no acá -- antes el emoji Unicode
+    # (📶🛑⏱️⚠️) iba pegado al string.
     items = [
-        ("📶", disp_texto, disp_estado),
-        ("🛑", canc_texto, canc_estado_final),
-        ("⏱️", wait_texto, wait_estado_final),
-        ("⚠️", recl_texto, recl_estado_final),
+        (disp_texto, disp_estado),
+        (canc_texto, canc_estado_final),
+        (wait_texto, wait_estado_final),
+        (recl_texto, recl_estado_final),
     ]
 
     # Estado de la card completa: el peor de los 4, ya con la escalacion
     # del Paso 2 aplicada -- "sin datos"/"sin alerta" (None) es neutro, no
     # cuenta ni para bien ni para mal.
-    estados_reales = [e for _, _, e in items if e is not None]
+    estados_reales = [e for _, e in items if e is not None]
     if "ALERT" in estados_reales:
         tag = "ALERT"
     elif "WATCH" in estados_reales:
@@ -1794,15 +1798,15 @@ def ops_tactical_card(key, availability_pct, lost_hours, gmv_ars=0, aov_ars=0, o
     else:
         tag = "HEALTHY"  # las 4 sin datos: no hay nada que reportar, se trata como sano
 
-    bullets = [f"{icono} {texto}" for icono, texto, _ in items]
+    bullets = [texto for texto, _ in items]
     detail = " · ".join(bullets)
 
     if tag == "ALERT":
-        titulo_top = "⚠️ Validar fricción operativa antes de escalar tráfico"
+        titulo_top = "Validar fricción operativa antes de escalar tráfico"
     elif tag == "WATCH":
-        titulo_top = "🟡 Hay puntos de OPS a revisar"
+        titulo_top = "Hay puntos de OPS a revisar"
     else:
-        titulo_top = "✅ OPS saludable"
+        titulo_top = "OPS saludable"
 
     # "items": los mismos 4 bullets pero como LISTA (no un solo string
     # unido por " · ") -- se mantiene igual que antes, la UI los pinta uno
@@ -1914,17 +1918,20 @@ def menu_tactical_card(key, perfect_store_pct, photos_pct, purchase_pct, missing
         pdf_estado = "HEALTHY"
         pdf_texto = "PDF Menú — No se necesita"
 
-    # Orden final fijo: Missing Products, Fotos, Experiencia de compra, PDF Menú.
+    # Orden final fijo: Missing Products, Fotos, Experiencia de compra,
+    # PDF Menú. Sin emoji concatenado (sexta vuelta, pedido explícito de
+    # Sabas): mismo criterio que ops_tactical_card, el bullet circular se
+    # agrega en el render.
     items = [
-        ("📦", mp_texto, mp_estado),
-        ("📸", fotos_texto, fotos_estado),
-        ("🛒", exp_texto, exp_estado),
-        ("📄", pdf_texto, pdf_estado),
+        (mp_texto, mp_estado),
+        (fotos_texto, fotos_estado),
+        (exp_texto, exp_estado),
+        (pdf_texto, pdf_estado),
     ]
 
     # Estado de la card completa: cualquier ALERT domina; sin ALERT, 2+
     # en WATCH escala a ALERT; exactamente 1 en WATCH se queda en WATCH.
-    estados_reales = [e for _, _, e in items if e is not None]
+    estados_reales = [e for _, e in items if e is not None]
     n_watch = estados_reales.count("WATCH")
     if "ALERT" in estados_reales:
         tag = "ALERT"
@@ -1937,7 +1944,7 @@ def menu_tactical_card(key, perfect_store_pct, photos_pct, purchase_pct, missing
     else:
         tag = "HEALTHY"
 
-    bullets_menu = [f"{icono} {texto}" for icono, texto, _ in items]
+    bullets_menu = [texto for texto, _ in items]
     title = " · ".join(bullets_menu)
     detail = (
         "Corregir antes de escalar tráfico o activar pauta."
@@ -1979,24 +1986,23 @@ def md_tactical_card(key, active, roi, campaign_name, mdpro=False):
     activa) o "Sin campaña aún" (si no hay).
     """
     kind = "md_pro" if mdpro else "md"
-    icon = "👑" if mdpro else "🏷️"
     nombre = "Markdown Pro" if mdpro else "Markdown"
     descripcion = _priority_descripcion_for(key, kind)
     accion, mostrar_nota = _clasificar_accion_priority(descripcion)
 
     if not accion:
         if active:
-            return {"title": f"{icon} {nombre}", "detail": "Seguimiento", "tag": "HEALTHY"}
+            return {"title": nombre, "detail": "Seguimiento", "tag": "HEALTHY"}
         # Sin campaña activa Y Priority Data no la pide -- pedido
         # explícito de Sabas (agosto 2026): estado neutro INACTIVE (gris),
         # no WATCH, con la nota especifica.
         return {
-            "title": f"{icon} {nombre} · Inactivo",
+            "title": f"{nombre} · Inactivo",
             "detail": "No hay prioridad comercial ahora, pero revisa qué le puedes ofrecer al aliado.",
             "tag": "INACTIVE",
         }
 
-    title = f"{icon} {nombre} · {accion}"
+    title = f"{nombre} · {accion}"
     detail = accion
     if active and roi:
         detail += f" · ROI {fmt_roi(roi)}"
@@ -2024,16 +2030,16 @@ def ads_tactical_card(key, active, roas, bookings_ars, currency="ARS"):
 
     if not accion:
         if active:
-            return {"title": "🚀 Ads", "detail": "Seguimiento", "tag": "HEALTHY"}
+            return {"title": "Ads", "detail": "Seguimiento", "tag": "HEALTHY"}
         # Sin campaña activa Y Priority Data no la pide -- mismo criterio
         # que Markdown, pedido explícito de Sabas (agosto 2026).
         return {
-            "title": "🚀 Ads · Inactivo",
+            "title": "Ads · Inactivo",
             "detail": "No hay prioridad comercial ahora, pero revisa qué le puedes ofrecer al aliado.",
             "tag": "INACTIVE",
         }
 
-    title = f"🚀 Ads · {accion}"
+    title = f"Ads · {accion}"
     if active:
         detail = f"{accion} · Booking {fmt_money(bookings_ars, currency)} · ROI {fmt_roi(roas)}"
     else:

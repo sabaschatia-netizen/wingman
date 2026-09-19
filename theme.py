@@ -923,21 +923,33 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     line-height: 1.4; margin-top: 2px;
 }}
 
-/* ── 360° ACTION: card de contexto + super-card de 4 palancas ── */
+/* ── 360° ACTION: card de contexto + super-card de 4 palancas ──
+   Rediseño septiembre 2026, sexta vuelta -- pedido explícito de Sabas:
+   antes título y pills iban apilados (título arriba, pills en fila
+   aparte debajo); ahora van en la MISMA fila (título a la izquierda,
+   pills a la derecha, como en la referencia de Growth OS), y las pills
+   pasan de cápsula celeste sólida a cápsula blanca con borde + número
+   en morado (antes: fondo celeste, texto azul, separador " · "). */
 .action-context-card {{
     background: {COLORS["card2"]};
     border-radius: 16px; padding: 16px 20px; margin-bottom: 16px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
 }}
+.action-context-label-block {{ flex-shrink: 0; margin-right: 8px; }}
+.action-context-pills {{ display: flex; flex-wrap: wrap; gap: 8px; }}
 .action-context-grid {{
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
 }}
 .action-mini-label {{ font-size: 10.5px; font-weight: 700; color: {COLORS["muted"]}; text-transform: uppercase; letter-spacing: 0.4px; }}
 .action-mini-value {{ font-size: 14px; font-weight: 700; color: {COLORS["text"]}; margin-top: 2px; }}
 .action-lever-pill {{
-    display: inline-block; font-size: 11.5px; font-weight: 600;
-    background: {COLORS["info_bg"]}; color: {COLORS["blue"]};
-    border-radius: 999px; padding: 5px 11px; margin: 8px 6px 0 0;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600;
+    background: {COLORS["card"]}; border: 1px solid {COLORS["border"]};
+    color: {COLORS["muted"]};
+    border-radius: 999px; padding: 6px 12px;
 }}
+.action-lever-pill-value {{ color: {COLORS["brand_purple"]}; font-weight: 700; }}
 
 /* Tabla de farmers del Supervisor (Gestión General por país): pills de
    colores en vez de texto plano, mismo estilo visual que las pills de
@@ -1153,6 +1165,24 @@ div[data-testid="stDialog"] {{
 .action-card-watch   {{ border-top-color: {COLORS["warning"]}; }}
 .action-card-alert   {{ border-top-color: {COLORS["danger"]}; }}
 .action-card-inactive {{ border-top-color: {COLORS["muted"]}; }}
+
+/* Bullet circular (círculo claro + punto sólido) que reemplaza los
+   emojis Unicode de colores (📶🛑⏱️⚠️ etc.) junto a cada item de
+   OPS/Menú y junto al título de Markdown/Ads -- rediseño septiembre
+   2026, sexta vuelta, pedido explícito de Sabas: mismo lenguaje visual
+   monocromático que el resto del rediseño, gris para OPS/Menú
+   (operativo), morado para Markdown/Ads (comercial). */
+.action-bullet {{
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+    background: {COLORS["card2"]}; margin-right: 8px; vertical-align: -4px;
+}}
+.action-bullet::after {{
+    content: ""; display: block; width: 8px; height: 8px; border-radius: 50%;
+    background: {COLORS["muted"]};
+}}
+.action-bullet.icon-purple {{ background: {COLORS["brand_purple_soft"]}; }}
+.action-bullet.icon-purple::after {{ background: {COLORS["brand_purple"]}; }}
 
 /* ── TABS (Home / 360 Action / Analytics / Campaign Designer / Outreach) ── */
 .stTabs [data-baseweb="tab-list"] {{
