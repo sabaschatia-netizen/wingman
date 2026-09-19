@@ -730,15 +730,42 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .ctx-pill.ok     {{ background: {COLORS["success_soft"]}; color: {COLORS["success"]}; border-color: rgba(34,197,94,0.30); }}
 .ctx-pill.info   {{ background: {COLORS["info_bg"]};      color: {COLORS["blue"]}; border-color: rgba(108,155,209,0.30); }}
 
+/* Pill de "Estado de conexión" dentro de la fila de 5 datos de la ficha
+   de marca -- más chica y totalmente redondeada (999px) que .ctx-pill,
+   mismos colores por estado (ok/warn/alert/info) reusados vía la misma
+   clase modificadora. */
+.conn-status-pill {{
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 700; padding: 5px 14px;
+    border-radius: 999px; margin-top: 4px;
+    background: {COLORS["card2"]}; color: {COLORS["text"]};
+}}
+.conn-status-pill.warn  {{ background: {COLORS["warning_soft"]}; color: #A97A1E; }}
+.conn-status-pill.alert {{ background: {COLORS["danger_soft"]};  color: #C4483F; }}
+.conn-status-pill.ok    {{ background: {COLORS["success_soft"]}; color: #166534; }}
+.conn-status-pill.info  {{ background: {COLORS["info_bg"]};      color: {COLORS["blue"]}; }}
+
 /* ── BRAND HEADER (franja fija) ── */
+/* Título + ID centrados, y los 5 datos (Teléfono/Correo/Categoría/Local/
+   Estado de conexión) en una sola fila centrada debajo -- rediseño
+   décima primera vuelta, pedido explícito de Sabas, aprobado primero
+   como mockup visual antes de tocar código: el Estado de Churn deja de
+   ser una pill aparte arriba y pasa a ser un dato más de la fila, con
+   su label renombrado a "Estado de conexión". */
 .brand-title {{
     font-size: 32px; font-weight: 800; color: {COLORS["text"]};
     letter-spacing: -0.8px; line-height: 1.1; margin-bottom: 4px;
+    text-align: center;
 }}
 .brand-id {{
     font-size: 14px; font-weight: 700; color: {COLORS["text_disabled"]};
-    letter-spacing: 0.5px;
+    letter-spacing: 0.5px; text-align: center;
 }}
+.brand-stats-row {{
+    display: flex; justify-content: center; align-items: flex-start;
+    gap: 36px; flex-wrap: wrap; margin-top: 28px; text-align: center;
+}}
+.brand-stats-row .stat-label {{ text-transform: uppercase; letter-spacing: 0.5px; }}
 .stat-box {{
     background: {COLORS["card2"]}; border-radius: 12px;
     padding: 11px 15px; margin-bottom: 9px;

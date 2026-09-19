@@ -2200,12 +2200,26 @@ if ficha_query.strip():
     elif not fqkey:
         st.info("Escribe un ID válido (ej. AR97338 o simplemente 97338).")
 
-# ── Franja fija: Nombre, ID, Contacto (texto plano estilo Growth OS) + Pills (Churn/Ranking) ──
+# ── Franja fija: Nombre, ID centrados + los 5 datos (Teléfono, Correo,
+# Categoría, Local, Estado de conexión) en una sola fila centrada --
+# rediseño décima primera vuelta, pedido explícito de Sabas, aprobado
+# como mockup visual antes de escribir el código: el Estado de Churn
+# (ahora "Estado de conexión") deja de ser una pill aparte arriba de
+# los datos de contacto y pasa a ser un dato más de la misma fila. ──
 search_url = dl.google_search_url(row.brand_name, row.categoria, row.ciudad)
 tel_btn_id, telefono_copy = (_copy_button_html(row.telefono) if row.telefono else (None, ""))
 mail_btn_id, mail_copy = (_copy_button_html(row.mail) if row.mail else (None, ""))
+
+# Estado de conexión (antes "Estado de Churn") -- mismo criterio de
+# color por severidad que ya existía, solo cambia el label visible y el
+# lugar donde se muestra.
+churn_class = {
+    "Disponible": "ok", "PW1": "warn", "PW2": "warn", "PW3": "alert", "Churn": "alert",
+}.get(row.churn_status, "info")
+churn_icon = "✅" if row.churn_status == "Disponible" else "⚠️"
+
 contact_html = (
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px;">'
+    '<div class="brand-stats-row">'
     f'<div><div class="stat-label">TELÉFONO</div><div class="stat-value">{row.telefono or "?"}{telefono_copy}</div></div>'
     f'<div><div class="stat-label">CORREO</div><div class="stat-value" style="font-size:13px;">{row.mail or "?"}{mail_copy}</div></div>'
     f'<div><div class="stat-label">CATEGORÍA</div><div class="stat-value"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_CATEGORIA}</span>{row.categoria or "?"}</div></div>'
@@ -2213,19 +2227,8 @@ contact_html = (
     f'<a href="{search_url}" target="_blank" rel="noopener noreferrer" '
     f'style="color:{COLORS["brand_purple"]};text-decoration:none;font-weight:700;">🔎 Buscar</a>'
     "</div></div>"
-    "</div>"
-)
-
-# Pills reales: Churn Status (con color segun severidad). Ranking por GMV
-# se quitó -- pedido explícito de Sabas (agosto 2026).
-churn_class = {
-    "Disponible": "ok", "PW1": "warn", "PW2": "warn", "PW3": "alert", "Churn": "alert",
-}.get(row.churn_status, "info")
-churn_icon = "✅" if row.churn_status == "Disponible" else "⚠️"
-
-status_pills_html = (
-    '<div class="pill-row">'
-    f'<span class="ctx-pill {churn_class}">{churn_icon} Estado de Churn: {row.churn_status}</span>'
+    f'<div><div class="stat-label">ESTADO DE CONEXIÓN</div>'
+    f'<div class="conn-status-pill {churn_class}">{churn_icon} {row.churn_status}</div></div>'
     "</div>"
 )
 
@@ -2233,7 +2236,6 @@ st.markdown(
     f'<div class="brand-sticky">'
     f'<div class="brand-title">{row.brand_name}</div>'
     f'<div class="brand-id">{row.brand_id}</div>'
-    f"{status_pills_html}"
     f"{contact_html}"
     f"</div>",
     unsafe_allow_html=True,
