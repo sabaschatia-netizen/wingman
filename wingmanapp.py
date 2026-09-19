@@ -2741,22 +2741,32 @@ with tab_analytics:
         ("Tráfico de la marca", diag["traffic_disp"] + "/sem", traffic_color, 68, traffic_texto_baldosa),
         ("Conversión de la marca", diag["cvr_disp"], conv_color, 40, conv_texto_baldosa),
     ]
-    # ── Funnel: escalones (rectángulos redondeados), no trapecios de
-    # embudo -- rediseño septiembre 2026, octava vuelta, pedido explícito
-    # de Sabas: la FORMA cambia de embudo a escalón (como Growth OS), los
-    # COLORES semánticos por estado (morado fijo la baldosa 1, rojo/verde
-    # según traffic_above_bench la 2, azul/gris según cvr_above_bench la
-    # 3) se mantienen igual -- confirmado explícitamente que NO pasan al
-    # degradado morado→naranja fijo de la referencia visual.
-    funnel_svg_parts = ['<svg viewBox="0 0 320 130" width="100%" height="130" style="max-width:280px;">']
-    y = 4
+    # ── Funnel: escalones (rectángulos redondeados) centrados entre sí,
+    # como un embudo -- rediseño septiembre 2026, novena vuelta, pedido
+    # explícito de Sabas. Los COLORES semánticos por estado (morado fijo
+    # la baldosa 1, rojo/verde según traffic_above_bench la 2, azul/gris
+    # según cvr_above_bench la 3) se mantienen igual -- confirmado
+    # explícitamente que NO pasan al degradado morado→naranja fijo de la
+    # referencia visual.
+    #
+    # Alineación bullet-barra (misma vuelta, mismo pedido): la leyenda ya
+    # NO es un bloque HTML aparte con su propio flujo de texto (que podía
+    # desalinearse verticalmente del SVG por casualidad de alturas) --
+    # ahora se posiciona con position:absolute + top calculado con las
+    # MISMAS coordenadas Y que usa cada barra del SVG, así el bullet de
+    # cada nivel queda garantizado a la altura exacta del centro de su
+    # barra, sin depender de que ambos bloques midan igual por suerte.
+    total_w = 280
     level_h = 28
     gap = 6
-    bar_x = 20
-    for i, (label, val, color, width_pct, texto_interno) in enumerate(levels):
-        w = 280 * (width_pct / 100)
+    funnel_svg_parts = ['<svg viewBox="0 0 320 130" width="100%" height="130" style="max-width:280px;display:block;">']
+    funnel_legend_parts = []
+    y = 4
+    for label, val, color, width_pct, texto_interno in levels:
+        w = total_w * (width_pct / 100)
+        bar_x = 20 + (total_w - w) / 2
         funnel_svg_parts.append(
-            f'<rect x="{bar_x}" y="{y}" width="{w:.0f}" height="{level_h}" rx="8" '
+            f'<rect x="{bar_x:.0f}" y="{y}" width="{w:.0f}" height="{level_h}" rx="8" '
             f'fill="{color}" opacity="0.9"/>'
         )
         if texto_interno:
@@ -2766,17 +2776,24 @@ with tab_analytics:
                 f'<text x="{cx:.0f}" y="{cy:.0f}" text-anchor="middle" '
                 f'font-size="11" font-weight="700" fill="white">{texto_interno}</text>'
             )
+        label_color = conv_label_color if label == "Conversión de la marca" else COLORS["muted"]
+        val_color = conv_label_color if label == "Conversión de la marca" else COLORS["text"]
+        top_pct = (y + level_h / 2) / 130 * 100
+        funnel_legend_parts.append(
+            f'<div style="position:absolute;top:{top_pct:.1f}%;left:0;transform:translateY(-50%);'
+            f'display:flex;align-items:center;gap:6px;white-space:nowrap;">'
+            f'<span style="width:9px;height:9px;border-radius:50%;background:{color};display:inline-block;flex-shrink:0;"></span>'
+            f'<span style="font-size:10.5px;color:{label_color};">'
+            f'{label}: <b style="color:{val_color};">{val}</b></span>'
+            f'</div>'
+        )
         y += level_h + gap
     funnel_svg_parts.append("</svg>")
     funnel_svg = "".join(funnel_svg_parts)
-
-    funnel_legend = "".join(
-        f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
-        f'<span style="width:9px;height:9px;border-radius:50%;background:{color};display:inline-block;"></span>'
-        f'<span style="font-size:10.5px;color:{conv_label_color if label == "Conversión de la marca" else COLORS["muted"]};">'
-        f'{label}: <b style="color:{conv_label_color if label == "Conversión de la marca" else COLORS["text"]};">{val}</b></span>'
-        f"</div>"
-        for label, val, color, _, _ in levels
+    funnel_legend = (
+        '<div style="position:relative;height:130px;min-width:180px;">'
+        + "".join(funnel_legend_parts)
+        + "</div>"
     )
 
     # ── Comparativo vs mes anterior (Tráfico arriba / Conversión abajo) ──
