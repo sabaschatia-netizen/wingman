@@ -3669,7 +3669,8 @@ _PORTFOLIO_COLUMNS = [
     "penetracion_md", "penetracion_mdpro", "campaign_md", "campaign_mdpro", "cvr",
     "cvr_delta", "traffic", "traffic_delta", "categoria", "gmv", "ordenes", "ciudad",
     "farmer_detalle", "brand_name_detalle", "n_stores", "aov", "gmv_last", "aov_last",
-    "gmv_delta", "aov_delta", "perfect_store_pct", "menu_global", "menu_photos",
+    "ordenes_last", "gmv_prev2", "aov_prev2", "ordenes_prev2",
+    "gmv_delta", "aov_delta", "ordenes_delta", "perfect_store_pct", "menu_global", "menu_photos",
     "menu_purchase", "menu_missing", "coinv_md_status", "coinv_md_label", "gmv_rank",
     "churn_status",
 ]
@@ -3815,32 +3816,41 @@ def portfolio_for(farmer_email):
     df = df.drop(columns=["categoria_detalle"])
 
     # LAST GMV: mismo GMV/AOV pero del mes anterior, para calcular variacion.
+    # Tambien trae Ordenes (septiembre 2026, cuarta vuelta -- pedido
+    # explícito de Sabas: "Órdenes" pasa a tener su propia card con
+    # comparativa de 3 meses, igual que GMV/AOV -- misma hoja, mismo
+    # merge, solo se suma la columna que antes no se usaba de acá).
     last_gmv = load_last_gmv()
     if last_gmv.empty:
         df["gmv_last"] = 0.0
         df["aov_last"] = 0.0
+        df["ordenes_last"] = 0.0
     else:
-        last_slim = last_gmv[["key", "gmv", "aov"]].rename(
-            columns={"gmv": "gmv_last", "aov": "aov_last"}
+        last_slim = last_gmv[["key", "gmv", "aov", "ordenes"]].rename(
+            columns={"gmv": "gmv_last", "aov": "aov_last", "ordenes": "ordenes_last"}
         )
         df = df.merge(last_slim, on="key", how="left")
     df["gmv_last"] = df["gmv_last"].fillna(0)
     df["aov_last"] = df["aov_last"].fillna(0)
+    df["ordenes_last"] = df["ordenes_last"].fillna(0)
 
     # PREVIOUS GMV: mismo GMV/AOV pero de hace DOS meses (no confundir con
     # LAST GMV, que es el mes inmediato anterior) -- para la comparativa de
-    # 3 meses reales en las cards de GMV/AOV (septiembre 2026).
+    # 3 meses reales en las cards de GMV/AOV (septiembre 2026). Ordenes
+    # idem (cuarta vuelta, mismo pedido que arriba).
     previous_gmv = load_previous_gmv()
     if previous_gmv.empty:
         df["gmv_prev2"] = 0.0
         df["aov_prev2"] = 0.0
+        df["ordenes_prev2"] = 0.0
     else:
-        previous_slim = previous_gmv[["key", "gmv", "aov"]].rename(
-            columns={"gmv": "gmv_prev2", "aov": "aov_prev2"}
+        previous_slim = previous_gmv[["key", "gmv", "aov", "ordenes"]].rename(
+            columns={"gmv": "gmv_prev2", "aov": "aov_prev2", "ordenes": "ordenes_prev2"}
         )
         df = df.merge(previous_slim, on="key", how="left")
     df["gmv_prev2"] = df["gmv_prev2"].fillna(0)
     df["aov_prev2"] = df["aov_prev2"].fillna(0)
+    df["ordenes_prev2"] = df["ordenes_prev2"].fillna(0)
 
     # gmv_delta: RITMO, no acumulado crudo (bug real corregido, agosto
     # 2026). Antes comparaba GMV acumulado del mes en curso contra el GMV
@@ -3884,6 +3894,14 @@ def portfolio_for(farmer_email):
     # calculado sobre 2 dias es comparable a uno de 31 dias sin proyectar
     # nada, así que aov_delta sigue siendo la variacion cruda de siempre.
     df["aov_delta"] = ((df["aov"] - df["aov_last"]) / df["aov_last"]).where(df["aov_last"] > 0, 0.0)
+    # Órdenes SÍ es un acumulado (como GMV, no como AOV) -- crece dia a
+    # dia dentro del mes, así que usa el mismo factor_proyeccion de
+    # ritmo que GMV (pedido explícito de Sabas, septiembre 2026, cuarta
+    # vuelta: comparar ordenes crudas de 2 dias contra el mes completo
+    # anterior daria la misma caida falsa que tenia GMV antes del fix de
+    # ritmo de agosto 2026).
+    ordenes_proyectado = df["ordenes"] * factor_proyeccion
+    df["ordenes_delta"] = ((ordenes_proyectado - df["ordenes_last"]) / df["ordenes_last"]).where(df["ordenes_last"] > 0, 0.0)
 
     # PERFECT STORE: gauge Menu
     pstore = load_perfect_store()

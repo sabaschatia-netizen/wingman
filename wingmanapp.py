@@ -384,6 +384,11 @@ def _trend_sparkline(prev2, prev, curr):
     sólidos, y debe haber un área sombreada con degradado por debajo de
     la línea (se desvanece hacia abajo) -- antes faltaban ambos detalles,
     esto es lo que se ve en la referencia visual de Growth OS.
+
+    Achicado (septiembre 2026, cuarta vuelta -- pedido explícito de
+    Sabas): viewBox 250->170 de ancho, ahora hay 3 cards por fila
+    (Órdenes/AOV/GMV) en vez de 2, menos ancho disponible por card;
+    width="100%" (ya no fijo) para que escale con el contenedor.
     """
     prev2, prev, curr = max(prev2, 0), max(prev, 0), max(curr, 0)
     top = max(prev2, prev, curr, 1)
@@ -393,37 +398,47 @@ def _trend_sparkline(prev2, prev, curr):
     color = COLORS["brand_orange"]
     fill_id = f"sparkfill-{abs(hash((prev2, prev, curr))) % 100000}"
     return (
-        f'<svg width="250" height="44" viewBox="0 0 250 44" style="overflow:visible;">'
+        f'<svg width="100%" height="40" viewBox="0 0 170 44" style="overflow:visible;display:block;">'
         f'<defs><linearGradient id="{fill_id}" x1="0" y1="0" x2="0" y2="1">'
         f'<stop offset="0%" stop-color="{color}" stop-opacity="0.35"/>'
         f'<stop offset="100%" stop-color="{color}" stop-opacity="0"/>'
         f'</linearGradient></defs>'
-        f'<path d="M20,{y_prev2:.1f} L125,{y_prev:.1f} L230,{y_curr:.1f} L230,44 L20,44 Z" '
+        f'<path d="M13,{y_prev2:.1f} L85,{y_prev:.1f} L157,{y_curr:.1f} L157,44 L13,44 Z" '
         f'fill="url(#{fill_id})" stroke="none"/>'
-        f'<line x1="20" y1="{y_prev2:.1f}" x2="125" y2="{y_prev:.1f}" '
+        f'<line x1="13" y1="{y_prev2:.1f}" x2="85" y2="{y_prev:.1f}" '
         f'stroke="{color}" stroke-width="2" stroke-linecap="round"/>'
-        f'<line x1="125" y1="{y_prev:.1f}" x2="230" y2="{y_curr:.1f}" '
+        f'<line x1="85" y1="{y_prev:.1f}" x2="157" y2="{y_curr:.1f}" '
         f'stroke="{color}" stroke-width="2" stroke-linecap="round"/>'
-        f'<circle cx="20" cy="{y_prev2:.1f}" r="4" fill="{COLORS["card"]}" stroke="{color}" stroke-width="2.5"/>'
-        f'<circle cx="125" cy="{y_prev:.1f}" r="4" fill="{COLORS["card"]}" stroke="{color}" stroke-width="2.5"/>'
-        f'<circle cx="230" cy="{y_curr:.1f}" r="4" fill="{COLORS["card"]}" stroke="{color}" stroke-width="2.5"/>'
+        f'<circle cx="13" cy="{y_prev2:.1f}" r="3.5" fill="{COLORS["card"]}" stroke="{color}" stroke-width="2.2"/>'
+        f'<circle cx="85" cy="{y_prev:.1f}" r="3.5" fill="{COLORS["card"]}" stroke="{color}" stroke-width="2.2"/>'
+        f'<circle cx="157" cy="{y_curr:.1f}" r="3.5" fill="{COLORS["card"]}" stroke="{color}" stroke-width="2.2"/>'
         f'</svg>'
     )
 
 
-def metric_trend_card(icon, label, value_ars, delta_frac, sub_left, prev_ars=0, prev2_ars=0,
-                       currency="ARS", es_ritmo=False):
+def metric_trend_card(icon, label, value, delta_frac, sub_left, prev=0, prev2=0,
+                       currency="ARS", es_ritmo=False, fmt_fn=None):
     """
-    Card de GMV/AOV al estilo Growth OS: icono + label arriba, monto grande
-    (en la moneda nativa del farmer -- currency), % de variacion vs mes
-    anterior, y sparkline de 3 meses reales a la derecha (solo si hay dato
-    de mes anterior).
+    Card de GMV/AOV/Órdenes al estilo Growth OS: icono + label arriba,
+    valor grande (moneda nativa del farmer -- currency -- salvo que
+    fmt_fn diga lo contrario), % de variacion vs mes anterior, y
+    sparkline de 3 meses reales a la derecha (solo si hay dato de mes
+    anterior).
 
-    prev2_ars (nuevo, septiembre 2026): dato de hace DOS meses (hoja
-    PREVIOUS GMV), para completar la comparativa de 3 meses reales --
-    antes el sparkline solo tenia 2 puntos genericos ("Anterior"/
-    "Actual"); ahora son 3 meses nombrados por su mes calendario real
-    (ej. Jul/Ago/Sep), que rota solo cada mes via
+    fmt_fn (nuevo, septiembre 2026, cuarta vuelta -- pedido explícito de
+    Sabas: "Órdenes" pasa a tener su propia card, con el mismo sparkline
+    de 3 meses que GMV/AOV, pero mostrando un CONTEO ("73 órdenes"), no
+    un monto en ARS): funcion opcional value -> str que reemplaza a
+    dl.fmt_money() en el valor grande y en los 3 puntos del sparkline.
+    None (default) mantiene el comportamiento de siempre (fmt_money con
+    currency) -- GMV/AOV no cambian su firma de llamada.
+
+    prev/prev2 (renombrados de prev_ars/prev2_ars en esta misma vuelta,
+    ya no son necesariamente ARS): dato de mes anterior y de hace DOS
+    meses (hoja LAST GMV / PREVIOUS GMV), para completar la comparativa
+    de 3 meses reales -- antes el sparkline solo tenia 2 puntos
+    genericos ("Anterior"/"Actual"); ahora son 3 meses nombrados por su
+    mes calendario real (ej. Jul/Ago/Sep), que rota solo cada mes via
     dl.etiquetas_3_meses() -- pedido explicito de Sabas: que el proximo
     mes (octubre) el grafico se actualice solo, sin tocar codigo, para
     mostrar Ago/Sep/Oct.
@@ -440,10 +455,12 @@ def metric_trend_card(icon, label, value_ars, delta_frac, sub_left, prev_ars=0, 
     agosto contra 31 dias de julio sin ajustar daba caidas falsas de
     -80/-90%). El texto dice "ritmo vs mes anterior" en vez de solo
     "vs mes anterior" para que quede claro que es una proyeccion, no lo
-    ya vendido. es_ritmo=False (AOV, default): variacion directa de
-    siempre -- el AOV es un promedio, no un acumulado, no hace falta
-    proyectarlo.
+    ya vendido. es_ritmo=False (AOV/Órdenes, default): variacion directa
+    de siempre -- ninguno de los dos es un acumulado que haga falta
+    proyectar (AOV es promedio, Órdenes ya viene sumada completa del mes
+    en DETALLE, no parcial por dia).
     """
+    _fmt = fmt_fn if fmt_fn else (lambda v: dl.fmt_money(v, currency))
     delta_html = ""
     if delta_frac:
         color = COLORS["success"] if delta_frac > 0 else COLORS["danger"]
@@ -455,33 +472,33 @@ def metric_trend_card(icon, label, value_ars, delta_frac, sub_left, prev_ars=0, 
             f'<span style="color:{COLORS["muted"]};font-size:11.5px;">{texto_comparacion}</span>'
         )
     trend_html = ""
-    if prev_ars > 0:
+    if prev > 0:
         mes_prev2, mes_prev, mes_curr = dl.etiquetas_3_meses()
         trend_html = (
-            '<div style="text-align:center;min-width:260px;">'
-            f'{_trend_sparkline(prev2_ars, prev_ars, value_ars)}'
-            f'<div style="display:flex;gap:14px;width:250px;margin:4px auto 0;">'
+            '<div style="text-align:center;flex:1;min-width:150px;max-width:220px;">'
+            f'{_trend_sparkline(prev2, prev, value)}'
+            f'<div style="display:flex;gap:8px;width:100%;margin:4px auto 0;">'
             f'<div style="flex:1;text-align:left;min-width:0;">'
             f'<div style="font-size:9px;color:{COLORS["muted"]};">{mes_prev2}</div>'
-            f'<div style="font-size:10.5px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;">{dl.fmt_money(prev2_ars, currency)}</div>'
+            f'<div style="font-size:10px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_fmt(prev2)}</div>'
             f'</div>'
             f'<div style="flex:1;text-align:center;min-width:0;">'
             f'<div style="font-size:9px;color:{COLORS["muted"]};">{mes_prev}</div>'
-            f'<div style="font-size:10.5px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;">{dl.fmt_money(prev_ars, currency)}</div>'
+            f'<div style="font-size:10px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_fmt(prev)}</div>'
             f'</div>'
             f'<div style="flex:1;text-align:right;min-width:0;">'
             f'<div style="font-size:9px;color:{COLORS["muted"]};">{mes_curr}</div>'
-            f'<div style="font-size:10.5px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;">{dl.fmt_money(value_ars, currency)}</div>'
+            f'<div style="font-size:10px;font-weight:600;color:{COLORS["muted"]};line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_fmt(value)}</div>'
             f'</div>'
             f'</div>'
             "</div>"
         )
     return (
         f'<div class="glass-card">'
-        f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-        f'<div style="flex:1;">'
+        f'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
+        f'<div style="flex:1;min-width:0;">'
         f'<div class="card-label"><span class="lever-icon">{icon}</span>{label}</div>'
-        f'<div class="card-value">{dl.fmt_money(value_ars, currency)}</div>'
+        f'<div class="card-value">{_fmt(value)}</div>'
         f'<div style="margin-top:8px;">{delta_html}</div>'
         f'<div class="card-copy" style="margin-top:4px;">{sub_left}</div>'
         f"</div>{trend_html}</div></div>"
@@ -2374,25 +2391,33 @@ tab_home, tab_action, tab_analytics, tab_campaign, tab_outreach = st.tabs(
 # ── TAB: HOME ──
 with tab_home:
     if row.gmv > 0:
-        g1, g2 = st.columns(2)
+        # 3 cards -- Órdenes, AOV, GMV, en ese orden (pedido explícito de
+        # Sabas, septiembre 2026, cuarta vuelta: antes "Órdenes" era una
+        # sub-línea dentro de la card de GMV; ahora tiene su propia card
+        # con el mismo sparkline de 3 meses reales que GMV/AOV, usando
+        # ordenes_last/ordenes_prev2 -- misma hoja LAST GMV/PREVIOUS GMV,
+        # que ya traía la columna Ordenes sin usarla desde acá).
+        g1, g2, g3 = st.columns(3)
         with g1:
-            ordenes_num = f'{row.ordenes:,.0f} órdenes'.replace(",", ".")
-            ordenes_sub = (
-                f'<span style="display:inline-flex;align-items:center;gap:6px;">'
-                f'<span class="lever-icon" style="width:14px;height:14px;">{ICON_ORDENES}</span>'
-                f'{ordenes_num}</span>'
-            )
+            fmt_ordenes = lambda v: f'{v:,.0f} órdenes'.replace(",", ".")
             st.markdown(
-                metric_trend_card(ICON_GMV, "GMV (mes)", row.gmv, row.gmv_delta,
-                                   ordenes_sub, prev_ars=row.gmv_last, prev2_ars=row.gmv_prev2,
-                                   currency=CURRENCY, es_ritmo=True),
+                metric_trend_card(ICON_ORDENES, "ÓRDENES", row.ordenes, row.ordenes_delta,
+                                   "Órdenes del mes", prev=row.ordenes_last, prev2=row.ordenes_prev2,
+                                   fmt_fn=fmt_ordenes, es_ritmo=True),
                 unsafe_allow_html=True,
             )
         with g2:
             st.markdown(
                 metric_trend_card(ICON_AOV, "AOV", row.aov, row.aov_delta,
-                                   "Ticket promedio", prev_ars=row.aov_last, prev2_ars=row.aov_prev2,
+                                   "Ticket promedio", prev=row.aov_last, prev2=row.aov_prev2,
                                    currency=CURRENCY),
+                unsafe_allow_html=True,
+            )
+        with g3:
+            st.markdown(
+                metric_trend_card(ICON_GMV, "GMV (mes)", row.gmv, row.gmv_delta,
+                                   "", prev=row.gmv_last, prev2=row.gmv_prev2,
+                                   currency=CURRENCY, es_ritmo=True),
                 unsafe_allow_html=True,
             )
     else:
