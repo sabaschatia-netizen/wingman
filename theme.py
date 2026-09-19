@@ -233,6 +233,49 @@ ICON_BULLET_CHECK = _icon(
 )
 
 
+# ── Analytics (octava vuelta, pedido explícito de Sabas) ──
+# Embudo lineal -- reemplaza la lupa 🔍 en el título "Funnel Tráfico &
+# Conversión vs Benchmark".
+ICON_FUNNEL = _icon(
+    '<path d="M3 4h18l-6.5 8v6.5l-5 2V12L3 4z" '
+    'stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" fill="none"/>'
+)
+# Ojo lineal -- reemplaza el semáforo 🚦 junto a "Tráfico" (gris, no el
+# color naranja/rojo de la referencia -- decisión explícita de Sabas).
+ICON_TRAFICO = _icon(
+    '<path d="M2 12c2.5-5 7-8 10-8s7.5 3 10 8c-2.5 5-7 8-10 8s-7.5-3-10-8z" '
+    'stroke="currentColor" stroke-width="1.7" fill="none" stroke-linejoin="round"/>'
+    '<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7" fill="none"/>'
+)
+# Diana lineal -- reemplaza el 🎯 junto a "Conversión" (gris, mismo
+# criterio que arriba).
+ICON_CONVERSION = _icon(
+    '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" fill="none"/>'
+    '<circle cx="12" cy="12" r="5.3" stroke="currentColor" stroke-width="1.6" fill="none"/>'
+    '<circle cx="12" cy="12" r="1.6" fill="currentColor"/>'
+)
+# Medalla (círculo + 2 cintas) -- reemplaza la ⭐ del badge de Dato
+# Ancla.
+ICON_MEDALLA = _icon(
+    '<circle cx="12" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.7" fill="none"/>'
+    '<path d="M8.7 13l-2.3 8 5.6-3 5.6 3-2.3-8" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+)
+# Corona -- reemplaza el badge de texto "LÍDER" en Benchmark.
+ICON_CORONA = _icon(
+    '<path d="M3 8l4 4 5-7 5 7 4-4-2 10H5L3 8z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+)
+# Tendencia ascendente -- título de la card "Tráfico & Conversión vs mes
+# anterior" (antes 📊 genérico).
+ICON_TENDENCIA = _icon(
+    '<path d="M3 16l6-6 4 4 8-8" stroke="currentColor" stroke-width="1.8" fill="none" '
+    'stroke-linecap="round" stroke-linejoin="round"/>'
+    '<path d="M15 6h6v6" stroke="currentColor" stroke-width="1.8" fill="none" '
+    'stroke-linecap="round" stroke-linejoin="round"/>'
+)
+
+
 # =========================
 # CSS
 # =========================
@@ -867,6 +910,19 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .funnel-headline {{ font-size: 16px; font-weight: 800; margin-bottom: 12px; }}
 .funnel-texto {{ font-size: 11.5px; color: {COLORS["muted"]}; line-height: 1.55; margin-bottom: 10px;
     border-top: 1px solid {COLORS["border"]}; padding-top: 10px; }}
+/* Insight del funnel como píldora separada, con el 💡 al costado --
+   octava vuelta, pedido explícito de Sabas: reemplaza el párrafo con
+   borde superior por una caja blanca redondeada aparte, mismo lenguaje
+   visual que la referencia (no tiene que ser una píldora perfecta, hay
+   bastante texto). El bombillo es el ÚNICO emoji Unicode que queda en
+   todo el rediseño -- confirmado explícitamente. */
+.funnel-insight-pill {{
+    display: flex; align-items: flex-start; gap: 10px;
+    background: {COLORS["card"]}; border-radius: 999px;
+    padding: 12px 18px; margin-top: 4px; font-size: 11.5px;
+    color: {COLORS["muted"]}; line-height: 1.5;
+}}
+.funnel-insight-pill span:first-child {{ font-size: 14px; flex-shrink: 0; line-height: 1.4; }}
 .funnel-pitch-label {{ font-size: 10px; font-weight: 700; text-transform: uppercase;
     color: {COLORS["muted"]}; margin-bottom: 4px; }}
 .funnel-pitch {{ font-size: 11.5px; color: {COLORS["muted"]}; line-height: 1.55; font-style: italic; }}
@@ -874,19 +930,16 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .analytics-mini-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }}
 .analytics-mini-grid .glass-card {{ position: relative; }}
 
-/* Badge circular (⭐) y ovalado (LÍDER) en la esquina de Dato Ancla /
-   Benchmark -- rediseño septiembre 2026, pedido explícito de Sabas. */
-.ancla-badge {{
+/* Badge circular en la esquina de Dato Ancla (medalla) / Benchmark
+   (corona) -- rediseño septiembre 2026, octava vuelta, pedido explícito
+   de Sabas: la ⭐ pasa a medalla y el badge de texto "LÍDER" pasa a
+   corona -- mismo tratamiento circular gris en ambas, ya no hay texto
+   ni fondo pastel naranja en Benchmark. */
+.ancla-badge, .bench-badge {{
     position: absolute; top: 18px; right: 18px;
     width: 34px; height: 34px; border-radius: 50%;
     background: {COLORS["card2"]}; color: {COLORS["muted"]};
     display: flex; align-items: center; justify-content: center;
-}}
-.bench-badge {{
-    position: absolute; top: 18px; right: 18px;
-    padding: 5px 13px; border-radius: 999px;
-    background: rgba(247,77,4,0.14); color: {COLORS["brand_orange"]};
-    font-size: 10.5px; font-weight: 800; letter-spacing: 0.4px;
 }}
 
 /* Barra tipo slider con marcador -- usada en Dato Ancla (percentil,

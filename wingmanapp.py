@@ -26,13 +26,18 @@ from theme import (
     ICON_BULLET_EYE,
     ICON_BULLET_WARNING,
     ICON_CATEGORIA,
-    ICON_ESTRELLA,
+    ICON_CONVERSION,
+    ICON_CORONA,
+    ICON_FUNNEL,
     ICON_GMV,
     ICON_MARKDOWN,
     ICON_MARKDOWN_LEVER,
+    ICON_MEDALLA,
     ICON_MENU,
     ICON_OPS,
     ICON_ORDENES,
+    ICON_TENDENCIA,
+    ICON_TRAFICO,
     build_css,
     favicon,
     logo_img,
@@ -2736,26 +2741,32 @@ with tab_analytics:
         ("Tráfico de la marca", diag["traffic_disp"] + "/sem", traffic_color, 68, traffic_texto_baldosa),
         ("Conversión de la marca", diag["cvr_disp"], conv_color, 40, conv_texto_baldosa),
     ]
+    # ── Funnel: escalones (rectángulos redondeados), no trapecios de
+    # embudo -- rediseño septiembre 2026, octava vuelta, pedido explícito
+    # de Sabas: la FORMA cambia de embudo a escalón (como Growth OS), los
+    # COLORES semánticos por estado (morado fijo la baldosa 1, rojo/verde
+    # según traffic_above_bench la 2, azul/gris según cvr_above_bench la
+    # 3) se mantienen igual -- confirmado explícitamente que NO pasan al
+    # degradado morado→naranja fijo de la referencia visual.
     funnel_svg_parts = ['<svg viewBox="0 0 320 130" width="100%" height="130" style="max-width:280px;">']
     y = 4
-    level_h = 34
+    level_h = 28
+    gap = 6
+    bar_x = 20
     for i, (label, val, color, width_pct, texto_interno) in enumerate(levels):
         w = 280 * (width_pct / 100)
-        x = (280 - w) / 2 + 20
-        next_w = 280 * (levels[i + 1][3] / 100) if i + 1 < len(levels) else w * 0.7
-        next_x = (280 - next_w) / 2 + 20
         funnel_svg_parts.append(
-            f'<polygon points="{x:.0f},{y} {x + w:.0f},{y} {next_x + next_w:.0f},{y + level_h} '
-            f'{next_x:.0f},{y + level_h}" fill="{color}" opacity="0.9"/>'
+            f'<rect x="{bar_x}" y="{y}" width="{w:.0f}" height="{level_h}" rx="8" '
+            f'fill="{color}" opacity="0.9"/>'
         )
         if texto_interno:
-            cx = 20 + 280 / 2
+            cx = bar_x + w / 2
             cy = y + level_h / 2 + 4
             funnel_svg_parts.append(
                 f'<text x="{cx:.0f}" y="{cy:.0f}" text-anchor="middle" '
                 f'font-size="11" font-weight="700" fill="white">{texto_interno}</text>'
             )
-        y += level_h
+        y += level_h + gap
     funnel_svg_parts.append("</svg>")
     funnel_svg = "".join(funnel_svg_parts)
 
@@ -2781,7 +2792,7 @@ with tab_analytics:
         if not tiene_dato:
             return (
                 f'<div class="mini-delta-row">'
-                f'<div class="mini-delta-head"><span>{icon} {label}</span>'
+                f'<div class="mini-delta-head"><span><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{icon}</span>{label}</span>'
                 f'<span class="mini-delta-val">s/d</span></div>'
                 f'<div class="mini-delta-sub">Sin dato para comparar.</div>'
                 f"</div>"
@@ -2806,7 +2817,7 @@ with tab_analytics:
         )
         return (
             f'<div class="mini-delta-row">'
-            f'<div class="mini-delta-head"><span>{icon} {label}</span>'
+            f'<div class="mini-delta-head"><span><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{icon}</span>{label}</span>'
             f'<span class="mini-delta-val" style="color:{color};">{arrow} {abs(delta_frac) * 100:.0f}%</span></div>'
             f'<div class="mini-delta-track">'
             f'<div class="mini-delta-mid"></div>'
@@ -2842,10 +2853,10 @@ with tab_analytics:
 
     comparativo_html = (
         '<div class="comparativo-card">'
-        '<div class="funnel-label">📊 Tráfico &amp; Conversión vs mes anterior</div>'
-        + _mini_delta_bar("🚦", "Tráfico", diag["traffic_disp"] + "/sem", row.traffic_delta, row.traffic > 0,
+        f'<div class="funnel-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_TENDENCIA}</span>Tráfico &amp; Conversión vs mes anterior</div>'
+        + _mini_delta_bar(ICON_TRAFICO, "Tráfico", diag["traffic_disp"] + "/sem", row.traffic_delta, row.traffic > 0,
                            valor_anterior_disp=traffic_anterior_disp, incremental_texto=traffic_incremental_txt)
-        + _mini_delta_bar("🎯", "Conversión", diag["cvr_disp"], row.cvr_delta, row.cvr > 0,
+        + _mini_delta_bar(ICON_CONVERSION, "Conversión", diag["cvr_disp"], row.cvr_delta, row.cvr > 0,
                            valor_anterior_disp=cvr_anterior_disp, incremental_texto=cvr_incremental_txt)
         + "</div>"
     )
@@ -2893,13 +2904,13 @@ with tab_analytics:
 
             ancla_html = (
                 '<div class="analytics-mini-grid">'
-                + f'<div class="glass-card"><span class="ancla-badge">{ICON_ESTRELLA}</span>'
+                + f'<div class="glass-card"><span class="ancla-badge">{ICON_MEDALLA}</span>'
                   f'<div class="card-label">DATO ANCLA</div>'
                   f'<div class="card-value" style="color:{ancla_color};">Percentil {percentil:.0f}%</div>'
                   f'<div class="card-copy">{ancla_texto}</div>'
                   + _pct_slider(percentil, COLORS["muted"], COLORS["muted"], f"{percentil:.0f}%", "0", "100%")
                   + '</div>'
-                + f'<div class="glass-card"><span class="bench-badge">LÍDER</span>'
+                + f'<div class="glass-card"><span class="bench-badge">{ICON_CORONA}</span>'
                   f'<div class="card-label">BENCHMARK</div>'
                   f'<div class="card-value" style="color:{COLORS["brand_orange"]};">{dl.fmt_money(leader["gmv"], CURRENCY)}</div>'
                   f'<div class="card-copy">El líder de {row.categoria} es {leader["brand_name"]} con '
@@ -2921,12 +2932,12 @@ with tab_analytics:
         f'<div class="analytics-supercard">'
         f'<div class="funnel-comparativo-grid">'
         f'<div class="funnel-card" style="margin-bottom:0;">'
-        f'<div class="funnel-label">🔍 Funnel Tráfico &amp; Conversión vs Benchmark</div>'
+        f'<div class="funnel-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_FUNNEL}</span>Funnel Tráfico &amp; Conversión vs Benchmark</div>'
         f'<div class="funnel-headline" style="color:{diag["color"]};">{diag["headline"]}</div>'
         f'<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;">'
         f'<div>{funnel_svg}</div><div>{funnel_legend}</div>'
         f"</div>"
-        f'<div class="funnel-texto">{diag["texto"]}</div>'
+        f'<div class="funnel-insight-pill"><span>💡</span><span>{diag["texto"]}</span></div>'
         f"</div>"
         f"{comparativo_html}"
         f"</div>"
