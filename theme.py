@@ -26,23 +26,29 @@ from logo_asset import WINGMAN_ICON_B64, WINGMAN_LOGO_FULL_B64
 # =========================
 COLORS = {
     # Marca (del logo)
-    "brand_orange":     "#F74D04",   # naranja — sidebar, headers, marca
+    "brand_orange":     "#F74D04",   # naranja — acentos, hovers, botón Entrar (se mantiene)
     "brand_orange_soft": "rgba(247,77,4,0.14)",
     "brand_purple":     "#9A54F6",   # morado — hover, sombras
     "brand_purple_soft": "rgba(154,84,246,0.16)",
     "brand_white":      "#FCFAF8",   # texto sobre naranja
+    # Color dominante nuevo -- décima vuelta, pedido explícito de Sabas:
+    # reemplaza al naranja como color de fondo de sidebar/header/login
+    # (logo recoloreado con este mismo azul de fondo). El naranja
+    # (brand_orange) NO se toca -- sigue siendo el acento de hover y el
+    # color del botón "Entrar" del login, confirmado explícitamente.
+    "brand_blue":       "#123E4A",   # azul petróleo — sidebar, header, login (nuevo color dominante)
 
     # Superficies (light mode)
     "bg":              "#F7F6F2",   # fondo general, blanco marfil/hueso tibio
     "card":            "#FFFFFF",   # cards, mas claras que el fondo (contraste)
     "card2":           "#EFEEE9",   # segundo plano (stat boxes, inputs)
-    "sidebar":         "#F74D04",   # sidebar naranja solido
+    "sidebar":         "#123E4A",   # sidebar — décima vuelta: azul petróleo, antes naranja
 
     # Texto
     "text":            "#23272E",   # texto principal, oscuro sobre fondo claro
     "muted":           "#6B7280",   # texto secundario
     "text_disabled":   "#9CA3AF",
-    "sidebar_text":    "#FCFAF8",   # texto blanco sobre el sidebar naranja
+    "sidebar_text":    "#FCFAF8",   # texto blanco sobre el sidebar (sigue igual, blanco sobre azul también contrasta bien)
 
     # Bordes
     "border":          "#E4E1D8",   # borde sutil, visible sobre fondo claro
@@ -433,7 +439,7 @@ ICON_COINV_REST = _icon(
 def build_css(login=False):
     LOGIN_CSS = (
         f'.stApp, [data-testid="stAppViewContainer"] {{'
-        f'  background: {COLORS["brand_orange"]} !important;'
+        f'  background: {COLORS["brand_blue"]} !important;'
         f'  min-height: 100vh; overflow-x: hidden;'
         f'}}'
         f'[data-testid="stAppViewContainer"] [data-testid="stMainBlockContainer"] {{'
@@ -592,7 +598,7 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     color: {COLORS["brand_white"]} !important;
 }}
 
-/* ── HEADER (area principal, naranja solido igual que sidebar) ── */
+/* ── HEADER (area principal, mismo color solido que el sidebar) ── */
 .app-header {{
     display: flex; align-items: center; justify-content: space-between;
     width: 100%;
