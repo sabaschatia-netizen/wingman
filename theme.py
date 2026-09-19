@@ -669,9 +669,12 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     border-color: {COLORS["border_hover"]};
     transform: translateY(-1px);
 }}
-.business-mini-card.lever-ads   {{ border-left: 3px solid {COLORS["brand_orange"]} !important; }}
-.business-mini-card.lever-md    {{ border-left: 3px solid {COLORS["blue"]} !important; }}
-.business-mini-card.lever-pro   {{ border-left: 3px solid {COLORS["brand_purple"]} !important; }}
+.business-mini-card.lever-ads, .business-mini-card.lever-md, .business-mini-card.lever-pro {{
+    /* Sin borde lateral de color -- pedido explícito de Sabas (décima
+       tercera vuelta): las 3 cards de palanca del Home (Ads/Markdown/
+       Markdown Pro) quedan completamente blancas, sin el acento de
+       color a la izquierda que tenían antes (naranja/azul/morado). */
+}}
 .business-mini-card.lever-menu  {{ border-left: 3px solid #6B7280 !important; }}
 
 /* Estado "apagado" de la tarjeta cuando la palanca está inactiva --
@@ -1007,7 +1010,7 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     padding: 4px 0; font-size: 11px; font-weight: 800; margin-right: 4px;
     background: {COLORS["card2"]}; color: {COLORS["text_disabled"]};
 }}
-.md-ladder-pill.active {{ background: {COLORS["blue"]}; color: {COLORS["brand_white"]}; }}
+.md-ladder-pill.active {{ background: {COLORS["brand_orange"]}; color: {COLORS["brand_white"]}; }}
 .coinv-block {{
     background: {COLORS["info_bg"]}; border: 1px solid rgba(108,155,209,0.22);
     border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;

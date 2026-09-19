@@ -2233,6 +2233,8 @@ churn_icon = "✅" if row.churn_status == "Disponible" else "⚠️"
 
 contact_html = (
     '<div class="brand-stats-row">'
+    f'<div><div class="stat-label">ESTADO DE CONEXIÓN</div>'
+    f'<div class="conn-status-pill {churn_class}">{churn_icon} {row.churn_status}</div></div>'
     f'<div><div class="stat-label">TELÉFONO</div><div class="stat-value">{row.telefono or "?"}{telefono_copy}</div></div>'
     f'<div><div class="stat-label">CORREO</div><div class="stat-value" style="font-size:13px;">{row.mail or "?"}{mail_copy}</div></div>'
     f'<div><div class="stat-label">CATEGORÍA</div><div class="stat-value"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_CATEGORIA}</span>{row.categoria or "?"}</div></div>'
@@ -2241,8 +2243,6 @@ contact_html = (
     f'title="Buscar en Google" aria-label="Buscar en Google" '
     f'style="color:{COLORS["brand_purple"]};text-decoration:none;font-size:18px;display:inline-block;margin-top:2px;">🔎</a>'
     "</div></div>"
-    f'<div><div class="stat-label">ESTADO DE CONEXIÓN</div>'
-    f'<div class="conn-status-pill {churn_class}">{churn_icon} {row.churn_status}</div></div>'
     "</div>"
 )
 
@@ -2905,7 +2905,7 @@ with tab_campaign:
             '<div class="coinv-block">'
             f'<span class="coinv-badge"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{coinv_icon_svg}</span>Coinversión activa · {coinv_plan["grupo_label"]} · ratio {coinv_plan["ratio"]}</span>'
             f'<div class="campaign-headline" style="font-size:26px;margin-top:8px;">'
-            f'{coinv_plan["discount"]}% OFF <span style="font-size:15px;color:{COLORS["success"]};">+ {coinv_plan["pro_extra"]}% PRO</span></div>'
+            f'{coinv_plan["discount"]}% OFF <span style="font-size:15px;color:{COLORS["brand_purple"]};">+ {coinv_plan["pro_extra"]}% PRO</span></div>'
             f'<div class="coinv-split">'
             f'<div class="coinv-split-item"><div class="coinv-split-label">Pone el aliado</div>'
             f'<div class="coinv-split-value">{coinv_plan["pct_aliado"]:.1f}%</div></div>'
@@ -2933,7 +2933,7 @@ with tab_campaign:
             '<div class="campaign-card">'
             f'<div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_MD_PLAN}</span>Markdown Plan</div>'
             f'<div class="campaign-headline" style="font-size:26px;">'
-            f'{md["discount"]}% OFF <span style="font-size:15px;color:{COLORS["success"]};">+ {md["pro_extra"]}% PRO</span></div>'
+            f'{md["discount"]}% OFF <span style="font-size:15px;color:{COLORS["brand_purple"]};">+ {md["pro_extra"]}% PRO</span></div>'
             f'<div class="md-ladder">{ladder_html}</div>'
             f'<div class="campaign-sub">{md["tramo"]} (CVR {row.cvr * 100:.1f}%)</div>'
             '<div class="section-title" style="margin:14px 0 8px 0;">TOP 3 PRODUCTOS</div>'
