@@ -87,6 +87,72 @@ def favicon():
 
 
 # =========================
+# ICONOGRAFIA — rediseño septiembre 2026, pedido explícito de Sabas
+# =========================
+# Reemplazo de los emojis Unicode (⚙️ 🍔 🏷️ 🚀 etc.) por un set propio de
+# íconos SVG monolineales (stroke, sin relleno). Usan `stroke="currentColor"`
+# a propósito: el color real lo pone el CSS del contenedor que los envuelve
+# (.action-card-icon, .lever-icon-active/.lever-icon-inactive, etc.), así
+# un mismo ícono puede pintarse morado (activo) o gris (inactivo) sin
+# duplicar el SVG. viewBox fijo 0 0 24 24 en los 4 para que se vean
+# consistentes uno al lado del otro en el grid de 360 Action.
+
+def _icon(paths, view_box="0 0 24 24"):
+    return (
+        f'<svg width="18" height="18" viewBox="{view_box}" fill="none" '
+        f'xmlns="http://www.w3.org/2000/svg" style="display:block;">{paths}</svg>'
+    )
+
+
+# OPS General — engranaje simplificado (6 dientes + centro hueco)
+ICON_OPS = _icon(
+    '<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>'
+    '<path d="M12 3v2.4M12 18.6V21M21 12h-2.4M5.4 12H3'
+    'M18.36 5.64l-1.7 1.7M7.34 16.66l-1.7 1.7'
+    'M18.36 18.36l-1.7-1.7M7.34 7.34l-1.7-1.7" '
+    'stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+)
+
+# Menú — 3 líneas horizontales tipo lista
+ICON_MENU = _icon(
+    '<path d="M4 7h16M4 12h16M4 17h10" '
+    'stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+)
+
+# Markdown — símbolo de porcentaje en trazo
+ICON_MARKDOWN = _icon(
+    '<circle cx="7" cy="7" r="2.4" stroke="currentColor" stroke-width="1.8"/>'
+    '<circle cx="17" cy="17" r="2.4" stroke="currentColor" stroke-width="1.8"/>'
+    '<path d="M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+)
+
+# Ads — flecha ascendente dentro de triángulo/cohete simplificado
+ICON_ADS = _icon(
+    '<path d="M12 3l4 7h-3v8h-2v-8H8l4-7z" '
+    'stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>'
+)
+
+# Categoría (imagen 1 — ficha de marca) — bowl con palitos cruzados
+ICON_CATEGORIA = _icon(
+    '<path d="M3.5 12a8.5 7 0 0017 0H3.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'
+    '<path d="M9 12V4M9 4l2.5-2M15 12V5M15 5l2-2.5" '
+    'stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+)
+
+# Palanca genérica (Ads/Markdown/Markdown Pro en Home) — rayo
+ICON_PALANCA = _icon(
+    '<path d="M13 3L5 14h5l-1 7 8-11h-5l1-7z" '
+    'stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>'
+)
+
+# Dato Ancla — estrella (imagen 2)
+ICON_ESTRELLA = _icon(
+    '<path d="M12 3l2.6 5.9 6.4.6-4.8 4.3 1.4 6.3L12 16.9 6.4 20.1l1.4-6.3-4.8-4.3 6.4-.6L12 3z" '
+    'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>'
+)
+
+
+# =========================
 # CSS
 # =========================
 
@@ -104,9 +170,9 @@ def build_css(login=False):
     )
     return f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-* {{ font-family: 'Poppins', sans-serif; }}
+* {{ font-family: 'Plus Jakarta Sans', sans-serif; }}
 
 /* ── APP BACKGROUND — dark ── */
 .stApp {{
@@ -337,7 +403,13 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .card-label {{
     font-size: 10.5px; font-weight: 700; color: {COLORS["muted"]};
     letter-spacing: 0.7px; text-transform: uppercase; margin-bottom: 5px;
+    display: flex; align-items: center; gap: 6px;
 }}
+.lever-icon {{
+    display: inline-flex; align-items: center; justify-content: center;
+    color: {COLORS["muted"]}; flex-shrink: 0;
+}}
+.lever-icon.icon-purple {{ color: {COLORS["brand_purple"]}; }}
 .card-value {{
     font-size: 22px; font-weight: 800; color: {COLORS["text"]};
     letter-spacing: -0.5px; line-height: 1.15;
@@ -701,6 +773,48 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .funnel-pitch {{ font-size: 11.5px; color: {COLORS["muted"]}; line-height: 1.55; font-style: italic; }}
 
 .analytics-mini-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }}
+.analytics-mini-grid .glass-card {{ position: relative; }}
+
+/* Badge circular (⭐) y ovalado (LÍDER) en la esquina de Dato Ancla /
+   Benchmark -- rediseño septiembre 2026, pedido explícito de Sabas. */
+.ancla-badge {{
+    position: absolute; top: 18px; right: 18px;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: {COLORS["card2"]}; color: {COLORS["muted"]};
+    display: flex; align-items: center; justify-content: center;
+}}
+.bench-badge {{
+    position: absolute; top: 18px; right: 18px;
+    padding: 5px 13px; border-radius: 999px;
+    background: rgba(247,77,4,0.14); color: {COLORS["brand_orange"]};
+    font-size: 10.5px; font-weight: 800; letter-spacing: 0.4px;
+}}
+
+/* Barra tipo slider con marcador -- usada en Dato Ancla (percentil,
+   marcador gris oscuro) y Benchmark (gmv vs líder, barra naranja). */
+.pct-slider {{ margin-top: 16px; }}
+.pct-slider-track {{
+    position: relative; height: 6px; border-radius: 999px;
+    background: {COLORS["card2"]};
+}}
+.pct-slider-fill {{
+    position: absolute; left: 0; top: 0; height: 100%; border-radius: 999px;
+}}
+.pct-slider-dot {{
+    position: absolute; top: 50%; width: 18px; height: 18px;
+    border-radius: 50%; background: {COLORS["card"]}; border: 3px solid;
+    transform: translate(-50%, -50%);
+}}
+.pct-slider-callout {{
+    position: absolute; bottom: 16px; transform: translateX(-50%);
+    background: {COLORS["card2"]}; color: {COLORS["text"]};
+    font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+    white-space: nowrap;
+}}
+.pct-slider-caption {{
+    display: flex; justify-content: space-between; margin-top: 6px;
+    font-size: 11.5px; font-weight: 600;
+}}
 
 /* ── ANALYTICS: grid funnel (izq) + comparativo vs mes anterior (der) ──
    Nuevo (septiembre 2026, pedido explícito de Sabas): la super-card ya
@@ -949,14 +1063,28 @@ div[data-testid="stDialog"] {{
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
 }}
 .action-card {{
-    background: {COLORS["card2"]}; border-radius: 14px; padding: 16px;
+    background: {COLORS["card"]}; border: 1px solid {COLORS["border"]};
+    border-radius: 14px; padding: 16px 16px 16px 16px; border-top: 3px solid transparent;
+    position: relative; overflow: hidden;
 }}
-.action-card-head {{ display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }}
+.action-card-icon {{
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: {COLORS["card2"]}; flex-shrink: 0; color: {COLORS["muted"]};
+}}
+.action-card-icon.icon-purple {{
+    background: {COLORS["brand_purple_soft"]}; color: {COLORS["brand_purple"]};
+}}
+.action-card-head {{ display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }}
 .action-card-pct {{ font-size: 24px; font-weight: 800; }}
 .action-card-name {{ font-size: 12.5px; font-weight: 700; color: {COLORS["text"]}; margin-top: 2px; }}
 .action-card-title {{ font-size: 12px; font-weight: 700; color: {COLORS["text"]}; margin-top: 10px; line-height: 1.4; }}
 .action-card-detail {{ font-size: 11px; color: {COLORS["muted"]}; margin-top: 6px; line-height: 1.5; }}
 .action-card-item {{ font-size: 11.5px; font-weight: 600; color: {COLORS["text"]}; margin-top: 8px; line-height: 1.4; }}
+.action-card-healthy {{ border-top-color: {COLORS["success"]}; }}
+.action-card-watch   {{ border-top-color: {COLORS["warning"]}; }}
+.action-card-alert   {{ border-top-color: {COLORS["danger"]}; }}
+.action-card-inactive {{ border-top-color: {COLORS["muted"]}; }}
 
 /* ── TABS (Home / 360 Action / Analytics / Campaign Designer / Outreach) ── */
 .stTabs [data-baseweb="tab-list"] {{

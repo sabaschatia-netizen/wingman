@@ -18,7 +18,19 @@ import streamlit as st
 import streamlit.components.v1 as st_components
 
 import data_layer as dl
-from theme import COLORS, build_css, favicon, logo_img
+from theme import (
+    COLORS,
+    ICON_ADS,
+    ICON_CATEGORIA,
+    ICON_ESTRELLA,
+    ICON_MARKDOWN,
+    ICON_MENU,
+    ICON_OPS,
+    ICON_PALANCA,
+    build_css,
+    favicon,
+    logo_img,
+)
 
 st.set_page_config(
     page_title="Wingman",
@@ -307,7 +319,7 @@ def header(farmer_name, section_name, pill=""):
     )
 
 
-def mini_card(label, value, copy="", lever="", chip="", chip_color="", corner_badge=None):
+def mini_card(label, value, copy="", lever="", chip="", chip_color="", corner_badge=None, active=False):
     chip_html = (
         f'<span class="card-chip" style="background:{chip_color}22;color:{chip_color};">{chip}</span>'
         if chip else ""
@@ -316,10 +328,15 @@ def mini_card(label, value, copy="", lever="", chip="", chip_color="", corner_ba
     if corner_badge:
         b_text, b_color = corner_badge
         badge_html = f'<span class="corner-badge" style="background:{b_color}22;color:{b_color};">{b_text}</span>'
+    # Ícono de palanca (morado si activa, gris si inactiva) -- rediseño
+    # septiembre 2026, pedido explícito de Sabas: reemplaza el label de
+    # texto suelto por un ícono circular chico + el nombre de la palanca.
+    icon_class = "lever-icon icon-purple" if active else "lever-icon"
+    icon_html = f'<span class="{icon_class}">{ICON_PALANCA}</span>'
     return (
         f'<div class="business-mini-card lever-{lever}">'
         f"{badge_html}"
-        f'<div class="card-label">{label}</div>'
+        f'<div class="card-label">{icon_html}{label}</div>'
         f'<div class="card-value">{value}{chip_html}</div>'
         f'<div class="card-copy">{copy}</div></div>'
     )
@@ -1406,7 +1423,7 @@ def render_loading_watcher():
             s.textContent = `
               #gw-loading {{ position: fixed; z-index: 2147483200; display: flex;
                 align-items: center; justify-content: center; background: {bg};
-                font-family: 'Poppins', sans-serif; animation: gw-fade-in .12s ease-out; }}
+                font-family: 'Plus Jakarta Sans', sans-serif; animation: gw-fade-in .12s ease-out; }}
               #gw-loading .gw-box {{ display: flex; flex-direction: column; align-items: center; gap: 16px; }}
               #gw-loading .gw-logo {{ height: 46px; width: auto; animation: gw-pulse 1.6s ease-in-out infinite; }}
               #gw-loading .gw-txt {{ font-size: 15px; font-weight: 700; color: {txt}; }}
@@ -2281,7 +2298,7 @@ contact_html = (
     '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px;">'
     f'<div><div class="stat-label">TELÉFONO</div><div class="stat-value">{row.telefono or "?"}{telefono_copy}</div></div>'
     f'<div><div class="stat-label">CORREO</div><div class="stat-value" style="font-size:13px;">{row.mail or "?"}{mail_copy}</div></div>'
-    f'<div><div class="stat-label">CATEGORÍA</div><div class="stat-value">{row.categoria or "?"}</div></div>'
+    f'<div><div class="stat-label">CATEGORÍA</div><div class="stat-value"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_CATEGORIA}</span>{row.categoria or "?"}</div></div>'
     f'<div><div class="stat-label">LOCAL</div><div class="stat-value">'
     f'<a href="{search_url}" target="_blank" rel="noopener noreferrer" '
     f'style="color:{COLORS["brand_purple"]};text-decoration:none;font-weight:700;">🔎 Buscar</a>'
@@ -2411,11 +2428,11 @@ with tab_home:
     st.markdown(
         '<div class="business-card-grid">'
         + mini_card("ADS", ads_txt, ads_copy,
-                    "ads", ads_chip, COLORS["accent"], corner_badge=ads_badge)
+                    "ads", ads_chip, COLORS["accent"], corner_badge=ads_badge, active=row.bookings > 0)
         + mini_card("MARKDOWN", md_txt, md_copy, "md",
-                    dl.fmt_roi(row.roi_md) if row.roi_md > 0 else "", COLORS["blue"], corner_badge=md_badge)
+                    dl.fmt_roi(row.roi_md) if row.roi_md > 0 else "", COLORS["blue"], corner_badge=md_badge, active=row.markdown_md > 0)
         + mini_card("MARKDOWN PRO", pro_txt, pro_copy, "pro",
-                    dl.fmt_roi(row.roi_mdpro) if row.roi_mdpro > 0 else "", COLORS["success"], corner_badge=pro_badge)
+                    dl.fmt_roi(row.roi_mdpro) if row.roi_mdpro > 0 else "", COLORS["success"], corner_badge=pro_badge, active=row.markdown_mdpro > 0)
         + "</div>",
         unsafe_allow_html=True,
     )
@@ -2483,19 +2500,20 @@ with tab_action:
             "ALERT": COLORS["danger"], "INACTIVE": COLORS["muted"],
         }[tag]
 
-    def _tag_bg(tag):
-        # Fondo pastel de la card completa segun estado -- pedido
-        # explícito de Sabas (agosto 2026): antes las 4 cards eran
-        # siempre grises, ahora toman el color del estado (mismo estilo
-        # suave que ya usamos en Rendimiento País).
+    def _tag_border_class(tag):
+        # Clase de la barra superior de la card segun estado -- rediseño
+        # septiembre 2026, pedido explícito de Sabas: las 4 cards pasan
+        # de fondo pastel completo a fondo blanco + barra superior de
+        # color (mismo semáforo que antes, ahora solo como acento).
         return {
-            "HEALTHY": COLORS["success_soft"], "WATCH": COLORS["warning_soft"],
-            "ALERT": COLORS["danger_soft"], "INACTIVE": COLORS["card2"],
+            "HEALTHY": "action-card-healthy", "WATCH": "action-card-watch",
+            "ALERT": "action-card-alert", "INACTIVE": "action-card-inactive",
         }[tag]
 
-    def _action_mini(icon, name, pct, tag, title, detail, items=None):
+    def _action_mini(icon_svg, name, pct, tag, title, detail, items=None, icon_purple=False):
         color = _tag_color(tag)
-        bg = _tag_bg(tag)
+        border_class = _tag_border_class(tag)
+        icon_class = "action-card-icon icon-purple" if icon_purple else "action-card-icon"
         pct_html = f'<div class="action-card-pct" style="color:{color};">{pct:.0f}%</div>' if pct is not None else ""
         tag_class = {
             "HEALTHY": "tag-healthy", "WATCH": "tag-watch",
@@ -2513,8 +2531,8 @@ with tab_action:
         else:
             cuerpo_html = f'<div class="action-card-title">{title}</div><div class="action-card-detail">{detail}</div>'
         return (
-            f'<div class="action-card" style="background:{bg};">'
-            f'<div class="action-card-head">{icon}</div>'
+            f'<div class="action-card {border_class}">'
+            f'<div class="action-card-head"><span class="{icon_class}">{icon_svg}</span></div>'
             f"{pct_html}"
             f'<div class="action-card-name">{name}</div>'
             f'<span class="gauge-tag {tag_class}">{tag}</span>'
@@ -2522,12 +2540,15 @@ with tab_action:
             f"</div>"
         )
 
+    # Ícono morado fijo para Markdown/Ads (palancas comerciales activables),
+    # gris fijo para OPS/Menú (señales operativas) -- así se ve en la
+    # imagen de referencia de Sabas, independiente del tag ALERT/HEALTHY.
     st.markdown(
         '<div class="action-supercard"><div class="action-grid">'
-        + _action_mini("⚙️", "OPS General", ops["pct"], ops["tag"], ops["title"], ops["detail"], items=ops.get("items"))
-        + _action_mini("🍔", "Menú", menu["pct"], menu["tag"], menu["title"], menu["detail"], items=menu.get("items"))
-        + _action_mini("🏷️", "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"])
-        + _action_mini("🚀", "Ads", None, ads_c["tag"], ads_c["title"], ads_c["detail"])
+        + _action_mini(ICON_OPS, "OPS General", ops["pct"], ops["tag"], ops["title"], ops["detail"], items=ops.get("items"))
+        + _action_mini(ICON_MENU, "Menú", menu["pct"], menu["tag"], menu["title"], menu["detail"], items=menu.get("items"))
+        + _action_mini(ICON_MARKDOWN, "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"], icon_purple=True)
+        + _action_mini(ICON_ADS, "Ads", None, ads_c["tag"], ads_c["title"], ads_c["detail"], icon_purple=True)
         + "</div></div>",
         unsafe_allow_html=True,
     )
@@ -2689,6 +2710,24 @@ with tab_analytics:
     # ── Dato Ancla + Benchmark: se calculan por GMV, no por AOV (mismo criterio
     # que Growth OS: percentil = cuantas marcas de la cartera tienen menos GMV;
     # benchmark = la marca con mayor GMV de la categoria). ──
+    def _pct_slider(pct_pos, fill_color, dot_color, callout_text, left_label, right_label, left_color=None, right_color=None):
+        # Slider visual reusable -- rediseño septiembre 2026 (imagen de
+        # referencia de Sabas): barra con relleno hasta pct_pos%, marcador
+        # circular en esa posición y un callout flotando arriba con el
+        # valor. pct_pos siempre 0-100 (ya clampeado por el caller).
+        left_style = f'style="color:{left_color};"' if left_color else ""
+        right_style = f'style="color:{right_color};"' if right_color else ""
+        return (
+            '<div class="pct-slider">'
+            f'<div class="pct-slider-track">'
+            f'<div class="pct-slider-fill" style="width:{pct_pos:.1f}%;background:{fill_color};"></div>'
+            f'<div class="pct-slider-dot" style="left:{pct_pos:.1f}%;border-color:{dot_color};"></div>'
+            f'<div class="pct-slider-callout" style="left:{pct_pos:.1f}%;">{callout_text}</div>'
+            "</div>"
+            f'<div class="pct-slider-caption"><span {left_style}>{left_label}</span><span {right_style}>{right_label}</span></div>'
+            "</div>"
+        )
+
     ancla_html = ""
     if row.gmv > 0 and row.categoria:
         cat_brands = portfolio[portfolio["categoria"] == row.categoria]
@@ -2707,15 +2746,27 @@ with tab_analytics:
                 ancla_texto = f"Estás en el percentil {percentil:.0f}% de {row.categoria}. Hay marcas similares vendiendo mucho más con la palanca correcta."
                 ancla_color = COLORS["brand_orange"]
 
+            bench_pct_pos = max(0.0, min(100.0, (row.gmv / leader["gmv"]) * 100)) if leader["gmv"] > 0 else 0.0
+
             ancla_html = (
                 '<div class="analytics-mini-grid">'
-                + f'<div class="glass-card"><div class="card-label">DATO ANCLA</div>'
+                + f'<div class="glass-card"><span class="ancla-badge">{ICON_ESTRELLA}</span>'
+                  f'<div class="card-label">DATO ANCLA</div>'
                   f'<div class="card-value" style="color:{ancla_color};">Percentil {percentil:.0f}%</div>'
-                  f'<div class="card-copy">{ancla_texto}</div></div>'
-                + f'<div class="glass-card"><div class="card-label">BENCHMARK</div>'
+                  f'<div class="card-copy">{ancla_texto}</div>'
+                  + _pct_slider(percentil, COLORS["muted"], COLORS["muted"], f"{percentil:.0f}%", "0", "100%")
+                  + '</div>'
+                + f'<div class="glass-card"><span class="bench-badge">LÍDER</span>'
+                  f'<div class="card-label">BENCHMARK</div>'
                   f'<div class="card-value" style="color:{COLORS["brand_orange"]};">{dl.fmt_money(leader["gmv"], CURRENCY)}</div>'
                   f'<div class="card-copy">El líder de {row.categoria} es {leader["brand_name"]} con '
-                  f'{dl.fmt_money(leader["gmv"], CURRENCY)}. Ese es el benchmark real.</div></div>'
+                  f'{dl.fmt_money(leader["gmv"], CURRENCY)}. Ese es el benchmark real.</div>'
+                  + _pct_slider(
+                        bench_pct_pos, COLORS["brand_orange"], COLORS["brand_orange"],
+                        "", f'{dl.fmt_money(row.gmv, CURRENCY)} (Tu Marca)', f'{dl.fmt_money(leader["gmv"], CURRENCY)} (Líder)',
+                        left_color=COLORS["brand_orange"], right_color=COLORS["muted"],
+                    )
+                  + '</div>'
                 + "</div>"
             )
         else:
