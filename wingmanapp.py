@@ -23,6 +23,7 @@ from theme import (
     ICON_ADS_LEVER,
     ICON_ADS_PLAN,
     ICON_AOV,
+    ICON_BILLETE,
     ICON_BULLET_CHECK,
     ICON_BULLET_EYE,
     ICON_BULLET_WARNING,
@@ -37,19 +38,28 @@ from theme import (
     ICON_COINV_REST,
     ICON_CONVERSION,
     ICON_CORONA,
+    ICON_CUADRADO,
     ICON_ENVELOPE,
+    ICON_FANTASMA,
+    ICON_FUEGO,
     ICON_FUNNEL,
     ICON_GMV,
     ICON_MARKDOWN,
     ICON_MARKDOWN_LEVER,
+    ICON_MAPA,
     ICON_MD_PLAN,
     ICON_MEDALLA,
     ICON_MENU,
+    ICON_MONITOR,
     ICON_OPS,
     ICON_ORDENES,
+    ICON_PIN,
+    ICON_RAYO,
     ICON_RENDIMIENTO,
+    ICON_TELEFONO,
     ICON_TENDENCIA,
     ICON_TRAFICO,
+    ICON_TROFEO,
     build_css,
     favicon,
     icon_medalla_numero,
@@ -611,7 +621,7 @@ def render_conosur_map():
 
     st.markdown(
         '<div class="mgmt-card" style="padding-bottom:8px;">'
-        '<div class="mgmt-card-title" style="margin-bottom:12px;">🗺️ Cono Sur — elegí un país</div>'
+        f'<div class="mgmt-card-title" style="margin-bottom:12px;"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_MAPA}</span>Cono Sur — elegí un país</div>'
         "</div>",
         unsafe_allow_html=True,
     )
@@ -653,7 +663,7 @@ _RENDIMIENTO_TEXT_COLOR = {
     "orange": COLORS["brand_orange"], "gray": COLORS["muted"],
     "farmer": COLORS["text"],
 }
-_RENDIMIENTO_EMOJI = {"blue": "⚡", "green": "🏆", "red": "🟥", "purple": "🔥", "yellow": "⚠️"}
+_RENDIMIENTO_ICON = {"blue": ICON_RAYO, "green": ICON_TROFEO, "red": ICON_CUADRADO, "purple": ICON_FUEGO, "yellow": ICON_BULLET_WARNING}
 
 
 def _rend_pill(valor, color):
@@ -662,8 +672,16 @@ def _rend_pill(valor, color):
 
 
 def _rend_pill_a(valor, color):
-    emoji = _RENDIMIENTO_EMOJI.get(color, "")
-    return _rend_pill(f"{valor} {emoji}".strip(), color)
+    # Ícono SVG monocromático GRIS fijo en vez de emoji Unicode a color
+    # (segunda vuelta, pedido explícito de Sabas: "pásalos a gris
+    # monocromático", igual que el resto del rediseño -- no coloreado
+    # por estado como el texto de la pill, siempre gris).
+    icon_svg = _RENDIMIENTO_ICON.get(color, "")
+    icon_html = (
+        f'<span class="lever-icon" style="margin-left:4px;width:13px;height:13px;vertical-align:-2px;">{icon_svg}</span>'
+        if icon_svg else ""
+    )
+    return _rend_pill(f"{valor}{icon_html}", color)
 
 
 def _trab_pill(valor, color):
@@ -1409,7 +1427,10 @@ def _render_comision_ads_proyectada(farmer_email):
 
     alerta_html = ""
     if notas_bloqueo:
-        items_html = "".join(f"<div>⚠️ {n}</div>" for n in notas_bloqueo)
+        items_html = "".join(
+            f'<div><span class="lever-icon" style="width:12px;height:12px;margin-right:5px;vertical-align:-2px;">{ICON_BULLET_WARNING}</span>{n}</div>'
+            for n in notas_bloqueo
+        )
         alerta_html = (
             '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;'
             f'background:rgba(251,191,36,0.14);color:#A97A1E;font-size:12.5px;font-weight:600;'
@@ -1444,13 +1465,14 @@ def _render_comision_ads_proyectada(farmer_email):
     if r["es_piso"]:
         piso_html = (
             f'<div style="font-size:11.5px;color:{COLORS["brand_purple"]};font-weight:700;margin-top:2px;">'
-            f"🎯 Esto es lo que ganarías llegando al 91% del target — con tu ritmo actual "
+            f'<span class="lever-icon" style="width:12px;height:12px;margin-right:5px;vertical-align:-2px;">{ICON_CONVERSION}</span>'
+            f"Esto es lo que ganarías llegando al 91% del target — con tu ritmo actual "
             f"({r['revenue_pace_pct']:.0f}%) todavía no se desbloquea.</div>"
         )
 
     st.markdown(
         '<div class="mgmt-card" style="margin-top:14px;">'
-        '<div class="mgmt-card-title">💵 Comisión Ads proyectada · al ritmo actual</div>'
+        f'<div class="mgmt-card-title"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_BILLETE}</span>Comisión Ads proyectada · al ritmo actual</div>'
         f'<div style="font-size:11.5px;color:{COLORS["muted"]};margin-bottom:8px;">'
         f'Revenue proyectado: {dl.fmt_money(r["revenue_pace_result"], "USD")} de '
         f'{dl.fmt_money(r["target_revenue"], "USD")} target ({r["revenue_pace_pct"]:.0f}% de ritmo)</div>'
@@ -2013,14 +2035,16 @@ def render_brand_coverage_and_contact(farmer_or_list):
     # funciones ya suman numerador y denominador de cada farmer
     # automáticamente, mismo patrón que brand_coverage_for/conversion_for.
     #
-    # Color por RITMO + emoji dentro del donut (agosto 2026, séptima
-    # vuelta, actualizado en la octava): Adquisición Ads, Upselling Ads
-    # y Conversión MD son las 3 métricas que se miden en ritmo/pace (ver
-    # adquisicion_ads_for/upselling_ads_for/conversion_for) -- para esas
-    # 3, el color del anillo y el emoji debajo del % salen de una función
-    # de pace, con _RENDIMIENTO_EMOJI para el símbolo. IMPORTANTE (octava
-    # vuelta): Adquisición y Upselling YA NO comparten semáforo con
-    # Conversión MD -- Adquisición/Upselling usan pace_color_ads_upsell
+    # Color por RITMO + ícono dentro del donut (agosto 2026, séptima
+    # vuelta, actualizado en la octava; ícono SVG monocromático en vez
+    # de emoji Unicode desde la segunda vuelta de septiembre): Adquisición
+    # Ads, Upselling Ads y Conversión MD son las 3 métricas que se miden
+    # en ritmo/pace (ver adquisicion_ads_for/upselling_ads_for/
+    # conversion_for) -- para esas 3, el color del anillo y el ícono
+    # debajo del % salen de una función de pace, con _RENDIMIENTO_ICON
+    # para el símbolo. IMPORTANTE (octava vuelta): Adquisición y
+    # Upselling YA NO comparten semáforo con Conversión MD -- Adquisición/
+    # Upselling usan pace_color_ads_upsell
     # (rojo<80% / azul 81-90% / verde 91-105% / morado >105%, un cuarto
     # nivel que el otro semáforo no tiene), Conversión MD sigue con
     # pace_color (rojo<90% / azul 90-94% / verde>94%), mismo criterio que
@@ -2115,21 +2139,28 @@ def render_brand_coverage_and_contact(farmer_or_list):
         if k in ("adq_pct", "ups_pct"):
             raw_pct = _donut_pct_raw(k)
             pace_name = dl.pace_color_ads_upsell(raw_pct)
-            return _RENDIMIENTO_TEXT_COLOR[pace_name], _RENDIMIENTO_EMOJI.get(pace_name, "")
+            return _RENDIMIENTO_TEXT_COLOR[pace_name], _RENDIMIENTO_ICON.get(pace_name, "")
         if k == "md_pct":
             raw_pct = _donut_pct_raw(k)
             pace_name = _rend_color_conversion(raw_pct)
-            return _RENDIMIENTO_TEXT_COLOR[pace_name], _RENDIMIENTO_EMOJI.get(pace_name, "")
+            return _RENDIMIENTO_TEXT_COLOR[pace_name], _RENDIMIENTO_ICON.get(pace_name, "")
         return fixed_color, ""
 
     donuts_html_parts = []
     for k, label, fixed_color in donut_specs:
-        color, emoji = _donut_color_and_emoji(k, fixed_color)
-        emoji_html = f'<div class="donut-emoji">{emoji}</div>' if emoji else ""
+        color, icon_svg = _donut_color_and_emoji(k, fixed_color)
+        # Ícono SVG gris fijo debajo del %, no emoji Unicode a color
+        # (segunda vuelta, pedido explícito de Sabas) -- mismo criterio
+        # que _rend_pill_a: el símbolo va siempre en gris monocromático,
+        # el color solo lo lleva el número de arriba.
+        icon_html = (
+            f'<div class="donut-emoji"><span class="lever-icon" style="width:14px;height:14px;">{icon_svg}</span></div>'
+            if icon_svg else ""
+        )
         donuts_html_parts.append(
             f'<div class="donut-item">'
             f'<div class="donut-wrap">{_donut_svg(_donut_pct(k), color)}'
-            f'<div class="donut-pct" style="color:{color};">{_donut_pct(k) * 100:.0f}%{emoji_html}</div></div>'
+            f'<div class="donut-pct" style="color:{color};">{_donut_pct(k) * 100:.0f}%{icon_html}</div></div>'
             f'<div class="donut-label">{label}</div>'
             f'<div class="donut-count">{_donut_count_text(k)}</div>'
             f"</div>"
@@ -2137,9 +2168,9 @@ def render_brand_coverage_and_contact(farmer_or_list):
     donuts_html = "".join(donuts_html_parts)
     st.markdown(
         '<div class="mgmt-card">'
-        f'<div class="mgmt-card-title">🎯 Brand Coverage · Live ({cov["total"]} marcas en cartera)</div>'
+        f'<div class="mgmt-card-title"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_CONVERSION}</span>Brand Coverage · Live ({cov["total"]} marcas en cartera)</div>'
         f'<div class="donut-grid">{donuts_html}</div>'
-        "</div>".format(cov=cov),
+        "</div>",
         unsafe_allow_html=True,
     )
 
@@ -2183,7 +2214,7 @@ def render_brand_coverage_and_contact(farmer_or_list):
         )
         target_html = (
             '<div class="cp-target-row">'
-            f'<div class="cp-target-label">🎯 Target del mes: '
+            f'<div class="cp-target-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_CONVERSION}</span>Target del mes: '
             f'<b>{cp["total_effective"]:.0f} / {target:.0f}</b> '
             f'<span style="color:{barra_color};font-weight:800;">({pct_mostrado:.0f}% ritmo)</span>'
             f"</div>"
@@ -2205,20 +2236,21 @@ def render_brand_coverage_and_contact(farmer_or_list):
         + "</div>"
     )
     legend_items = [
-        ("📞 Amazon Connect", cp["calls"], calls_pct, COLORS["brand_purple"]),
-        ("💬 WhatsApp", cp["chats"], chats_pct, COLORS["success"]),
-        ("🖥️ Meet", cp["meets"], meets_pct, COLORS["blue"]),
-        ("👻 No Contactado", cp["not_contacted"], ghost_pct, COLORS["danger"]),
+        (ICON_TELEFONO, "Amazon Connect", cp["calls"], calls_pct, COLORS["brand_purple"]),
+        (ICON_CHAT, "WhatsApp", cp["chats"], chats_pct, COLORS["success"]),
+        (ICON_MONITOR, "Meet", cp["meets"], meets_pct, COLORS["blue"]),
+        (ICON_FANTASMA, "No Contactado", cp["not_contacted"], ghost_pct, COLORS["danger"]),
     ]
     legend_html = "".join(
         f'<div class="cp-legend-item"><div class="cp-legend-dot" style="background:{color};"></div>'
+        f'<span class="lever-icon" style="margin-right:5px;vertical-align:-2px;width:13px;height:13px;">{icon_svg}</span>'
         f'<span style="color:{color};">{label}</span>'
         f'<span style="color:{COLORS["muted"]};font-weight:600;">{n} · {pct}%</span></div>'
-        for label, n, pct, color in legend_items
+        for icon_svg, label, n, pct, color in legend_items
     )
     st.markdown(
         '<div class="mgmt-card">'
-        f'<div class="mgmt-card-title">📞 Contact Performance · desde {month_label}</div>'
+        f'<div class="mgmt-card-title"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_TELEFONO}</span>Contact Performance · desde {month_label}</div>'
         f'<div class="cp-total">{cp["total_effective"]} <span class="cp-total-label">contactos efectivos</span></div>'
         f"{target_html}"
         f"{cp_bar_html}"
@@ -2316,7 +2348,7 @@ if st.session_state["view"] == "landing":
             st.markdown(
                 f'<div style="font-size:13px;font-weight:800;color:{COLORS["brand_purple"]};'
                 f'margin:4px 0 14px;text-transform:uppercase;letter-spacing:.04em;">'
-                f"📍 {pais_label}</div>",
+                f'<span class="lever-icon" style="width:13px;height:13px;margin-right:5px;vertical-align:-2px;">{ICON_PIN}</span>{pais_label}</div>',
                 unsafe_allow_html=True,
             )
 

@@ -327,6 +327,61 @@ ICON_EXPANDIR = _icon(
     'stroke-linecap="round" stroke-linejoin="round"/>'
 )
 
+# ── Gestión General, segunda vuelta (pedido explícito de Sabas): Brand
+# Coverage, Contact Performance y las pills de Rendimiento País seguían
+# con emojis Unicode a color (🎯📞💬🖥️👻⚡🏆🟥🔥⚠️) que se me habían
+# escapado en la primera pasada -- estaban fuera del rango de líneas
+# donde busqué. ──
+ICON_TELEFONO = _icon(
+    '<path d="M7.5 3.8L10 6.3a1.2 1.2 0 01-.1 1.7l-1.6 1.4a11 11 0 004.8 4.8l1.4-1.6a1.2 1.2 0 011.7-.1l2.5 2.5a1.2 1.2 0 01.1 1.7l-1.6 1.8c-.5.5-1.2.8-1.9.6a15 15 0 01-10-10c-.2-.7.1-1.4.6-1.9l1.8-1.6a1.2 1.2 0 011.8.2z" '
+    'fill="currentColor"/>'
+)
+ICON_MONITOR = _icon(
+    '<rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" stroke-width="1.7" fill="none"/>'
+    '<path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
+)
+ICON_FANTASMA = _icon(
+    '<path d="M6 21V11a6 6 0 0112 0v10l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+    '<circle cx="9.5" cy="11" r="1" fill="currentColor"/>'
+    '<circle cx="14.5" cy="11" r="1" fill="currentColor"/>'
+)
+# Los 5 estados de _RENDIMIENTO_EMOJI (pills de la tabla Rendimiento
+# País): rayo (blue), trofeo (green), cuadrado relleno (red), fuego
+# (purple), warning ya existe como ICON_BULLET_WARNING (yellow).
+ICON_RAYO = _icon(
+    '<path d="M13 3L5 14h5l-1 7 8-11h-5l1-7z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+)
+ICON_TROFEO = _icon(
+    '<path d="M8 4h8v4a4 4 0 01-8 0V4z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+    '<path d="M8 5H5a2 2 0 002 4M16 5h3a2 2 0 01-2 4" stroke="currentColor" stroke-width="1.5" fill="none"/>'
+    '<path d="M12 12v4M9 20h6M10 16h4v4h-4z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>'
+)
+ICON_CUADRADO = _icon(
+    '<rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>'
+)
+ICON_FUEGO = _icon(
+    '<path d="M12 2.5c.8 2.3-1.8 3.2-1.8 5.8a1.8 1.8 0 003.6 0c1 1.5 1.7 3 1.7 4.7a5.5 5.5 0 01-11 0c0-3.5 2.2-5 3-7.3.6.8 1.2 1.2 1.5.6.3-.6 0-2.3 3-3.8z" '
+    'fill="currentColor"/>'
+)
+ICON_BILLETE = _icon(
+    '<rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" stroke-width="1.6" fill="none"/>'
+    '<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6" fill="none"/>'
+    '<circle cx="6" cy="12" r="0.8" fill="currentColor"/>'
+    '<circle cx="18" cy="12" r="0.8" fill="currentColor"/>'
+)
+ICON_MAPA = _icon(
+    '<path d="M9 3L3 5v16l6-2 6 2 6-2V3l-6 2-6-2z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+    '<path d="M9 3v16M15 5v16" stroke="currentColor" stroke-width="1.5"/>'
+)
+ICON_PIN = _icon(
+    '<path d="M12 21s7-6.5 7-11.5a7 7 0 10-14 0C5 14.5 12 21 12 21z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+    '<circle cx="12" cy="9.5" r="2.3" stroke="currentColor" stroke-width="1.5" fill="none"/>'
+)
+
 
 # Íconos de los 6 grupos de coinversión (COINV_GROUPS en data_layer.py,
 # antes 🎯🌱🚫🛡️⭐📦) -- diferenciados entre sí porque cada grupo es un
@@ -951,15 +1006,21 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     line-height: 1.1;
 }}
-/* Emoji de ritmo dentro del donut, centrado y debajo del % (agosto 2026,
-   séptima vuelta -- pedido explícito de Sabas): solo aparece en las 3
-   métricas medidas en pace (Adquisición/Upselling Ads, Conversión MD),
-   mismo emoji que ya usa la tabla Rendimiento País/Farmer por color de
-   ritmo (ver _RENDIMIENTO_EMOJI en wingmanapp.py). display:flex +
-   align-items:center en el padre (.donut-pct) es lo que centra el
-   emoji simétrico respecto al número, sin necesidad de margin/padding
-   manual por caso. */
-.donut-emoji {{ font-size: 13px; margin-top: 2px; line-height: 1; }}
+/* Ícono de ritmo dentro del donut, centrado y debajo del % (agosto
+   2026, séptima vuelta -- pedido explícito de Sabas): solo aparece en
+   las 3 métricas medidas en pace (Adquisición/Upselling Ads,
+   Conversión MD), mismo criterio de color que ya usa la tabla
+   Rendimiento País/Farmer por color de ritmo (ver _RENDIMIENTO_ICON en
+   wingmanapp.py). display:flex + align-items:center en el padre
+   (.donut-pct) es lo que centra el ícono simétrico respecto al número,
+   sin necesidad de margin/padding manual por caso.
+
+   Ícono SVG monocromático gris en vez de emoji Unicode a color
+   (segunda vuelta, pedido explícito de Sabas) -- display:flex +
+   justify-content:center acá porque, a diferencia de un carácter de
+   texto (que se centraba solo por herencia), un <span><svg></span> no
+   se centra horizontalmente sin flex propio. */
+.donut-emoji {{ margin-top: 2px; line-height: 1; display: flex; justify-content: center; }}
 .donut-label {{ font-size: 11px; font-weight: 700; color: {COLORS["text"]}; text-align: center; }}
 .donut-count {{ font-size: 10px; font-weight: 500; color: {COLORS["muted"]}; text-align: center; margin-top: 1px; }}
 .donut-sub {{ font-size: 9.5px; color: {COLORS["muted"]}; }}
