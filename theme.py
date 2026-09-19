@@ -1438,12 +1438,19 @@ div[data-testid="stDialog"] {{
 .action-bullet.has-icon::after {{ content: none; }}
 .action-bullet.has-icon svg {{ width: 10px; height: 10px; }}
 
-/* ── TABS (Home / 360 Action / Analytics / Campaign Designer / Outreach) ── */
+/* ── TABS (Home / 360 Action / Analytics / Campaign Designer / Outreach) ──
+   Distribuidas a lo ancho de toda la barra -- pedido explícito de
+   Sabas (décima cuarta vuelta): antes quedaban agrupadas a la
+   izquierda con gap fijo; ahora cada tab ocupa espacio proporcional
+   (flex:1) y el texto queda centrado dentro de su tramo, repartiendo
+   las 5 a lo largo del ancho completo del contenedor. */
 .stTabs [data-baseweb="tab-list"] {{
     gap: 6px; border-bottom: 1px solid {COLORS["border"]};
+    width: 100%;
 }}
 .stTabs [data-baseweb="tab"] {{
     color: {COLORS["muted"]} !important;
+    flex: 1 1 0; display: flex; justify-content: center;
 }}
 .stTabs [aria-selected="true"] {{
     color: {COLORS["brand_purple"]} !important;
