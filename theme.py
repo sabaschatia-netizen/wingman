@@ -163,6 +163,33 @@ ICON_MARKDOWN_LEVER = _icon(
     '<path d="M8 16L16 8" stroke="white" stroke-width="1.6" stroke-linecap="round"/>'
 )
 
+# GMV — círculo relleno con "S" (símbolo de venta/moneda) adentro,
+# reemplaza el emoji 📈 (tercera vuelta, pedido explícito de Sabas:
+# GMV/AOV/órdenes seguían con emoji Unicode de Apple sin tocar).
+ICON_GMV = _icon(
+    '<circle cx="12" cy="12" r="10" fill="currentColor"/>'
+    '<text x="12" y="16.5" font-family="Arial, sans-serif" font-size="13" '
+    'font-weight="700" fill="white" text-anchor="middle">S</text>'
+)
+
+# AOV — carrito de compras lineal, reemplaza el emoji 🛒.
+ICON_AOV = _icon(
+    '<circle cx="9" cy="20" r="1.3" fill="currentColor"/>'
+    '<circle cx="17" cy="20" r="1.3" fill="currentColor"/>'
+    '<path d="M2.5 3h2l2.2 11.6a2 2 0 002 1.6h7.7a2 2 0 002-1.6L18 7.5H6.2" '
+    'stroke="currentColor" stroke-width="1.8" fill="none" '
+    'stroke-linecap="round" stroke-linejoin="round"/>'
+)
+
+# Órdenes (sub-línea de la card de GMV) — caja/paquete isométrica lineal,
+# reemplaza el emoji 📦.
+ICON_ORDENES = _icon(
+    '<path d="M12 2.5l8.5 4.9v9.2L12 21.5l-8.5-4.9V7.4L12 2.5z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+    '<path d="M3.5 7.4L12 12.2l8.5-4.8M12 12.2v9.3" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+)
+
 # Dato Ancla — estrella (imagen 2)
 ICON_ESTRELLA = _icon(
     '<path d="M12 3l2.6 5.9 6.4.6-4.8 4.3 1.4 6.3L12 16.9 6.4 20.1l1.4-6.3-4.8-4.3 6.4-.6L12 3z" '

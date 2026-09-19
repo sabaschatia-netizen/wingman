@@ -22,12 +22,15 @@ from theme import (
     COLORS,
     ICON_ADS,
     ICON_ADS_LEVER,
+    ICON_AOV,
     ICON_CATEGORIA,
     ICON_ESTRELLA,
+    ICON_GMV,
     ICON_MARKDOWN,
     ICON_MARKDOWN_LEVER,
     ICON_MENU,
     ICON_OPS,
+    ICON_ORDENES,
     build_css,
     favicon,
     logo_img,
@@ -477,7 +480,7 @@ def metric_trend_card(icon, label, value_ars, delta_frac, sub_left, prev_ars=0, 
         f'<div class="glass-card">'
         f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
         f'<div style="flex:1;">'
-        f'<div class="card-label">{icon} {label}</div>'
+        f'<div class="card-label"><span class="lever-icon">{icon}</span>{label}</div>'
         f'<div class="card-value">{dl.fmt_money(value_ars, currency)}</div>'
         f'<div style="margin-top:8px;">{delta_html}</div>'
         f'<div class="card-copy" style="margin-top:4px;">{sub_left}</div>'
@@ -486,7 +489,11 @@ def metric_trend_card(icon, label, value_ars, delta_frac, sub_left, prev_ars=0, 
 
 
 def state_text(active):
-    return ("Active 🚀", COLORS["success"]) if active else ("Inactive 💤", COLORS["text_disabled"])
+    # Sin emoji al lado de Active/Inactive -- pedido explícito de Sabas
+    # (septiembre 2026, tercera vuelta): antes llevaba 🚀/💤, ahora solo
+    # la palabra (el color y, si corresponde, el corner-badge/pill ya
+    # comunican el estado).
+    return ("Active", COLORS["success"]) if active else ("Inactive", COLORS["text_disabled"])
 
 
 def watch_alert_tag(pct, good=95, ok=85):
@@ -2369,16 +2376,21 @@ with tab_home:
     if row.gmv > 0:
         g1, g2 = st.columns(2)
         with g1:
-            ordenes_sub = f'📦 {row.ordenes:,.0f} órdenes'.replace(",", ".")
+            ordenes_num = f'{row.ordenes:,.0f} órdenes'.replace(",", ".")
+            ordenes_sub = (
+                f'<span style="display:inline-flex;align-items:center;gap:6px;">'
+                f'<span class="lever-icon" style="width:14px;height:14px;">{ICON_ORDENES}</span>'
+                f'{ordenes_num}</span>'
+            )
             st.markdown(
-                metric_trend_card("📈", "GMV (mes)", row.gmv, row.gmv_delta,
+                metric_trend_card(ICON_GMV, "GMV (mes)", row.gmv, row.gmv_delta,
                                    ordenes_sub, prev_ars=row.gmv_last, prev2_ars=row.gmv_prev2,
                                    currency=CURRENCY, es_ritmo=True),
                 unsafe_allow_html=True,
             )
         with g2:
             st.markdown(
-                metric_trend_card("🛒", "AOV", row.aov, row.aov_delta,
+                metric_trend_card(ICON_AOV, "AOV", row.aov, row.aov_delta,
                                    "Ticket promedio", prev_ars=row.aov_last, prev2_ars=row.aov_prev2,
                                    currency=CURRENCY),
                 unsafe_allow_html=True,
