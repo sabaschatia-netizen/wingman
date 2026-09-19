@@ -172,22 +172,27 @@ ICON_GMV = _icon(
     'font-weight="700" fill="white" text-anchor="middle">S</text>'
 )
 
-# AOV — carrito de compras lineal, reemplaza el emoji 🛒.
+# AOV — ticket/boleto de entrada lineal (rectángulo con muescas
+# semicirculares a los lados + línea punteada vertical), reemplaza el
+# carrito de compras que tenía antes (cuarta vuelta, pedido explícito
+# de Sabas: AOV = ticket, el carrito pasa a ser el ícono de órdenes).
 ICON_AOV = _icon(
+    '<path d="M3 7a2 2 0 012-2h14a2 2 0 012 2v2a1.5 1.5 0 000 3v2a1.5 1.5 0 000 3v2'
+    'a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a1.5 1.5 0 000-3V9a1.5 1.5 0 000-3V7z" '
+    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
+    '<line x1="14.5" y1="5.5" x2="14.5" y2="18.5" stroke="currentColor" '
+    'stroke-width="1.4" stroke-dasharray="1.8,1.8" stroke-linecap="round"/>'
+)
+
+# Órdenes (sub-línea de la card de GMV) — carrito de compras lineal,
+# reemplaza el ícono de caja/paquete que tenía antes (cuarta vuelta,
+# mismo pedido: el carrito pasa de AOV a órdenes).
+ICON_ORDENES = _icon(
     '<circle cx="9" cy="20" r="1.3" fill="currentColor"/>'
     '<circle cx="17" cy="20" r="1.3" fill="currentColor"/>'
     '<path d="M2.5 3h2l2.2 11.6a2 2 0 002 1.6h7.7a2 2 0 002-1.6L18 7.5H6.2" '
     'stroke="currentColor" stroke-width="1.8" fill="none" '
     'stroke-linecap="round" stroke-linejoin="round"/>'
-)
-
-# Órdenes (sub-línea de la card de GMV) — caja/paquete isométrica lineal,
-# reemplaza el emoji 📦.
-ICON_ORDENES = _icon(
-    '<path d="M12 2.5l8.5 4.9v9.2L12 21.5l-8.5-4.9V7.4L12 2.5z" '
-    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
-    '<path d="M3.5 7.4L12 12.2l8.5-4.8M12 12.2v9.3" '
-    'stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>'
 )
 
 # Dato Ancla — estrella (imagen 2)

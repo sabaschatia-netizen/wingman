@@ -2449,7 +2449,7 @@ with tab_home:
 
     md_txt, _ = state_text(row.markdown_md > 0)
     md_camp = row.campaign_md if row.campaign_md and row.campaign_md != "-" else ""
-    md_copy = f"Campaign {md_camp or '-'}" if row.markdown_md > 0 else "Campaign —"
+    md_copy = f"Campaign {md_camp or '-'}" if row.markdown_md > 0 else "Sin promo activa este mes"
     md_badge = None
     if row.markdown_md > 0:
         pen_color = COLORS["success"] if row.penetracion_md >= 0.10 else COLORS["danger"]
@@ -2457,7 +2457,7 @@ with tab_home:
 
     pro_txt, _ = state_text(row.markdown_mdpro > 0)
     pro_camp = row.campaign_mdpro if row.campaign_mdpro and row.campaign_mdpro != "-" else ""
-    pro_copy = f"Campaign {pro_camp or '-'}" if row.markdown_mdpro > 0 else "Campaign —"
+    pro_copy = f"Campaign {pro_camp or '-'}" if row.markdown_mdpro > 0 else "Sin promo activa este mes"
     pro_badge = None
     if row.markdown_mdpro > 0:
         pen_color = COLORS["success"] if row.penetracion_mdpro >= 0.10 else COLORS["danger"]
