@@ -1255,30 +1255,33 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 }}
 .sup-table th {{
     font-size: 11px; font-weight: 700; color: {COLORS["muted"]};
-    text-transform: uppercase; letter-spacing: 0.4px; text-align: left;
-    padding: 0 8px 6px 8px; overflow: hidden;
+    text-transform: uppercase; letter-spacing: 0.4px; text-align: center;
+    vertical-align: middle; padding: 0 8px 6px 8px; overflow: hidden;
+    word-break: keep-all; overflow-wrap: normal; line-height: 1.35;
 }}
-/* Anchos por columna (9 columnas fijas de Rendimiento País, agosto
-   2026, cuarta vuelta -- se agregó Upselling Ads como columna 4,
-   corriendo MD/Bookings/Revenue/MD Full/MD PRO un puesto y agregando
-   MD PRO como 9na columna, que antes no tenía ancho explícito y por eso
-   se cortaba en el borde del contenedor). Farmer y Contactos Efectivos
-   con espacio moderado; Adquisición/Upselling/Conversión MD y los 2
-   Objetivo Ads (contenido corto, "112% 🔥") bien angostas; MD Full/PRO
-   mas anchas porque su contenido es mas largo ("6,76% / 7,69% - 88%").
-   NO se busca que las 9 columnas se vean completas en el ancho normal
-   del contenedor -- para eso está el botón de pantalla completa (ver
-   sup-table-fullscreen); aquí el criterio es que ninguna columna quede
-   sin ancho definido (eso es lo que las corta), no que quepan todas. */
-.sup-table th:nth-child(1), .sup-table td:nth-child(1) {{ width: 13%; }}
+.sup-table th:first-child {{ text-align: left; }}
+/* Anchos por columna (9 columnas fijas de Rendimiento País) -- pedido
+   explícito de Sabas (décima séptima vuelta, corregido en la misma
+   vuelta): NO significa que las 9 columnas midan lo mismo -- significa
+   que cada una tiene la proporción que su propio contenido necesita
+   (una celda que no necesita tanto "aire" queda más chica, una que sí
+   lo necesita queda más grande), calibrado contra el contenido real:
+   Farmer lleva el nombre de usuario más largo del equipo
+   (luisfernando.hernandez); Objetivo Ads Bookings es solo un
+   porcentaje corto ("75%"); Objetivo MD Full/PRO llevan la pill más
+   larga de toda la tabla ("11.54% / 10.41% - 111%" + ícono). Antes
+   Bookings/Revenue (8%) y MD Full/PRO (17%) tenían más del doble de
+   diferencia sin que el contenido lo justificara tanto -- ahora la
+   proporción seescala con el ancho real de cada pill. */
+.sup-table th:nth-child(1), .sup-table td:nth-child(1) {{ width: 15%; }}
 .sup-table th:nth-child(2), .sup-table td:nth-child(2) {{ width: 11%; }}
 .sup-table th:nth-child(3), .sup-table td:nth-child(3) {{ width: 9%; }}
 .sup-table th:nth-child(4), .sup-table td:nth-child(4) {{ width: 9%; }}
-.sup-table th:nth-child(5), .sup-table td:nth-child(5) {{ width: 8%; }}
-.sup-table th:nth-child(6), .sup-table td:nth-child(6) {{ width: 8%; }}
-.sup-table th:nth-child(7), .sup-table td:nth-child(7) {{ width: 8%; }}
-.sup-table th:nth-child(8), .sup-table td:nth-child(8) {{ width: 17%; }}
-.sup-table th:nth-child(9), .sup-table td:nth-child(9) {{ width: 17%; }}
+.sup-table th:nth-child(5), .sup-table td:nth-child(5) {{ width: 10%; }}
+.sup-table th:nth-child(6), .sup-table td:nth-child(6) {{ width: 7%; }}
+.sup-table th:nth-child(7), .sup-table td:nth-child(7) {{ width: 12%; }}
+.sup-table th:nth-child(8), .sup-table td:nth-child(8) {{ width: 13.5%; }}
+.sup-table th:nth-child(9), .sup-table td:nth-child(9) {{ width: 13.5%; }}
 
 /* Tabla interactiva (Rendimiento País/Farmer): resize de columnas
    arrastrando el borde derecho del header, y ordenar de mayor a menor /
@@ -1349,9 +1352,9 @@ div[data-testid="stDialog"] {{
    pegado a bordes) -- pedido explícito de Sabas. */
 .sup-table-fullscreen {{ table-layout: auto; width: auto; }}
 .sup-table-fullscreen th, .sup-table-fullscreen td {{ width: auto !important; white-space: nowrap; }}
-.sup-table-fullscreen th {{ padding: 0 20px 10px 20px; text-align: center; }}
+.sup-table-fullscreen th {{ padding: 0 20px 10px 20px; text-align: center; vertical-align: middle; }}
 .sup-table-fullscreen th:first-child {{ text-align: left; }}
-.sup-table-fullscreen td {{ padding: 6px 20px; text-align: center; }}
+.sup-table-fullscreen td {{ padding: 6px 20px; text-align: center; vertical-align: middle; }}
 .sup-table-fullscreen td:first-child {{ text-align: left; }}
 .sup-table-fullscreen .sup-pill {{ display: inline-flex; align-items: center; justify-content: center; }}
 
@@ -1371,11 +1374,12 @@ div[data-testid="stDialog"] {{
    pill. */
 .sup-table-single {{ table-layout: auto; }}
 .sup-table-single th {{
-    width: auto; white-space: normal; text-align: center; line-height: 1.3;
-    max-width: 90px;
+    width: auto; white-space: normal; text-align: center; vertical-align: middle;
+    line-height: 1.35; word-break: keep-all; overflow-wrap: normal; hyphens: none;
+    max-width: 130px;
 }}
 .sup-table-single th:first-child {{ text-align: left; max-width: none; }}
-.sup-table-single td {{ width: 1%; white-space: nowrap; text-align: center; padding: 4px 10px; }}
+.sup-table-single td {{ width: 1%; white-space: nowrap; text-align: center; vertical-align: middle; padding: 4px 10px; }}
 .sup-table-single td:first-child {{ text-align: left; width: auto; }}
 
 .sup-table td {{ padding: 4px 4px; vertical-align: middle; overflow: hidden; }}

@@ -956,7 +956,7 @@ def _tabla_fullscreen_dialog(pais, fs_flag_key):
         # rerun, y para que el botón de afuera pueda volver a abrirlo.
         st.session_state[fs_flag_key] = False
 
-    @st.dialog(f"📊 Rendimiento País — {pais}", width="large", on_dismiss=_on_dismiss)
+    @st.dialog(f"Rendimiento País — {pais}", width="large", icon=":material/bar_chart:", on_dismiss=_on_dismiss)
     def _dialog():
         tabla = dl.tabla_farmers_por_pais(pais)
         if tabla.empty:
@@ -991,7 +991,7 @@ def _farmer_fullscreen_dialog(farmer_email, fila_html, fs_flag_key):
     def _on_dismiss():
         st.session_state[fs_flag_key] = False
 
-    @st.dialog("📊 Rendimiento Farmer", width="large", on_dismiss=_on_dismiss)
+    @st.dialog("Rendimiento Farmer", width="large", icon=":material/bar_chart:", on_dismiss=_on_dismiss)
     def _dialog():
         st.markdown(
             f'<table class="sup-table sup-table-single sup-table-fullscreen">'
