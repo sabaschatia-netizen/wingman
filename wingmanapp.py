@@ -656,16 +656,11 @@ def render_conosur_map():
 # vista Farmer -su propia fila-, agosto 2026)
 # =========================
 
-# Pill con FONDO de color pastel (inversión, pedido explícito de Sabas
-# décima sexta vuelta): antes el fondo era SIEMPRE gris y el color
-# correspondía al TEXTO; ahora es al revés -- el fondo lleva el pastel
-# del color de estado, y el texto + el ícono adentro van siempre en
-# gris (COLORS["muted"]). Los 5 colores base (antes tonos hardcodeados
-# ligeramente distintos a la paleta -- ej. el rojo era #C4483F, un vino
-# tinto, no el mismo rojo que ya usa "No Contactado" en Contact
-# Performance) se alinean a los ESTÁNDAR de la paleta: success/warning/
-# blue/brand_purple/brand_orange/danger -- pedido explícito de Sabas
-# tras notar la diferencia.
+# _RENDIMIENTO_BG_COLOR: paleta PASTEL, usada por _rend_pill hasta la
+# vigésima tercera vuelta -- pedido explícito de Sabas la revirtió de
+# nuevo a fondo ELÉCTRICO/sólido (ver _RENDIMIENTO_SOLID_COLOR más abajo,
+# que ahora es la que usa _rend_pill). Se deja esta paleta definida sin
+# uso por si se reutiliza en el futuro, no se elimina.
 _RENDIMIENTO_BG_COLOR = {
     "red": COLORS["danger_soft"], "green": COLORS["success_soft"],
     "yellow": COLORS["warning_soft"], "blue": "rgba(108,155,209,0.16)",
@@ -673,11 +668,13 @@ _RENDIMIENTO_BG_COLOR = {
     "gray": "rgba(107,114,128,0.10)",
 }
 _RENDIMIENTO_ICON = {"blue": ICON_RAYO, "green": ICON_TROFEO, "red": ICON_CUADRADO, "purple": ICON_FUEGO, "yellow": ICON_BULLET_WARNING}
-# Color SÓLIDO (no fondo pastel) para el anillo/texto del donut de Brand
-# Coverage -- contexto distinto de las pills de Rendimiento País/Farmer
-# (ahí el color va en el fondo pastel, acá sigue siendo el color puro
-# del anillo y el número, como siempre fue). Mismos 5 estándar de
-# paleta que _RENDIMIENTO_BG_COLOR, solo que en su versión sólida.
+# Color SÓLIDO/eléctrico -- usado por los 5 donuts de Brand Coverage Y
+# (desde la vigésima tercera vuelta, pedido explícito de Sabas: "los
+# colores de las pills ya no irán en tono pastel... sino en tono
+# eléctrico como los de arriba") por el FONDO de las pills de
+# Rendimiento País/Farmer -- ambos contextos comparten ahora la misma
+# paleta, para que el color de un farmer/equipo nunca contradiga entre
+# el donut y la pill de la tabla.
 _RENDIMIENTO_SOLID_COLOR = {
     "red": COLORS["danger"], "green": COLORS["success"], "yellow": "#A97A1E",
     "blue": COLORS["blue"], "purple": COLORS["brand_purple"],
@@ -686,8 +683,13 @@ _RENDIMIENTO_SOLID_COLOR = {
 
 
 def _rend_pill(valor, color):
-    bg_color = _RENDIMIENTO_BG_COLOR.get(color, "rgba(107,114,128,0.10)")
-    return f'<span class="sup-pill" style="background:{bg_color};color:{COLORS["muted"]};">{valor}</span>'
+    # Pill invertida de nuevo (vigésima tercera vuelta, pedido explícito
+    # de Sabas): ya NO fondo pastel + texto gris -- ahora fondo del color
+    # ELÉCTRICO/sólido (el mismo que ya usan los 5 donuts de Brand
+    # Coverage, _RENDIMIENTO_SOLID_COLOR) + texto e ícono en blanco (el
+    # ícono hereda vía currentColor, no hace falta tocarlo aparte).
+    bg_color = _RENDIMIENTO_SOLID_COLOR.get(color, COLORS["muted"])
+    return f'<span class="sup-pill" style="background:{bg_color};color:{COLORS["brand_white"]};">{valor}</span>'
 
 
 def _rend_pill_a(valor, color):

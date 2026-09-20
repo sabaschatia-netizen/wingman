@@ -19,7 +19,7 @@ Reglas de color explicitas del usuario:
 import base64
 import io
 
-from logo_asset import WINGMAN_ICON_B64, WINGMAN_LOGO_AZUL_B64, WINGMAN_LOGO_FULL_B64
+from logo_asset import WINGMAN_ICON_AZUL_B64, WINGMAN_ICON_B64, WINGMAN_LOGO_AZUL_B64, WINGMAN_LOGO_FULL_B64
 
 # =========================
 # PALETA — extraida por pixel del logo v2, mas dark mode
@@ -91,7 +91,11 @@ def favicon():
     try:
         from PIL import Image
 
-        return Image.open(io.BytesIO(base64.b64decode(WINGMAN_ICON_B64)))
+        # Pedido explícito de Sabas (vigésima tercera vuelta): el
+        # favicon del navegador pasa del ícono blanco/naranja original
+        # al ícono azul petróleo/naranja (mismo criterio que el logo
+        # LOGO_AZUL_URI usado en el loader, ver theme.py más abajo).
+        return Image.open(io.BytesIO(base64.b64decode(WINGMAN_ICON_AZUL_B64)))
     except Exception:
         return "🤝"
 
