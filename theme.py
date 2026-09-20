@@ -1372,7 +1372,7 @@ div[data-testid="stDialog"] {{
    así no manda el ancho de la columna; el contenido de la celda queda
    centrado con padding parejo a los lados, ajustado al tamaño real de la
    pill. */
-.sup-table-single {{ table-layout: auto; }}
+.sup-table-single {{ table-layout: auto; margin: 0 auto; }}
 .sup-table-single th {{
     width: auto; white-space: normal; text-align: center; vertical-align: middle;
     line-height: 1.35; word-break: keep-all; overflow-wrap: normal; hyphens: none;
