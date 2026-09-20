@@ -4133,6 +4133,12 @@ def gmv_ultima_semana(gmv_mes_actual, dias_transcurridos):
     semana, sino sacar el promedio diario real (con los dias que
     efectivamente transcurrieron, mismo criterio ya validado de
     dias_transcurridos_mes_actual()) y multiplicarlo por 7.
+
+    SIN USO DESDE la vigésima segunda vuelta (pedido explícito de Sabas):
+    ads_plan() ya no llama a esta función -- pasó a usar gmv_last / 4
+    (ver el "BUG REAL CORREGIDO" en el docstring de ads_plan) en vez del
+    ritmo del mes actual que esta función calculaba. Se deja definida sin
+    uso por si se necesita en el futuro, no se elimina.
     """
     dias = max(dias_transcurridos, 1)
     return (gmv_mes_actual / dias) * 7 if gmv_mes_actual > 0 else 0.0
@@ -4145,12 +4151,26 @@ def ads_plan(gmv_last, gmv_mes_actual, dias_transcurridos, cvr, aov):
     del mes anterior ÷ 4 semanas).
 
     Presupuesto semana 1 = % sugerido (ver ads_pressure_pct_for, tabla por
-    GMV del mes anterior completo) x GMV de la ultima semana (ver
-    gmv_ultima_semana, derivado del GMV de Home). Ya NO se distingue
-    Adquisicion vs Upselling -- siempre se devuelve el presupuesto
-    recomendado completo para la marca, tenga o no Ads activo hoy (pedido
-    explicito de Sabas: esa decision queda en criterio del Farmer, no en
-    la formula).
+    GMV del mes anterior completo) x GMV semanal derivado del MISMO GMV
+    del mes anterior (gmv_last ÷ 4) -- ver "BUG REAL CORREGIDO" abajo, esto
+    reemplazó al ritmo del mes actual. Ya NO se distingue Adquisicion vs
+    Upselling -- siempre se devuelve el presupuesto recomendado completo
+    para la marca, tenga o no Ads activo hoy (pedido explicito de Sabas:
+    esa decision queda en criterio del Farmer, no en la formula).
+
+    BUG REAL CORREGIDO (vigésima segunda vuelta, pedido explícito de
+    Sabas): antes, el monto en pesos del presupuesto salía del ritmo del
+    MES ACTUAL EN CURSO (gmv_ultima_semana: gmv_mes_actual ÷ días
+    transcurridos × 7), mientras que el % de la tabla salía del GMV del
+    MES ANTERIOR completo (gmv_last) -- dos fuentes de GMV distintas
+    mezcladas en la misma fórmula. Ahora ambos pasos (elegir el % Y
+    calcular el monto) usan el MISMO gmv_last (mes anterior completo),
+    simplemente dividido entre 4 en vez de proyectado por ritmo diario.
+    gmv_mes_actual y dias_transcurridos quedan en la firma sin usarse (no
+    se tocó el punto de llamada en wingmanapp.py, que sigue pasando los
+    mismos 5 argumentos) -- si se quiere, se pueden quitar de la firma en
+    una limpieza futura, pero dejarlos no rompe nada ni cambia el
+    resultado.
 
     Proyeccion con erosion (mecanismo NUEVO, no existia antes en
     Wingman): se asume el MISMO presupuesto semanal sostenido durante 4
@@ -4177,7 +4197,7 @@ def ads_plan(gmv_last, gmv_mes_actual, dias_transcurridos, cvr, aov):
         return out
 
     pct = ads_pressure_pct_for(gmv_last)
-    gmv_sem = gmv_ultima_semana(gmv_mes_actual, dias_transcurridos)
+    gmv_sem = gmv_last / 4
     presupuesto = round(pct * gmv_sem / 1000) * 1000
 
     out["pct"] = pct
