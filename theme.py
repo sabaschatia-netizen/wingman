@@ -19,7 +19,7 @@ Reglas de color explicitas del usuario:
 import base64
 import io
 
-from logo_asset import WINGMAN_ICON_B64, WINGMAN_LOGO_FULL_B64
+from logo_asset import WINGMAN_ICON_B64, WINGMAN_LOGO_AZUL_B64, WINGMAN_LOGO_FULL_B64
 
 # =========================
 # PALETA — extraida por pixel del logo v2, mas dark mode
@@ -71,6 +71,10 @@ COLORS = {
 
 LOGO_FULL_URI = "data:image/png;base64," + WINGMAN_LOGO_FULL_B64
 LOGO_ICON_URI = "data:image/png;base64," + WINGMAN_ICON_B64
+# Logo completo con letras en azul petróleo -- pedido explícito de Sabas
+# (décima novena vuelta): usado en el loader nuevo, que va sobre fondo
+# claro (COLORS["bg"]), donde el logo blanco original sería invisible.
+LOGO_AZUL_URI = "data:image/png;base64," + WINGMAN_LOGO_AZUL_B64
 
 
 def logo_img(size=40, radius=0, full=False):

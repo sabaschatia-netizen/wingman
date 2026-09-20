@@ -1332,13 +1332,13 @@ def render_loading_watcher():
       real del sidebar (getBoundingClientRect) -- el sidebar queda visible
       siempre, el overlay solo tapa el área de contenido.
     """
-    from theme import LOGO_ICON_URI
+    from theme import LOGO_AZUL_URI
     import json
 
-    logo_js = json.dumps(LOGO_ICON_URI)
+    logo_js = json.dumps(LOGO_AZUL_URI)
     bg = COLORS["bg"]
-    txt = COLORS["muted"]
-    track = COLORS["card2"]
+    ring_track = "rgba(18,62,74,0.10)"
+    ring_fill = COLORS["brand_orange"]
 
     st_components.html(
         f"""
@@ -1355,30 +1355,46 @@ def render_loading_watcher():
               #gw-loading {{ position: fixed; z-index: 2147483200; display: flex;
                 align-items: center; justify-content: center; background: {bg};
                 font-family: 'Plus Jakarta Sans', sans-serif; animation: gw-fade-in .12s ease-out; }}
-              #gw-loading .gw-box {{ display: flex; flex-direction: column; align-items: center; gap: 16px; }}
-              #gw-loading .gw-logo {{ height: 46px; width: auto; animation: gw-pulse 1.6s ease-in-out infinite; }}
-              #gw-loading .gw-txt {{ font-size: 15px; font-weight: 700; color: {txt}; }}
-              #gw-loading .gw-bar {{ width: 230px; height: 6px; border-radius: 999px; background: {track}; overflow: hidden; }}
-              #gw-loading .gw-bar-fill {{ height: 100%; width: 38%; border-radius: 999px;
-                background: {COLORS["brand_orange"]}; animation: gw-slide 1.1s ease-in-out infinite; }}
-              @keyframes gw-slide {{ 0% {{ transform: translateX(-130%); }} 100% {{ transform: translateX(360%); }} }}
+              #gw-loading .gw-ring-wrap {{ position: relative; width: 150px; height: 150px;
+                display: flex; align-items: center; justify-content: center; }}
+              #gw-loading .gw-ring-svg {{ position: absolute; top: 0; left: 0; }}
+              #gw-loading .gw-ring-arc {{ animation: gw-ring-cycle 2.4s cubic-bezier(.4,0,.2,1) infinite; }}
+              #gw-loading .gw-logo {{ width: 88px; height: auto; position: relative; }}
+              @keyframes gw-ring-cycle {{
+                0% {{ stroke-dashoffset: 389.6; }}
+                50% {{ stroke-dashoffset: 0; }}
+                100% {{ stroke-dashoffset: 389.6; }}
+              }}
               @keyframes gw-fade-in {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
-              @keyframes gw-pulse {{ 0%,100% {{ transform: scale(1); opacity: .92; }} 50% {{ transform: scale(1.06); opacity: 1; }} }}
             `;
           }} catch (e) {{}}
 
           var LOGO = {logo_js};
           var S = W.__gwNavState = W.__gwNavState || {{ sawBusy: false, shownAt: 0, lastAct: 0 }};
 
+          // buildOverlay ya NO recibe ni muestra ningún texto ("Cargando
+          // X...") -- pedido explícito de Sabas (décima novena vuelta,
+          // aprobado primero como mockup animado antes de tocar código): el
+          // loader es siempre el mismo sin importar a dónde se navegue --
+          // el logo completo de Wingman (en azul petróleo, para verse sobre
+          // el fondo claro del área de contenido) quieto en el centro, con
+          // un anillo tipo dona alrededor que se llena y se vacía en bucle
+          // continuo (color naranja de marca). El parámetro `label` se
+          // conserva sin usar en la firma para no tener que tocar las 3
+          // llamadas a startNav(label) que lo siguen pasando -- simplemente
+          // ya no se renderiza en ningún lado.
           function buildOverlay(label) {{
             var el = D.getElementById('gw-loading');
             if (!el) {{ el = D.createElement('div'); el.id = 'gw-loading'; D.body.appendChild(el); }}
-            var safe = String(label == null ? '' : label)
-              .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            el.innerHTML = '<div class="gw-box">' +
+            el.innerHTML = '<div class="gw-ring-wrap">' +
+              '<svg class="gw-ring-svg" width="150" height="150" viewBox="0 0 150 150">' +
+                '<circle cx="75" cy="75" r="62" fill="none" stroke="{ring_track}" stroke-width="6"/>' +
+                '<circle class="gw-ring-arc" cx="75" cy="75" r="62" fill="none" stroke="{ring_fill}" ' +
+                  'stroke-width="6" stroke-linecap="round" stroke-dasharray="389.6" ' +
+                  'stroke-dashoffset="389.6" transform="rotate(-90 75 75)"/>' +
+              '</svg>' +
               '<img class="gw-logo" src="' + LOGO + '" alt="Wingman"/>' +
-              '<div class="gw-txt">Cargando ' + safe + '…</div>' +
-              '<div class="gw-bar"><div class="gw-bar-fill"></div></div></div>';
+              '</div>';
             el.style.display = 'flex';
 
             var left = 0;
@@ -1430,7 +1446,26 @@ def render_loading_watcher():
               if (testid.indexOf('Sidebar') !== -1 || testid.indexOf('Collapse') !== -1) return;
               var ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
               if (ariaLabel.indexOf('sidebar') !== -1) return;
-              var label = ((btn.innerText || btn.textContent) || '').trim();
+              // BUG REAL CORREGIDO (décima novena vuelta, pedido explícito de
+              // Sabas -- "el loader sigue sin arreglarse", vio "Cargando
+              // bar_chart Rendimiento General..."): desde que los botones de
+              // navegación llevan icon=":material/...:" (Material Symbols),
+              // Streamlit los renderiza como un <span data-testid=
+              // "stIconMaterial"> cuyo TEXTO LITERAL es el nombre crudo del
+              // ícono (ej. "bar_chart") -- la fuente de íconos lo convierte
+              // visualmente en el glifo correcto, pero btn.innerText sigue
+              // leyendo ese nombre técnico concatenado con el label real
+              // ("bar_chart\n\nRendimiento General", confirmado inspeccionando
+              // el DOM real). El filtro viejo de "todo el label es puro
+              // snake_case" nunca lo atajaba porque el label completo no es
+              // SOLO snake_case, es el ícono pegado al texto real. Fix: se
+              // clona el botón, se le quita el <span data-testid=
+              // "stIconMaterial"> ANTES de leer el texto, así el label nunca
+              // incluye el nombre del ícono, sin importar cuál sea.
+              var btnClone = btn.cloneNode(true);
+              var iconSpan = btnClone.querySelector('[data-testid="stIconMaterial"]');
+              if (iconSpan) iconSpan.remove();
+              var label = ((btnClone.innerText || btnClone.textContent) || '').trim();
               if (!label) return;
               // Cualquier texto en snake_case/sin espacios que parezca nombre
               // de ícono técnico (ej. "keyboard_double_arrow_left") tampoco es
