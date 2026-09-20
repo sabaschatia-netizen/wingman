@@ -2569,12 +2569,12 @@ with tab_action:
     # gris fijo para OPS/Menú (señales operativas) -- así se ve en la
     # imagen de referencia de Sabas, independiente del tag ALERT/HEALTHY.
     st.markdown(
-        '<div class="action-supercard"><div class="action-grid">'
+        '<div class="action-grid">'
         + _action_mini(ICON_OPS, "OPS General", ops["pct"], ops["tag"], ops["title"], ops["detail"], items=ops.get("items"))
         + _action_mini(ICON_MENU, "Menú", menu["pct"], menu["tag"], menu["title"], menu["detail"], items=menu.get("items"))
         + _action_mini(ICON_MARKDOWN, "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"])
         + _action_mini(ICON_ADS_LEVER, "Ads", None, ads_c["tag"], ads_c["title"], ads_c["detail"])
-        + "</div></div>",
+        + "</div>",
         unsafe_allow_html=True,
     )
 
@@ -2823,7 +2823,6 @@ with tab_analytics:
         ancla_html = '<div class="card-copy">Sin GMV/categoría para calcular Dato Ancla y Benchmark.</div>'
 
     st.markdown(
-        f'<div class="analytics-supercard">'
         f'<div class="funnel-comparativo-grid">'
         f'<div class="funnel-card" style="margin-bottom:0;">'
         f'<div class="funnel-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_FUNNEL}</span>Funnel Tráfico &amp; Conversión vs Benchmark</div>'
@@ -2835,8 +2834,7 @@ with tab_analytics:
         f"</div>"
         f"{comparativo_html}"
         f"</div>"
-        f"{ancla_html}"
-        f"</div>",
+        f"{ancla_html}",
         unsafe_allow_html=True,
     )
 
@@ -2860,14 +2858,14 @@ with tab_campaign:
     else:
         pct_label = f'{plan["pct"] * 100:.0f}%'
         minis = (
-            f'<div class="glass-card"><div class="card-label">ROAS 1 SEMANA</div>'
+            f'<div class="campaign-inner-card"><div class="card-label">ROAS 1 SEMANA</div>'
             f'<div class="card-value">{plan["roas_1sem"]:.2f}x</div></div>'
-            f'<div class="glass-card"><div class="card-label">ROAS 4 SEMANAS</div>'
+            f'<div class="campaign-inner-card"><div class="card-label">ROAS 4 SEMANAS</div>'
             f'<div class="card-value">{plan["roas_4sem"]:.2f}x</div></div>'
-            f'<div class="glass-card"><div class="card-label">VENTA INCREMENTAL · 1 SEM</div>'
+            f'<div class="campaign-inner-card"><div class="card-label">VENTA INCREMENTAL · 1 SEM</div>'
             f'<div class="card-value">{dl.fmt_money(plan["gmv_inc_1sem"], CURRENCY)}</div>'
             f'<div class="card-copy">{plan["pedidos_inc_1sem"]:,.0f} pedidos</div></div>'.replace(",", ".")
-            + f'<div class="glass-card"><div class="card-label">VENTA INCREMENTAL · 4 SEM</div>'
+            + f'<div class="campaign-inner-card"><div class="card-label">VENTA INCREMENTAL · 4 SEM</div>'
             f'<div class="card-value">{dl.fmt_money(plan["gmv_inc_4sem"], CURRENCY)}</div>'
             f'<div class="card-copy">{plan["pedidos_inc_4sem"]:,.0f} pedidos</div></div>'.replace(",", ".")
         )

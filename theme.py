@@ -1032,6 +1032,17 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     display: grid; grid-template-columns: 30px 1fr 130px; gap: 10px; align-items: center;
     padding: 9px 12px; border-radius: 10px; background: {COLORS["card2"]}; margin-bottom: 6px;
 }}
+/* Cards internas de Ads Plan (ROAS 1/4 semanas, Venta incremental
+   1/4 sem) -- pedido explícito de Sabas (décima quinta vuelta): antes
+   usaban .glass-card (fondo blanco), que se perdía contra el fondo
+   igual de blanco de la card contenedora "Ads Plan" ("blanco sobre
+   blanco"). Mismo gris card2 que usa .top3-row en Markdown Plan, para
+   que ambas mitades de Campaign Designer (Ads Plan / Markdown Plan)
+   tengan el mismo tratamiento de "card externa blanca + internas
+   grises". */
+.campaign-inner-card {{
+    background: {COLORS["card2"]}; border-radius: 18px; padding: 20px 22px;
+}}
 
 /* ── MANAGEMENT DASHBOARD: Brand Coverage (6 donuts) + Contact Performance ── */
 .mgmt-card {{
@@ -1089,14 +1100,19 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .cp-legend-item {{ display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }}
 .cp-legend-dot {{ width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }}
 
-/* ── ANALYTICS: super-card con funnel + dato ancla + benchmark ── */
-.analytics-supercard {{
-    background: {COLORS["card"]}; border: 1px solid {COLORS["border"]};
-    border-radius: 18px; padding: 20px; box-shadow: 0 4px 18px rgba(154,84,246,0.08);
-}}
+/* .analytics-supercard eliminada -- pedido explícito de Sabas (décima
+   quinta vuelta, mismo criterio que .action-supercard en 360° Action):
+   la card contenedora gigante se quita, las cards internas (Funnel,
+   Comparativo, Dato Ancla, Benchmark) flotan directo sobre el fondo.
+   Los colores de Funnel/Comparativo (antes gris card2) y del insight
+   del funnel (antes blanco card) se INVIERTEN a la vez -- pedido
+   explícito: ahora las cards son blancas con su propio borde/sombra
+   (mismo tratamiento que .glass-card) y el insight queda en gris
+   card2, para que la pill se distinga del fondo blanco de su card. */
 .funnel-card {{
-    background: {COLORS["card2"]}; border-radius: 14px; padding: 18px 20px;
-    margin-bottom: 14px;
+    background: {COLORS["card"]}; border: 1px solid {COLORS["border"]};
+    border-radius: 14px; padding: 18px 20px;
+    margin-bottom: 14px; box-shadow: 0 4px 18px rgba(154,84,246,0.08);
 }}
 .funnel-label {{ font-size: 10.5px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.5px; color: {COLORS["muted"]}; margin-bottom: 8px; }}
@@ -1111,7 +1127,7 @@ section[data-testid="stMain"] .stMainBlockContainer {{
    todo el rediseño -- confirmado explícitamente. */
 .funnel-insight-pill {{
     display: flex; align-items: flex-start; gap: 10px;
-    background: {COLORS["card"]}; border-radius: 999px;
+    background: {COLORS["card2"]}; border-radius: 999px;
     padding: 12px 18px; margin-top: 4px; font-size: 11.5px;
     color: {COLORS["muted"]}; line-height: 1.5;
 }}
@@ -1176,8 +1192,10 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     .funnel-comparativo-grid {{ grid-template-columns: 1fr; }}
 }}
 .comparativo-card {{
-    background: {COLORS["card2"]}; border-radius: 14px; padding: 18px 20px;
+    background: {COLORS["card"]}; border: 1px solid {COLORS["border"]};
+    border-radius: 14px; padding: 18px 20px;
     display: flex; flex-direction: column; gap: 16px; justify-content: center;
+    box-shadow: 0 4px 18px rgba(154,84,246,0.08);
 }}
 .mini-delta-row {{ display: flex; flex-direction: column; gap: 5px; }}
 .mini-delta-head {{
@@ -1381,12 +1399,16 @@ div[data-testid="stDialog"] {{
 .sup-pill-blue   {{ background: rgba(108,155,209,0.14); color: #4C7CAD; }}
 .sup-pill-gray   {{ background: rgba(107,114,128,0.10); color: {COLORS["muted"]}; }}
 
-.action-supercard {{
-    background: {COLORS["card"]}; border: 1px solid {COLORS["border"]};
-    border-radius: 18px; padding: 20px; box-shadow: 0 4px 18px rgba(154,84,246,0.08);
-}}
+/* .action-supercard eliminada -- pedido explícito de Sabas (décima
+   quinta vuelta): la card contenedora gigante que envolvía las 4 cards
+   de OPS/Menú/Markdown/Ads se quita por completo, dejándolas "flotar"
+   directo sobre el fondo de la página, igual que en Home. El grid ya
+   no hereda padding del contenedor eliminado, así que se le da margen
+   superior propio para separarlo de la card de Coinversión MD de
+   arriba. */
 .action-grid {{
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    margin-top: 16px;
 }}
 .action-card {{
     background: {COLORS["card"]}; border: 1px solid {COLORS["border"]};
