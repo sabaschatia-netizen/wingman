@@ -1455,8 +1455,8 @@ def render_loading_watcher():
               // ícono (ej. "bar_chart") -- la fuente de íconos lo convierte
               // visualmente en el glifo correcto, pero btn.innerText sigue
               // leyendo ese nombre técnico concatenado con el label real
-              // ("bar_chart\n\nRendimiento General", confirmado inspeccionando
-              // el DOM real). El filtro viejo de "todo el label es puro
+              // ("bar_chart" + salto de línea + "Rendimiento General",
+              // confirmado inspeccionando el DOM real). El filtro viejo de "todo el label es puro
               // snake_case" nunca lo atajaba porque el label completo no es
               // SOLO snake_case, es el ícono pegado al texto real. Fix: se
               // clona el botón, se le quita el <span data-testid=
