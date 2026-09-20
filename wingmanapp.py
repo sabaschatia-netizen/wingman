@@ -2323,6 +2323,11 @@ link_html = (
     f'style="text-decoration:none;">🔗</a>'
     if link_rappi else '<span style="opacity:0.3;" title="Sin link disponible">🔗</span>'
 )
+google_html = (
+    f'<a href="{search_url}" target="_blank" rel="noopener noreferrer" '
+    f'title="Buscar en Google" aria-label="Buscar en Google" '
+    f'style="text-decoration:none;">🔎</a>'
+)
 
 contact_html = (
     '<div class="brand-stats-row">'
@@ -2333,12 +2338,8 @@ contact_html = (
     f'<div><div class="stat-label">CATEGORÍA</div><div class="stat-value">{row.categoria or "?"}</div></div>'
     f'<div><div class="stat-label">CONEXIÓN / ÓRDENES</div><div class="stat-value">'
     f'{pitch_info["conexion_icono"]} / {pitch_info["ordenes_icono"]}</div></div>'
-    f'<div><div class="stat-label">GOOGLE / RAPPI</div><div class="stat-value" style="display:flex;gap:10px;">'
-    f'<a href="{search_url}" target="_blank" rel="noopener noreferrer" '
-    f'title="Buscar en Google" aria-label="Buscar en Google" '
-    f'style="color:{COLORS["brand_purple"]};text-decoration:none;font-size:18px;display:inline-block;">🔎</a>'
-    f'<span style="font-size:18px;display:inline-block;">{link_html}</span>'
-    "</div></div>"
+    f'<div><div class="stat-label">GOOGLE / RAPPI</div><div class="stat-value">'
+    f'{google_html} / {link_html}</div></div>'
     "</div>"
 )
 
@@ -2531,12 +2532,30 @@ with tab_action:
         f'<span class="action-lever-pill">{lb} <span class="action-lever-pill-value">{v:.2f}</span></span>'
         for lb, v in pmap.get(row.key, [])
     )
+    # Top Res movido acá (vigésima tercera vuelta, pedido explícito de
+    # Sabas): antes eran 2 líneas dentro de la card de OPS General, ahora
+    # es UNA pill en la esquina derecha de esta barra de contexto (mismo
+    # estilo que las pills de palanca), con los 2 meses apilados uno
+    # encima del otro DENTRO de la misma pill blanca -- no 2 pills
+    # separadas. margin-left:auto empuja esta pill sola hasta el borde
+    # derecho de la card, separada del resto de pills de palanca.
+    _top_res = pitch_info["top_res"]
+    top_res_pill = (
+        '<span class="action-lever-pill" style="margin-left:auto;flex-direction:column;'
+        'align-items:flex-start;gap:2px;line-height:1.5;">'
+        f'<span>{_top_res["icono_anterior"]} TOP RES {_top_res["mes_anterior"] or "ANT."}: '
+        f'<span class="action-lever-pill-value">{_top_res["tier_anterior"]}</span></span>'
+        f'<span>{_top_res["icono_actual"]} TOP RES {_top_res["mes_actual"] or "ACT."}: '
+        f'<span class="action-lever-pill-value">{_top_res["tier_actual"]}</span></span>'
+        "</span>"
+    )
     st.markdown(
         f'<div class="action-context-card">'
         f'<div class="action-context-label-block">'
         f'<div class="action-mini-label">Coinversión MD</div>'
         f'<div class="action-mini-value">{row.coinv_md_label}</div></div>'
         f'<div class="action-context-pills">{lever_pills}</div>'
+        f"{top_res_pill}"
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -2664,22 +2683,16 @@ with tab_action:
     # gris fijo para OPS/Menú (señales operativas) -- así se ve en la
     # imagen de referencia de Sabas, independiente del tag ALERT/HEALTHY.
     #
-    # Top Res en OPS General (vigésima segunda vuelta, pedido explícito
-    # de Sabas): 2 líneas discretas al inicio de la card (mes anterior
-    # arriba, mes actual abajo, según lo confirmado), con la medalla del
-    # tier -- "Sin dato" cuando falta. Meses dinámicos (toman el nombre
-    # real de la columna del Excel, no un mes fijo en el código).
-    _top_res = pitch_info["top_res"]
-    top_res_html = (
-        '<div style="font-size:11px;color:#6B7280;margin-bottom:10px;line-height:1.6;">'
-        f'{_top_res["icono_anterior"]} TOP REST {_top_res["mes_anterior"] or "MES ANTERIOR"}: {_top_res["tier_anterior"]}<br>'
-        f'{_top_res["icono_actual"]} TOP REST {_top_res["mes_actual"] or "MES ACTUAL"}: {_top_res["tier_actual"]}'
-        "</div>"
-    )
-
+    # Top Res YA NO va acá (vigésima tercera vuelta, pedido explícito de
+    # Sabas: "eso vamos a transportarlo a una sola pill en la barra
+    # horizontal de arriba") -- se movió a la barra de contexto (ver
+    # top_res_pill, más arriba en este mismo tab), como una pill más
+    # apilada en 2 líneas en la esquina derecha. _action_mini conserva el
+    # parámetro top_res_html (default "") por si se reutiliza en el
+    # futuro, pero ya no se le pasa nada desde acá.
     st.markdown(
         '<div class="action-grid">'
-        + _action_mini(ICON_OPS, "OPS General", ops["pct"], ops["tag"], ops["title"], ops["detail"], items=ops.get("items"), top_res_html=top_res_html)
+        + _action_mini(ICON_OPS, "OPS General", ops["pct"], ops["tag"], ops["title"], ops["detail"], items=ops.get("items"))
         + _action_mini(ICON_MENU, "Menú", menu["pct"], menu["tag"], menu["title"], menu["detail"], items=menu.get("items"))
         + _action_mini(ICON_MARKDOWN, "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"])
         + _action_mini(ICON_ADS_LEVER, "Ads", None, ads_c["tag"], ads_c["title"], ads_c["detail"])

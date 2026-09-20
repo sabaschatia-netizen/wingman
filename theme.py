@@ -791,10 +791,11 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 }}
 .brand-stats-row {{
     display: flex; justify-content: center; align-items: flex-start;
-    gap: 48px; flex-wrap: wrap; margin-top: 36px; text-align: center;
+    gap: 28px; flex-wrap: nowrap; margin-top: 36px; text-align: center;
 }}
-.brand-stats-row > div {{ min-width: 160px; }}
+.brand-stats-row > div {{ min-width: 0; flex: 1 1 auto; }}
 .brand-stats-row .stat-label {{ text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }}
+.brand-stats-row .stat-value {{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 .stat-box {{
     background: {COLORS["card2"]}; border-radius: 12px;
     padding: 11px 15px; margin-bottom: 9px;
