@@ -1481,15 +1481,14 @@ div[data-testid="stDialog"] {{
     position: relative !important;
     z-index: 1;
 }}
-/* Línea naranja SOLO bajo la tab activa -- el highlight nativo de
-   Streamlit (barra que se desliza entre tabs) se oculta; se reemplaza
-   por un borde inferior en la tab activa, que es donde Sabas la
-   quiere, no como una barra independiente. */
-.stTabs [data-baseweb="tab-highlight"] {{ display: none !important; }}
-.stTabs [role="tab"][aria-selected="true"]::after {{
-    content: ""; position: absolute; left: 14px; right: 14px; bottom: 6px;
-    height: 3px; border-radius: 2px; background: {COLORS["brand_orange"]};
-}}
+/* Línea naranja bajo la tab activa: se deja el highlight NATIVO de
+   Streamlit hacer el trabajo (ya la pinta él solo) -- pedido explícito
+   de Sabas, tras ver en la app real que mi ::after manual se sumaba al
+   highlight nativo y quedaban dos líneas superpuestas/duplicadas. Antes
+   yo ocultaba el nativo (display:none) y dibujaba mi propia línea con
+   ::after; ahora se quita esa duplicación por completo -- solo se le
+   da el color de marca al highlight nativo. */
+.stTabs [data-baseweb="tab-highlight"] {{ background-color: {COLORS["brand_orange"]} !important; }}
 .stTabs [data-baseweb="tab-border"] {{ display: none !important; }}
 
 /* Ocultar chrome de Streamlit */
