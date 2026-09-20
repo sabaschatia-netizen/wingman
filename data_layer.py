@@ -17,6 +17,7 @@ Reglas que no se rompen:
 import os
 import re
 import unicodedata
+from datetime import datetime
 from urllib.parse import quote_plus
 
 import pandas as pd
@@ -187,6 +188,8 @@ SHEETS = {
     "export_md_kam": "EXPORT MD KAM",
     "export_ads_relation": "EXPORT ADS RELATION",
     "checkout": "CHECKOUT",
+    "pitchdata": "PITCHDATA",
+    "toprest": "TOPREST",
 }
 
 _JUNK = ("total", "nan", "none", "filtros aplicados", "metrica", "metrica")
@@ -210,6 +213,62 @@ def normalize(text):
 def name_key(value):
     """Nombre de marca -> clave comparable. Sin acentos, espacios ni simbolos."""
     return re.sub(r"[^a-z0-9]", "", normalize(value))
+
+
+# Prefijos de ciudad/región conocidos que aparecen pegados al nombre real
+# de la microzona en PITCHDATA (ej. "Bs As CABA (Palermo)" -> "Palermo",
+# "Cordoba Centro" -> "Centro") -- pedido explícito de Sabas (vigésima
+# segunda vuelta), lista construida a partir de los prefijos que
+# realmente se repiten en el archivo real (no una lista inventada).
+# Orden de más largo a más corto para que "Bs As CABA" se pruebe antes
+# que "Bs As" (si no, "Bs As" comería parte del nombre real de zonas que
+# sí empiezan con "Bs As CABA"/"Bs As Norte"/etc.).
+_MICROZONA_PREFIJOS = sorted([
+    "Bs As CABA", "Bs As Norte", "Bs As Oeste", "Bs As Sur",
+    "Cordoba", "Córdoba", "Neuquen", "Neuquén", "Rosario", "Corrientes",
+    "Tucuman", "Tucumán", "MDQ", "Mendoza", "Salta", "San Luis", "San Rafael",
+], key=len, reverse=True)
+
+
+def _corregir_encoding_microzona(texto):
+    """
+    Corrige acentos rotos por un problema de doble-codificación UTF-8 en
+    PITCHDATA (ej. "Alta CÃ³rdoba" -> "Alta Córdoba", "Roque Saenz
+    PeÃÂ±a" -> "Roque Saenz Peña") -- pedido explícito de Sabas: se
+    reinterpreta el texto como si hubiera sido decodificado con Latin-1
+    cuando en realidad era UTF-8, revirtiendo el error. Si el texto no
+    tiene el patrón roto (Ã seguido de otro caracter), se devuelve tal
+    cual -- nunca rompe un texto que ya estaba bien.
+    """
+    if not texto or "Ã" not in texto:
+        return texto
+    try:
+        return texto.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return texto
+
+
+def limpiar_microzona(texto):
+    """
+    Quita el prefijo de ciudad conocido (si lo tiene) y corrige el
+    encoding -- pedido explícito de Sabas (vigésima segunda vuelta):
+      - "Bs As CABA (Palermo)" -> "Palermo"
+      - "Cordoba Centro" -> "Centro"
+      - "Bs As Norte Acassuso" -> "Acassuso"
+      - "Belgrano" -> "Belgrano" (sin prefijo reconocible, se deja tal cual)
+      - "ALVARADO_PULLAY" -> "ALVARADO_PULLAY" (idem, guiones/guiones bajos
+        se dejan tal cual si no hay prefijo de ciudad que quitar)
+    """
+    if not texto:
+        return ""
+    t = _corregir_encoding_microzona(str(texto).strip())
+    for prefijo in _MICROZONA_PREFIJOS:
+        if t.startswith(prefijo):
+            resto = t[len(prefijo):].strip()
+            resto = resto.strip("()").strip()
+            if resto:
+                return resto
+    return t
 
 
 def brand_key(value, default_country=PAIS):
@@ -977,7 +1036,217 @@ def _load_detalle_like(kind):
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def load_detalle():
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_pitchdata():
+    """
+    {key: {microzona, telefono, contacto, take_rate, link, ultima_conexion,
+    ultima_orden}} -- una fila por STORE (no por marca), a diferencia del
+    resto de las hojas de Wingman que ya vienen a nivel Brand. Se agrega
+    directamente el dict por Store ID (numero puro, sin prefijo de pais --
+    ver brand_key sobre solo el numero) porque el cruce real hacia una
+    marca necesita pasar por DETALLE (Brand -> lista de Store), que puede
+    tener varias tiendas por marca -- eso lo resuelve tienda_referencia_for
+    más abajo, no esta función.
+
+    Hoja nueva (vigésima segunda vuelta, pedido explícito de Sabas):
+    antes vivía en un archivo Excel aparte (Librfffffo1.xlsx) que Sabas
+    subió para validar el cruce a mano -- ahora está pegada como hoja
+    PITCHDATA del Excel grande. Columnas reales: Store ID, Nombre,
+    Ciudad, Microzona, Última Conexión, %Take Rate, Nombre contacto
+    store, Teléfono store, Última Orden, Link Tienda.
+    """
+    df = _read("pitchdata")
+    if df.empty:
+        return {}
+    c_store = pick_col(df, "Store ID", "store id")
+    c_micro = pick_col(df, "Microzona")
+    c_conn  = pick_col(df, "Última Conexión", "ultima conexion")
+    c_take  = pick_col(df, "%Take Rate", "take rate")
+    c_cont  = pick_col(df, "Nombre contacto store", "nombre contacto")
+    c_tel   = pick_col(df, "Teléfono store", "telefono store")
+    c_ord   = pick_col(df, "Última Orden", "ultima orden")
+    c_link  = pick_col(df, "Link Tienda", "link tienda")
+    if not c_store:
+        return {}
+
+    out = {}
+    for _, r in df.iterrows():
+        raw_id = r.get(c_store)
+        m = re.search(r"(\d+)", str(raw_id or ""))
+        if not m:
+            continue
+        sid = int(m.group(1))
+        out[sid] = {
+            "microzona": str(r.get(c_micro) or "").strip() if c_micro else "",
+            "ultima_conexion": r.get(c_conn) if c_conn else None,
+            "take_rate": to_num(r.get(c_take), default=None) if c_take else None,
+            "contacto": str(r.get(c_cont) or "").strip() if c_cont else "",
+            "telefono": str(r.get(c_tel) or "").strip() if c_tel else "",
+            "ultima_orden": r.get(c_ord) if c_ord else None,
+            "link": str(r.get(c_link) or "").strip() if c_link else "",
+        }
+    return out
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_toprest():
+    """
+    {key: {tier_actual, mes_actual, tier_anterior, mes_anterior}} -- por
+    Store ID (mismo patrón que load_pitchdata, una fila por tienda).
+
+    Hoja nueva (vigésima segunda vuelta, pedido explícito de Sabas):
+    antes vivía en TOPREST.xlsx, ahora pegada como hoja TOPREST del Excel
+    grande. Columnas reales: Store ID, Store Name, Top Res ACTUAL, Mes
+    ACTUAL, Top Res ANTERIOR, Mes ANTERIOR. Top Res ACTUAL/ANTERIOR vienen
+    con el tier PRECEDIDO por un número + guion ("1.-Oro", "2.-Plata",
+    "3.-Basico", "4.-Alerta") -- se guarda tal cual, el número al inicio
+    ya funciona como el orden de mejor a peor sin tener que armar un
+    mapeo aparte en el código.
+    """
+    df = _read("toprest")
+    if df.empty:
+        return {}
+    c_store = pick_col(df, "Store ID", "store id")
+    c_actual = pick_col(df, "Top Res ACTUAL", "top res actual")
+    c_mes_actual = pick_col(df, "Mes ACTUAL", "mes actual")
+    c_anterior = pick_col(df, "Top Res ANTERIOR", "top res anterior")
+    c_mes_anterior = pick_col(df, "Mes ANTERIOR", "mes anterior")
+    if not c_store:
+        return {}
+
+    out = {}
+    for _, r in df.iterrows():
+        raw_id = r.get(c_store)
+        m = re.search(r"(\d+)", str(raw_id or ""))
+        if not m:
+            continue
+        sid = int(m.group(1))
+        tier_actual = str(r.get(c_actual) or "").strip() if c_actual else ""
+        tier_anterior = str(r.get(c_anterior) or "").strip() if c_anterior else ""
+        out[sid] = {
+            "tier_actual": tier_actual if tier_actual and tier_actual.lower() != "none" else "",
+            "mes_actual": r.get(c_mes_actual) if c_mes_actual else None,
+            "tier_anterior": tier_anterior if tier_anterior and tier_anterior.lower() != "none" else "",
+            "mes_anterior": r.get(c_mes_anterior) if c_mes_anterior else None,
+        }
+    return out
+
+
+def tienda_referencia_for(brand_key_str, farmer_email=None):
+    """
+    Encuentra la Store ID "de referencia" de una marca para leer PITCHDATA
+    (contacto, link, microzona) -- pedido explícito de Sabas (vigésima
+    segunda vuelta), mismo criterio para las 3 cosas:
+      1) La tienda de DETALLE cuyo Teléfono store (normalizado, últimos
+         10 dígitos) coincide con el PHONE ALIADO de ASIGNACION.
+      2) Si ninguna coincide, cualquiera de las tiendas de DETALLE
+         asignadas al mismo Farmer que la marca (ya filtra por Farmer
+         real, nunca se cuela una tienda de otro).
+      3) Si la marca no tiene ninguna tienda en DETALLE, no hay
+         referencia -- devuelve None, sin inventar nada.
+
+    Devuelve el Store ID (numero) de referencia, o None.
+    """
+    return _tienda_referencia_for_impl(brand_key_str)
+
+
+def _normalizar_telefono_10(v):
+    """Últimos 10 dígitos -- comparación robusta entre formatos de
+    teléfono distintos (+54, 54, 549, 011, etc.), mismo criterio ya
+    validado a mano por Sabas en el análisis de teléfonos múltiples."""
+    if v is None or str(v).strip().upper() in ("", "#N/D", "NAN"):
+        return None
+    s = re.sub(r"\D", "", str(v))
+    if len(s) < 8:
+        return None
+    return s[-10:] if len(s) >= 10 else s
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _detalle_brand_to_stores():
+    """{brand_key: [store_id_num, ...]} y {brand_key: farmer_email} -- del
+    Brand/Store crudos de DETALLE (num, sin prefijo pais), para uso
+    interno de tienda_referencia_for. Separado de load_detalle() (que ya
+    agrega por marca con otras columnas) para no tocar esa función."""
+    df = _read("detalle")
+    if df.empty:
+        return {}, {}
+    c_brand = pick_col(df, "Brand")
+    c_store = pick_col(df, "Store")
+    c_mail = pick_col(df, "Correo", "Email")
+    if not (c_brand and c_store):
+        return {}, {}
+
+    brand_to_stores = {}
+    brand_to_farmer = {}
+    for _, r in df.iterrows():
+        brand_txt, store_txt = r.get(c_brand), r.get(c_store)
+        if not brand_txt or not store_txt:
+            continue
+        m_brand = re.match(r"^(\d+)", str(brand_txt).strip())
+        m_store = re.match(r"^(\d+)", str(store_txt).strip())
+        if not (m_brand and m_store):
+            continue
+        bkey = brand_key(m_brand.group(1))
+        brand_to_stores.setdefault(bkey, []).append(int(m_store.group(1)))
+        if c_mail:
+            farmer = r.get(c_mail)
+            if farmer:
+                brand_to_farmer[bkey] = str(farmer).strip().lower()
+    return brand_to_stores, brand_to_farmer
+
+
+def _tienda_referencia_for_impl(brand_key_str):
+    brand_to_stores, brand_to_farmer = _detalle_brand_to_stores()
+    stores = brand_to_stores.get(brand_key_str, [])
+    if not stores:
+        return None
+
+    pitch = load_pitchdata()
+
+    # Paso 1: telefono de ASIGNACION para esta marca
+    tel_asig = _telefono_asignacion_for(brand_key_str)
+    tel_asig_norm = _normalizar_telefono_10(tel_asig)
+    if tel_asig_norm:
+        for sid in stores:
+            data = pitch.get(sid)
+            if data and _normalizar_telefono_10(data.get("telefono")) == tel_asig_norm:
+                return sid
+
+    # Paso 2: cualquiera del mismo Farmer (ya filtrado -- brand_to_farmer
+    # viene de DETALLE, que es Store->Farmer real, no hace falta re-chequear).
+    for sid in stores:
+        if sid in pitch:
+            return sid
+    return None
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _telefono_asignacion_by_key():
+    """{brand_key: telefono_crudo} de ASIGNACION (PHONE ALIADO) -- helper
+    interno para tienda_referencia_for, separado para no duplicar la
+    lectura de ASIGNACION que ya hace portfolio_for."""
+    df = _read("asignacion")
+    if df.empty:
+        return {}
+    c_id = pick_col(df, "COUNTRY_BRAND_ID")
+    c_tel = pick_col(df, "PHONE ALIADO")
+    if not (c_id and c_tel):
+        return {}
+    out = {}
+    for _, r in df.iterrows():
+        bid = r.get(c_id)
+        if bid is None:
+            continue
+        out[brand_key(bid)] = r.get(c_tel)
+    return out
+
+
+def _telefono_asignacion_for(brand_key_str):
+    return _telefono_asignacion_by_key().get(brand_key_str)
+
+
+
     return _load_detalle_like("detalle")
 
 
@@ -4283,6 +4552,148 @@ def coinversion_markdown_plan(cvr, coinv_group_key):
         "pct_aliado": pct_aliado,
         "pct_rappi": pct_rappi,
     }
+
+
+def _fmt_fecha_relativa(fecha):
+    """
+    < 72h desde ahora -> chulito; > 72h -> alerta; sin fecha -> guion --
+    pedido explícito de Sabas (vigésima segunda vuelta). "Ahora" es
+    datetime.now() en hora local del servidor (mismo criterio que el
+    resto de Wingman usa para "hoy"/"días transcurridos").
+    """
+    if fecha is None:
+        return "-"
+    try:
+        ahora = datetime.now()
+        if isinstance(fecha, datetime):
+            delta = ahora - fecha
+        else:
+            delta = ahora - datetime.combine(fecha, datetime.min.time())
+        horas = delta.total_seconds() / 3600
+        return "✅" if 0 <= horas <= 72 else "🚨"
+    except Exception:
+        return "-"
+
+
+_TIER_ICON = {
+    "1": "🥇", "2": "🥈", "3": "🥉", "4": "🚨",
+}
+
+
+def _tier_icon_for(tier_texto):
+    """'1.-Oro' -> 🥇, '2.-Plata' -> 🥈, '3.-Basico' -> 🥉, '4.-Alerta' -> 🚨,
+    sin dato -> sin ícono (string vacío)."""
+    if not tier_texto:
+        return ""
+    primer_char = tier_texto.strip()[:1]
+    return _TIER_ICON.get(primer_char, "")
+
+
+def pitchdata_for_brand(brand_key_str):
+    """
+    Todos los datos derivados de PITCHDATA/TOPREST para UNA marca --
+    pedido explícito de Sabas (vigésima segunda vuelta), función central
+    que wingmanapp.py consume para la cabecera de Ficha de Marca, OPS
+    General (Top Res) y la barra de contactos de Outreach. Nunca
+    revienta si falta algún dato -- todo tiene un default seguro.
+
+    Devuelve:
+      microzonas_texto: "Palermo / Belgrano / Centro" (limpias,
+        deduplicadas, en el orden en que aparecen las tiendas de la
+        marca en DETALLE) -- "" si no hay ninguna.
+      encargado: nombre de contacto de la tienda de referencia (ver
+        tienda_referencia_for) -- "" si no hay.
+      link: Link Tienda de la tienda de referencia -- "" si no hay.
+      conexion_icono / ordenes_icono: "✅"/"🚨"/"-" según _fmt_fecha_relativa
+        sobre la Última Conexión/Última Orden de la tienda de referencia.
+      take_rate: % de comisión (float 0-1) de la tienda de referencia, o
+        None si no hay dato -- el caller decide cómo mostrarlo (pedido
+        explícito: se muestra tal cual venga, incluso si es negativo).
+      telefonos_extra / correos_extra: listas de teléfonos/correos que
+        NO son el que ya se muestra en la cabecera -- para la barra de
+        Outreach. Sin duplicados (mismo número en formato distinto no
+        cuenta 2 veces, normalizado a últimos 10 dígitos).
+      top_res: dict con tier_actual/mes_actual/tier_anterior/mes_anterior
+        de la tienda de referencia, con íconos de medalla ya resueltos
+        -- "Sin dato" en vez del tier cuando falta, pedido explícito.
+    """
+    out = {
+        "microzonas_texto": "", "encargado": "", "link": "",
+        "conexion_icono": "-", "ordenes_icono": "-", "take_rate": None,
+        "telefonos_extra": [], "correos_extra": [],
+        "top_res": {"tier_actual": "Sin dato", "icono_actual": "", "mes_actual": "",
+                    "tier_anterior": "Sin dato", "icono_anterior": "", "mes_anterior": ""},
+    }
+
+    brand_to_stores, _ = _detalle_brand_to_stores()
+    stores = brand_to_stores.get(brand_key_str, [])
+    if not stores:
+        return out
+
+    pitch = load_pitchdata()
+    toprest = load_toprest()
+
+    # Microzonas: todas las de las tiendas de la marca, limpias y
+    # deduplicadas, en el orden en que aparecen -- pedido explícito.
+    vistas = []
+    for sid in stores:
+        data = pitch.get(sid)
+        if data and data.get("microzona"):
+            limpia = limpiar_microzona(data["microzona"])
+            if limpia and limpia not in vistas:
+                vistas.append(limpia)
+    out["microzonas_texto"] = " / ".join(vistas)
+
+    # Tienda de referencia: resuelve encargado, link, conexión/órdenes,
+    # take rate y Top Res -- mismo criterio para las 5 cosas.
+    ref_sid = _tienda_referencia_for_impl(brand_key_str)
+    if ref_sid is not None:
+        ref_data = pitch.get(ref_sid, {})
+        out["encargado"] = ref_data.get("contacto", "") or ""
+        out["link"] = ref_data.get("link", "") or ""
+        out["conexion_icono"] = _fmt_fecha_relativa(ref_data.get("ultima_conexion"))
+        out["ordenes_icono"] = _fmt_fecha_relativa(ref_data.get("ultima_orden"))
+        out["take_rate"] = ref_data.get("take_rate")
+
+        ref_top = toprest.get(ref_sid)
+        if ref_top:
+            mes_actual_txt = _MESES_ES.get(ref_top["mes_actual"].month, "").upper() if ref_top.get("mes_actual") else ""
+            mes_anterior_txt = _MESES_ES.get(ref_top["mes_anterior"].month, "").upper() if ref_top.get("mes_anterior") else ""
+            tier_actual = ref_top.get("tier_actual") or ""
+            tier_anterior = ref_top.get("tier_anterior") or ""
+            out["top_res"] = {
+                "tier_actual": tier_actual if tier_actual else "Sin dato",
+                "icono_actual": _tier_icon_for(tier_actual),
+                "mes_actual": mes_actual_txt,
+                "tier_anterior": tier_anterior if tier_anterior else "Sin dato",
+                "icono_anterior": _tier_icon_for(tier_anterior),
+                "mes_anterior": mes_anterior_txt,
+            }
+
+    # Teléfonos/correos adicionales: todos los de TODAS las tiendas de la
+    # marca (no solo la de referencia), que no sean el que ya se muestra
+    # en la cabecera (el de ASIGNACION) -- pedido explícito: no perder
+    # ningún número/correo. El correo de ASIGNACION se agrega aparte por
+    # el caller (viene de otra fuente, no de PITCHDATA).
+    tel_asig_norm = _normalizar_telefono_10(_telefono_asignacion_for(brand_key_str))
+    vistos_tel = set()
+    if tel_asig_norm:
+        vistos_tel.add(tel_asig_norm)
+    telefonos_extra = []
+    for sid in stores:
+        data = pitch.get(sid)
+        if not data or not data.get("telefono"):
+            continue
+        norm = _normalizar_telefono_10(data["telefono"])
+        if norm and norm not in vistos_tel:
+            vistos_tel.add(norm)
+            telefonos_extra.append(data["telefono"])
+    out["telefonos_extra"] = telefonos_extra
+    # PITCHDATA no trae correo por tienda (solo Nombre contacto store) --
+    # correos_extra queda vacía por ahora; el caller agrega el de
+    # ASIGNACION. Si en el futuro PITCHDATA suma una columna de correo
+    # por tienda, se completa acá con el mismo patrón que telefonos_extra.
+    return out
 
 
 def outreach_hallazgos(key, availability_pct, perfect_store_pct, photos_pct, purchase_pct,

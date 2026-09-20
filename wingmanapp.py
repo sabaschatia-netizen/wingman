@@ -2278,17 +2278,20 @@ if ficha_query.strip():
 # grandes, ID con guión separando letras de números, "Local" renombrado
 # a "Buscar en Google" con solo el ícono de lupa como link (antes decía
 # "Buscar" en texto). ──
-search_url = dl.google_search_url(row.brand_name, row.categoria, row.ciudad)
 tel_btn_id, telefono_copy = (_copy_button_html(row.telefono) if row.telefono else (None, ""))
-mail_btn_id, mail_copy = (_copy_button_html(row.mail) if row.mail else (None, ""))
 
-# ID con guión entre el prefijo de país (letras) y el número -- pedido
-# explícito de Sabas: "AR16516" -> "AR-16516". Regex en vez de asumir
-# siempre 2 letras fijas, por si algún ID viene con otro largo de
-# prefijo; si no matchea el patrón letras+dígitos (dato sucio o vacío),
-# se muestra tal cual sin romper.
+# ID con guión + microzonas -- pedido explícito de Sabas (vigésima
+# segunda vuelta): "AR16516" -> "AR-16516", y ahora se le agregan las
+# microzonas de todas las tiendas de la marca, limpias y deduplicadas,
+# unidas con "/" ("AR-16516 / Balvanera/Once"). Si la marca no tiene
+# ninguna microzona conocida (no está en PITCHDATA), se muestra solo el
+# ID, igual que antes.
 _id_match = re.match(r"^([A-Za-z]+)(\d+)$", str(row.brand_id or "").strip())
 brand_id_display = f"{_id_match.group(1)}-{_id_match.group(2)}" if _id_match else row.brand_id
+
+pitch_info = dl.pitchdata_for_brand(row.key)
+if pitch_info["microzonas_texto"]:
+    brand_id_display = f'{brand_id_display} / {pitch_info["microzonas_texto"]}'
 
 # Estado de conexión (antes "Estado de Churn") -- mismo criterio de
 # color por severidad que ya existía, solo cambia el label visible y el
@@ -2298,17 +2301,43 @@ churn_class = {
 }.get(row.churn_status, "info")
 churn_icon = "✅" if row.churn_status == "Disponible" else "⚠️"
 
+# Cabecera de 6 ítems (antes 5) -- pedido explícito de Sabas (vigésima
+# segunda vuelta):
+#   1. Estado de Conexión -- sin cambios.
+#   2. Teléfono -- sin cambios (sigue siendo el de ASIGNACION).
+#   3. ENCARGADO (nuevo, reemplaza a Correo) -- nombre de contacto de la
+#      tienda de referencia (ver pitchdata_for_brand/tienda_referencia_for).
+#      El correo de ASIGNACION NO desaparece del todo -- se muda a la
+#      barra de Outreach junto con los correos/teléfonos adicionales.
+#   4. Categoría -- sin cambios.
+#   5. CONEXIÓN / ÓRDENES (nuevo) -- ✅ si <72h, 🚨 si >72h, "-" sin dato,
+#      de la tienda de referencia.
+#   6. GOOGLE / RAPPI (reemplaza a "Buscar en Google") -- 🔎 abre Google
+#      (igual que antes), 🔗 abre el Link Tienda de la tienda de
+#      referencia (si no hay link, el ícono no es clickeable).
+search_url = dl.google_search_url(row.brand_name, row.categoria, row.ciudad)
+link_rappi = pitch_info["link"]
+link_html = (
+    f'<a href="{link_rappi}" target="_blank" rel="noopener noreferrer" '
+    f'title="Abrir en Rappi" aria-label="Abrir en Rappi" '
+    f'style="text-decoration:none;">🔗</a>'
+    if link_rappi else '<span style="opacity:0.3;" title="Sin link disponible">🔗</span>'
+)
+
 contact_html = (
     '<div class="brand-stats-row">'
     f'<div><div class="stat-label">ESTADO DE CONEXIÓN</div>'
     f'<div class="conn-status-pill {churn_class}">{churn_icon} {row.churn_status}</div></div>'
     f'<div><div class="stat-label">TELÉFONO</div><div class="stat-value">{row.telefono or "?"}{telefono_copy}</div></div>'
-    f'<div><div class="stat-label">CORREO</div><div class="stat-value" style="font-size:13px;">{row.mail or "?"}{mail_copy}</div></div>'
+    f'<div><div class="stat-label">ENCARGADO</div><div class="stat-value" style="font-size:13px;">{pitch_info["encargado"] or "?"}</div></div>'
     f'<div><div class="stat-label">CATEGORÍA</div><div class="stat-value">{row.categoria or "?"}</div></div>'
-    f'<div><div class="stat-label">BUSCAR EN GOOGLE</div><div class="stat-value">'
+    f'<div><div class="stat-label">CONEXIÓN / ÓRDENES</div><div class="stat-value">'
+    f'{pitch_info["conexion_icono"]} / {pitch_info["ordenes_icono"]}</div></div>'
+    f'<div><div class="stat-label">GOOGLE / RAPPI</div><div class="stat-value" style="display:flex;gap:10px;">'
     f'<a href="{search_url}" target="_blank" rel="noopener noreferrer" '
     f'title="Buscar en Google" aria-label="Buscar en Google" '
-    f'style="color:{COLORS["brand_purple"]};text-decoration:none;font-size:18px;display:inline-block;margin-top:2px;">🔎</a>'
+    f'style="color:{COLORS["brand_purple"]};text-decoration:none;font-size:18px;display:inline-block;">🔎</a>'
+    f'<span style="font-size:18px;display:inline-block;">{link_html}</span>'
     "</div></div>"
     "</div>"
 )
@@ -2341,8 +2370,6 @@ st.markdown(
 )
 if tel_btn_id:
     _render_copy_script(row.telefono, tel_btn_id)
-if mail_btn_id:
-    _render_copy_script(row.mail, mail_btn_id)
 
 tab_home, tab_action, tab_analytics, tab_campaign, tab_outreach = st.tabs(
     ["Home", "360° Action", "Analytics", "Campaign Designer", "Outreach"]
@@ -2570,7 +2597,7 @@ with tab_action:
             return f'<span class="{base_class} has-icon">{icon_svg_bullet}</span>'
         return f'<span class="{base_class}"></span>'
 
-    def _action_mini(icon_svg, name, pct, tag, title, detail, items=None, icon_purple=False):
+    def _action_mini(icon_svg, name, pct, tag, title, detail, items=None, icon_purple=False, top_res_html=""):
         color = _tag_color(tag)
         border_class = _tag_border_class(tag)
         icon_class = "action-card-icon icon-purple" if icon_purple else "action-card-icon"
@@ -2628,6 +2655,7 @@ with tab_action:
             f"{pct_html}"
             f'<div class="action-card-name">{name}</div>'
             f'<span class="gauge-tag {tag_class}">{tag}</span>'
+            f"{top_res_html}"
             f"{cuerpo_html}"
             f"</div>"
         )
@@ -2635,9 +2663,23 @@ with tab_action:
     # Ícono morado fijo para Markdown/Ads (palancas comerciales activables),
     # gris fijo para OPS/Menú (señales operativas) -- así se ve en la
     # imagen de referencia de Sabas, independiente del tag ALERT/HEALTHY.
+    #
+    # Top Res en OPS General (vigésima segunda vuelta, pedido explícito
+    # de Sabas): 2 líneas discretas al inicio de la card (mes anterior
+    # arriba, mes actual abajo, según lo confirmado), con la medalla del
+    # tier -- "Sin dato" cuando falta. Meses dinámicos (toman el nombre
+    # real de la columna del Excel, no un mes fijo en el código).
+    _top_res = pitch_info["top_res"]
+    top_res_html = (
+        '<div style="font-size:11px;color:#6B7280;margin-bottom:10px;line-height:1.6;">'
+        f'{_top_res["icono_anterior"]} TOP REST {_top_res["mes_anterior"] or "MES ANTERIOR"}: {_top_res["tier_anterior"]}<br>'
+        f'{_top_res["icono_actual"]} TOP REST {_top_res["mes_actual"] or "MES ACTUAL"}: {_top_res["tier_actual"]}'
+        "</div>"
+    )
+
     st.markdown(
         '<div class="action-grid">'
-        + _action_mini(ICON_OPS, "OPS General", ops["pct"], ops["tag"], ops["title"], ops["detail"], items=ops.get("items"))
+        + _action_mini(ICON_OPS, "OPS General", ops["pct"], ops["tag"], ops["title"], ops["detail"], items=ops.get("items"), top_res_html=top_res_html)
         + _action_mini(ICON_MENU, "Menú", menu["pct"], menu["tag"], menu["title"], menu["detail"], items=menu.get("items"))
         + _action_mini(ICON_MARKDOWN, "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"])
         + _action_mini(ICON_ADS_LEVER, "Ads", None, ads_c["tag"], ads_c["title"], ads_c["detail"])
@@ -2915,10 +2957,29 @@ with tab_campaign:
     #    que usa gmv_delta en Home, extraida como funcion reutilizable. ──
     plan = dl.ads_plan(row.gmv_last, row.gmv, dl.dias_transcurridos_mes_actual(), row.cvr, row.aov)
 
+    # Insight de comisión (Take Rate) -- pedido explícito de Sabas
+    # (vigésima segunda vuelta): esquina superior derecha de AMBAS cards
+    # (Ads Plan y Markdown Plan), chico y discreto -- solo dato
+    # informativo para que el Farmer lo tenga a mano al negociar con el
+    # aliado, SIN mezclarlo en ningún cálculo de rentabilidad (Sabas
+    # decidió explícitamente no armar un P&L real, ver conversación: "no
+    # divague, tocaría tener en cuenta todo lo que viene en una
+    # facturación de Rappi"). Se muestra tal cual venga el dato, incluso
+    # si es negativo o llamativo (pedido explícito, sin filtrar) -- "-"
+    # solo cuando no hay dato en absoluto (None).
+    take_rate = pitch_info["take_rate"]
+    take_rate_html = (
+        f'<div style="font-size:10px;color:#9CA3AF;text-align:right;line-height:1.3;">'
+        f'Comisión<br><span style="color:{COLORS["muted"]};font-weight:700;">{take_rate * 100:.0f}%</span></div>'
+        if take_rate is not None else ""
+    )
+
     if row.gmv_last <= 0:
         ads_card_html = (
             '<div class="campaign-card">'
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
             f'<div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_ADS_PLAN}</span>Ads Plan</div>'
+            f'{take_rate_html}</div>'
             '<div class="campaign-sub" style="margin-top:8px;">Sin GMV del mes anterior para calcular el modelo.</div>'
             "</div>"
         )
@@ -2968,7 +3029,9 @@ with tab_campaign:
         )
         ads_card_html = (
             '<div class="campaign-card">'
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
             f'<div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_ADS_PLAN}</span>Ads Plan</div>'
+            f'{take_rate_html}</div>'
             f'<div class="campaign-headline">{dl.fmt_money(plan["presupuesto_semana1"], CURRENCY)}<span style="font-size:14px;font-weight:600;"> /semana</span></div>'
             f'<div class="campaign-sub">Inversión recomendada: el {pct_label} del GMV de la última semana '
             f'({dl.fmt_money(plan["gmv_semana"], CURRENCY)})</div>'
@@ -3098,7 +3161,9 @@ with tab_campaign:
         )
         md_card_html = (
             '<div class="campaign-card">'
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
             f'<div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_MD_PLAN}</span>Markdown Plan</div>'
+            f'{take_rate_html}</div>'
             f'<div style="margin-top:10px;">{coinv_html}</div>'
             f"{default_pill_html}"
             '<div class="section-title" style="margin:14px 0 8px 0;">TOP 3 PRODUCTOS</div>'
@@ -3108,7 +3173,9 @@ with tab_campaign:
     else:
         md_card_html = (
             '<div class="campaign-card">'
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
             f'<div class="card-label"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_MD_PLAN}</span>Markdown Plan</div>'
+            f'{take_rate_html}</div>'
             f'<div class="campaign-headline" style="font-size:26px;">'
             f'{md["discount"]}% OFF <span style="font-size:15px;color:{COLORS["brand_purple"]};">+ {md["pro_extra"]}% PRO</span></div>'
             f'<div class="md-ladder">{ladder_html}</div>'
@@ -3172,6 +3239,47 @@ with tab_outreach:
         f"{wa_cierre} "
         f"¿Tienes 10 minutos ahora para cerrarlo?"
     )
+
+    # Barra de contactos (teléfonos/correos adicionales) -- pedido
+    # explícito de Sabas (vigésima segunda vuelta): mismo estilo visual
+    # de la barra "COINVERSIÓN MD" de 360° Action (fondo gris, pills
+    # blancas), pero acá siempre 2 filas fijas (Teléfonos / Correos),
+    # SIEMPRE visible aunque no haya adicionales (se repite la pill del
+    # dato que ya está en la cabecera, pedido explícito: "si el único
+    # número que aparece es el que está en la cabecera, pues se coloca
+    # la pill de ese mismo número"). Sin nombre de marca repetido en las
+    # filas (ya está en la cabecera de toda la ficha).
+    telefonos_pills = [row.telefono] if row.telefono else []
+    telefonos_pills += pitch_info["telefonos_extra"]
+    if not telefonos_pills:
+        telefonos_pills = ["?"]
+
+    correos_pills = [row.mail] if row.mail else []
+    correos_pills += pitch_info["correos_extra"]
+    if not correos_pills:
+        correos_pills = ["?"]
+
+    def _pill_row(label, valores):
+        pills = "".join(
+            f'<span style="background:#FFFFFF;border-radius:999px;padding:6px 14px;'
+            f'font-size:12.5px;font-weight:600;color:{COLORS["text"]};">{html_lib.escape(str(v))}</span>'
+            for v in valores
+        )
+        return (
+            '<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:10px;">'
+            f'<div style="min-width:90px;font-size:10px;font-weight:700;color:{COLORS["muted"]};'
+            f'text-transform:uppercase;letter-spacing:0.4px;">{label}</div>'
+            f'<div style="display:flex;gap:8px;flex-wrap:wrap;">{pills}</div>'
+            "</div>"
+        )
+
+    contactos_bar_html = (
+        f'<div style="background:{COLORS["card2"]};border-radius:16px;padding:18px 24px;margin-bottom:20px;">'
+        + _pill_row("TELÉFONOS", telefonos_pills)
+        + _pill_row("CORREOS", correos_pills).replace('margin-bottom:10px;', 'margin-bottom:0;')
+        + "</div>"
+    )
+    st.markdown(contactos_bar_html, unsafe_allow_html=True)
 
     oc1, oc2 = st.columns(2)
     with oc1:
