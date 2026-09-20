@@ -654,29 +654,44 @@ def render_conosur_map():
 # vista Farmer -su propia fila-, agosto 2026)
 # =========================
 
-# Pill SIEMPRE gris de fondo (pedido explicito de Sabas, agosto 2026,
-# segundo ajuste): lo que antes era el color de FONDO de la pill ahora es
-# el color del TEXTO adentro -- la logica de que color corresponde a cada
-# rango de valor no cambia, solo cambia DONDE se aplica ese color.
-_RENDIMIENTO_TEXT_COLOR = {
-    "red": "#C4483F", "green": "#3E9160", "yellow": "#A97A1E",
-    "blue": "#4C7CAD", "purple": COLORS["brand_purple"],
-    "orange": COLORS["brand_orange"], "gray": COLORS["muted"],
-    "farmer": COLORS["text"],
+# Pill con FONDO de color pastel (inversión, pedido explícito de Sabas
+# décima sexta vuelta): antes el fondo era SIEMPRE gris y el color
+# correspondía al TEXTO; ahora es al revés -- el fondo lleva el pastel
+# del color de estado, y el texto + el ícono adentro van siempre en
+# gris (COLORS["muted"]). Los 5 colores base (antes tonos hardcodeados
+# ligeramente distintos a la paleta -- ej. el rojo era #C4483F, un vino
+# tinto, no el mismo rojo que ya usa "No Contactado" en Contact
+# Performance) se alinean a los ESTÁNDAR de la paleta: success/warning/
+# blue/brand_purple/brand_orange/danger -- pedido explícito de Sabas
+# tras notar la diferencia.
+_RENDIMIENTO_BG_COLOR = {
+    "red": COLORS["danger_soft"], "green": COLORS["success_soft"],
+    "yellow": COLORS["warning_soft"], "blue": "rgba(108,155,209,0.16)",
+    "purple": COLORS["brand_purple_soft"], "orange": COLORS["brand_orange_soft"],
+    "gray": "rgba(107,114,128,0.10)",
 }
 _RENDIMIENTO_ICON = {"blue": ICON_RAYO, "green": ICON_TROFEO, "red": ICON_CUADRADO, "purple": ICON_FUEGO, "yellow": ICON_BULLET_WARNING}
+# Color SÓLIDO (no fondo pastel) para el anillo/texto del donut de Brand
+# Coverage -- contexto distinto de las pills de Rendimiento País/Farmer
+# (ahí el color va en el fondo pastel, acá sigue siendo el color puro
+# del anillo y el número, como siempre fue). Mismos 5 estándar de
+# paleta que _RENDIMIENTO_BG_COLOR, solo que en su versión sólida.
+_RENDIMIENTO_SOLID_COLOR = {
+    "red": COLORS["danger"], "green": COLORS["success"], "yellow": "#A97A1E",
+    "blue": COLORS["blue"], "purple": COLORS["brand_purple"],
+    "orange": COLORS["brand_orange"], "gray": COLORS["muted"],
+}
 
 
 def _rend_pill(valor, color):
-    text_color = _RENDIMIENTO_TEXT_COLOR.get(color, COLORS["muted"])
-    return f'<span class="sup-pill sup-pill-gray" style="color:{text_color};">{valor}</span>'
+    bg_color = _RENDIMIENTO_BG_COLOR.get(color, "rgba(107,114,128,0.10)")
+    return f'<span class="sup-pill" style="background:{bg_color};color:{COLORS["muted"]};">{valor}</span>'
 
 
 def _rend_pill_a(valor, color):
-    # Ícono SVG monocromático GRIS fijo en vez de emoji Unicode a color
-    # (segunda vuelta, pedido explícito de Sabas: "pásalos a gris
-    # monocromático", igual que el resto del rediseño -- no coloreado
-    # por estado como el texto de la pill, siempre gris).
+    # Ícono SVG monocromático GRIS fijo (se mantiene igual que antes de
+    # la inversión de colores -- el ícono nunca tomó el color de estado,
+    # solo el fondo/texto de la pill cambiaron de lugar).
     icon_svg = _RENDIMIENTO_ICON.get(color, "")
     icon_html = (
         f'<span class="lever-icon" style="margin-left:4px;width:13px;height:13px;vertical-align:-2px;">{icon_svg}</span>'
@@ -1940,11 +1955,11 @@ def render_brand_coverage_and_contact(farmer_or_list):
         if k in ("adq_pct", "ups_pct"):
             raw_pct = _donut_pct_raw(k)
             pace_name = dl.pace_color_ads_upsell(raw_pct)
-            return _RENDIMIENTO_TEXT_COLOR[pace_name], _RENDIMIENTO_ICON.get(pace_name, "")
+            return _RENDIMIENTO_SOLID_COLOR[pace_name], _RENDIMIENTO_ICON.get(pace_name, "")
         if k == "md_pct":
             raw_pct = _donut_pct_raw(k)
             pace_name = _rend_color_conversion(raw_pct)
-            return _RENDIMIENTO_TEXT_COLOR[pace_name], _RENDIMIENTO_ICON.get(pace_name, "")
+            return _RENDIMIENTO_SOLID_COLOR[pace_name], _RENDIMIENTO_ICON.get(pace_name, "")
         return fixed_color, ""
 
     donuts_html_parts = []
