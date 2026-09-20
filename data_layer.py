@@ -1246,7 +1246,8 @@ def _telefono_asignacion_for(brand_key_str):
     return _telefono_asignacion_by_key().get(brand_key_str)
 
 
-
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_detalle():
     return _load_detalle_like("detalle")
 
 
