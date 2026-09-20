@@ -336,6 +336,20 @@ ICON_FICHA_MARCA = _icon(
     '<circle cx="10.5" cy="10.5" r="7" stroke="currentColor" stroke-width="1.8" fill="none"/>'
     '<line x1="15.5" y1="15.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
 )
+# Ojo/carrito -- pedido explícito de Sabas (vigésima vuelta): íconos de
+# las barras del Top 3 de Markdown Plan (ojos = visitas del producto,
+# carrito = pedidos reales), en vez del texto "VPD"/"CVR" crudo.
+ICON_OJO = _icon(
+    '<path d="M2 12c2.5-4.5 6-7 10-7s7.5 2.5 10 7c-2.5 4.5-6 7-10 7s-7.5-2.5-10-7z" '
+    'stroke="currentColor" stroke-width="1.7" fill="none" stroke-linejoin="round"/>'
+    '<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6" fill="none"/>'
+)
+ICON_CARRITO_MD = _icon(
+    '<path d="M3 4h2.2l1 3M6.2 7l2 9.5h9.8l2-7H6.2" stroke="currentColor" stroke-width="1.7" '
+    'fill="none" stroke-linejoin="round" stroke-linecap="round"/>'
+    '<circle cx="9.5" cy="20" r="1.3" fill="currentColor"/>'
+    '<circle cx="16" cy="20" r="1.3" fill="currentColor"/>'
+)
 # Expandir/pantalla completa -- reemplaza ⛶ en el botón "Pantalla
 # completa".
 ICON_EXPANDIR = _icon(
@@ -1043,6 +1057,33 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     display: grid; grid-template-columns: 30px 1fr 130px; gap: 10px; align-items: center;
     padding: 9px 12px; border-radius: 10px; background: {COLORS["card2"]}; margin-bottom: 6px;
 }}
+/* Markdown Plan -- Top 3 productos como barras verticales con íconos de
+   ojo (visitas) y carrito (pedidos) -- pedido explícito de Sabas
+   (vigésima vuelta, aprobado primero como mockup): reemplaza las filas
+   horizontales de VPD/CVR en texto. "VPD" se relenguaja a "ojos"
+   (vistas del producto) y el número de "carrito" se calcula como
+   ojos × CVR, redondeado a entero (pedidos reales estimados) --
+   ordenados por carrito descendente ("el que más se mueve"), no por
+   VPD/ranking crudo como antes. La altura de cada barra es
+   proporcional al máximo de ojos del trío, así el más visto se ve
+   más alto de un vistazo. */
+.md-prod-chart {{ display: flex; align-items: flex-end; gap: 14px; margin: 14px 0 4px; justify-content: center; }}
+.md-prod-bar-wrap {{ display: flex; flex-direction: column; align-items: center; width: 110px; }}
+.md-prod-bar {{
+    width: 72px; border-radius: 8px; background: {COLORS["brand_orange"]};
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: {COLORS["brand_white"]}; gap: 4px; box-sizing: border-box; padding: 6px 0;
+}}
+.md-prod-bar .metric {{ display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 800; }}
+.md-prod-bar .metric svg {{ width: 13px; height: 13px; flex-shrink: 0; }}
+.md-prod-name {{ font-size: 10.5px; font-weight: 700; color: {COLORS["text"]}; text-align: center; margin-top: 8px; line-height: 1.3; }}
+.md-prod-rank {{ font-size: 9px; color: {COLORS["muted"]}; margin-top: 2px; }}
+.md-prod-insight {{
+    font-size: 11px; color: {COLORS["muted"]}; margin-top: 12px; line-height: 1.5;
+    background: {COLORS["card2"]}; border-radius: 12px; padding: 10px 12px;
+}}
+.md-prod-insight b {{ color: {COLORS["text"]}; }}
+
 /* Cards internas de Ads Plan (ROAS 1/4 semanas, Venta incremental
    1/4 sem) -- pedido explícito de Sabas (décima quinta vuelta): antes
    usaban .glass-card (fondo blanco), que se perdía contra el fondo
@@ -1054,6 +1095,45 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .campaign-inner-card {{
     background: {COLORS["card2"]}; border-radius: 18px; padding: 20px 22px;
 }}
+
+/* Ads Plan -- 3 barras (Inversión / GMV actual / GMV proyectado) en la
+   MISMA escala real -- pedido explícito de Sabas (vigésima vuelta,
+   aprobado primero como mockup): reemplaza las 4 cards de ROAS/Venta
+   incremental. Inversión fija en el % recomendado real de la marca
+   (ver ADS_PRESSURE_TIERS en data_layer.py) -- ya no hay slider ni
+   rango movible, es un solo valor fijo, coloreado verde (el recomendado
+   siempre se cumple porque es fijo, nunca queda por debajo). GMV actual
+   siempre morado, sin semáforo -- es la referencia fija. GMV proyectado
+   verde si el ROAS de la campaña supera 3.5x, rojo si no -- el ancho de
+   la barra representa el TOTAL proyectado (90% del GMV actual como
+   orgánico, margen de conservadurismo, + el incremental de la
+   campaña), pero el texto adentro de la barra muestra SOLO el
+   incremental de Ads (lo que le interesa destacar al Farmer), no el
+   total. */
+.ads-bar-row {{ margin-bottom: 18px; }}
+.ads-bar-row:last-child {{ margin-bottom: 0; }}
+.ads-bar-label {{
+    font-size: 12px; font-weight: 700; color: {COLORS["text"]};
+    margin-bottom: 6px; display: flex; justify-content: space-between;
+}}
+.ads-bar-label .val {{ color: {COLORS["muted"]}; font-weight: 600; }}
+.ads-bar-track {{
+    height: 34px; background: {COLORS["card2"]}; border-radius: 10px;
+    overflow: hidden; position: relative;
+}}
+.ads-bar-fill {{
+    height: 100%; border-radius: 10px; display: flex; align-items: center;
+    padding-left: 12px; box-sizing: border-box;
+}}
+.ads-bar-fill .txt {{ font-size: 11px; font-weight: 800; color: {COLORS["brand_white"]}; }}
+.ads-bar-fill.green {{ background: {COLORS["success"]}; }}
+.ads-bar-fill.red {{ background: {COLORS["danger"]}; }}
+.ads-bar-fill.purple {{ background: {COLORS["brand_purple"]}; }}
+.ads-roas-row {{
+    margin-top: 18px; padding-top: 14px; border-top: 0.5px solid {COLORS["border"]};
+    display: flex; justify-content: space-between; font-size: 13px;
+}}
+.ads-roas-row .val {{ font-weight: 800; color: {COLORS["text"]}; }}
 
 /* ── MANAGEMENT DASHBOARD: Brand Coverage (6 donuts) + Contact Performance ── */
 .mgmt-card {{

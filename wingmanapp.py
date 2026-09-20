@@ -28,6 +28,7 @@ from theme import (
     ICON_BULLET_CHECK,
     ICON_BULLET_EYE,
     ICON_BULLET_WARNING,
+    ICON_CARRITO_MD,
     ICON_CHAT,
     ICON_CLIPBOARD,
     ICON_COINV_CHURN,
@@ -51,6 +52,7 @@ from theme import (
     ICON_MEDALLA,
     ICON_MENU,
     ICON_MONITOR,
+    ICON_OJO,
     ICON_OPS,
     ICON_ORDENES,
     ICON_PIN,
@@ -2922,17 +2924,47 @@ with tab_campaign:
         )
     else:
         pct_label = f'{plan["pct"] * 100:.0f}%'
-        minis = (
-            f'<div class="campaign-inner-card"><div class="card-label">ROAS 1 SEMANA</div>'
-            f'<div class="card-value">{plan["roas_1sem"]:.2f}x</div></div>'
-            f'<div class="campaign-inner-card"><div class="card-label">ROAS 4 SEMANAS</div>'
-            f'<div class="card-value">{plan["roas_4sem"]:.2f}x</div></div>'
-            f'<div class="campaign-inner-card"><div class="card-label">VENTA INCREMENTAL · 1 SEM</div>'
-            f'<div class="card-value">{dl.fmt_money(plan["gmv_inc_1sem"], CURRENCY)}</div>'
-            f'<div class="card-copy">{plan["pedidos_inc_1sem"]:,.0f} pedidos</div></div>'.replace(",", ".")
-            + f'<div class="campaign-inner-card"><div class="card-label">VENTA INCREMENTAL · 4 SEM</div>'
-            f'<div class="card-value">{dl.fmt_money(plan["gmv_inc_4sem"], CURRENCY)}</div>'
-            f'<div class="card-copy">{plan["pedidos_inc_4sem"]:,.0f} pedidos</div></div>'.replace(",", ".")
+        gmv_actual = plan["gmv_semana"]
+        incremental = plan["gmv_inc_1sem"]
+        organico_proyectado = gmv_actual * 0.90
+        total_proyectado = organico_proyectado + incremental
+        roas = plan["roas_1sem"]
+
+        # Escala compartida por las 3 barras -- el ancho relativo ES el
+        # mensaje (una inversión chica al lado de un GMV grande se debe
+        # VER chica, no ocupar el mismo ancho que las otras). Techo con
+        # 5% de aire para que la barra más ancha no toque el borde.
+        escala_max = max(plan["presupuesto_semana1"], gmv_actual, total_proyectado) * 1.05
+        pct_ancho_inv = min(100, plan["presupuesto_semana1"] / escala_max * 100) if escala_max > 0 else 0
+        pct_ancho_actual = min(100, gmv_actual / escala_max * 100) if escala_max > 0 else 0
+        pct_ancho_proy = min(100, total_proyectado / escala_max * 100) if escala_max > 0 else 0
+
+        # Inversión: siempre verde -- es un valor FIJO en el % recomendado
+        # real de la marca (nunca puede quedar "por debajo" de sí mismo).
+        # Proyectado: verde si el ROAS de la campaña supera 3.5x, rojo si no.
+        color_proy = "green" if roas > 3.5 else "red"
+
+        bars_html = (
+            '<div style="margin-top:16px;">'
+            '<div class="ads-bar-row">'
+            f'<div class="ads-bar-label"><span>Inversión semanal recomendada</span>'
+            f'<span class="val">{dl.fmt_money(plan["presupuesto_semana1"], CURRENCY)} ({pct_label})</span></div>'
+            f'<div class="ads-bar-track"><div class="ads-bar-fill green" style="width:{pct_ancho_inv:.1f}%;"></div></div>'
+            "</div>"
+            '<div class="ads-bar-row">'
+            f'<div class="ads-bar-label"><span>GMV actual (última semana)</span>'
+            f'<span class="val">{dl.fmt_money(gmv_actual, CURRENCY)}</span></div>'
+            f'<div class="ads-bar-track"><div class="ads-bar-fill purple" style="width:{pct_ancho_actual:.1f}%;"></div></div>'
+            "</div>"
+            '<div class="ads-bar-row">'
+            f'<div class="ads-bar-label"><span>GMV proyectado (orgánico + campaña)</span>'
+            f'<span class="val">{dl.fmt_money(total_proyectado, CURRENCY)} total</span></div>'
+            f'<div class="ads-bar-track"><div class="ads-bar-fill {color_proy}" style="width:{pct_ancho_proy:.1f}%;">'
+            f'<span class="txt">+{dl.fmt_money(incremental, CURRENCY)} incremental de Ads</span></div></div>'
+            "</div>"
+            '<div class="ads-roas-row"><span style="color:'
+            f'{COLORS["muted"]};">ROAS de la campaña</span><span class="val">{roas:.2f}x</span></div>'
+            "</div>"
         )
         ads_card_html = (
             '<div class="campaign-card">'
@@ -2940,7 +2972,7 @@ with tab_campaign:
             f'<div class="campaign-headline">{dl.fmt_money(plan["presupuesto_semana1"], CURRENCY)}<span style="font-size:14px;font-weight:600;"> /semana</span></div>'
             f'<div class="campaign-sub">Inversión recomendada: el {pct_label} del GMV de la última semana '
             f'({dl.fmt_money(plan["gmv_semana"], CURRENCY)})</div>'
-            f'<div class="analytics-mini-grid" style="margin-top:14px;">{minis}</div>'
+            f"{bars_html}"
             "</div>"
         )
 
@@ -2954,12 +2986,65 @@ with tab_campaign:
     )
     tops = tpmap.get(row.key, [])
     if tops:
-        tops_html = "".join(
-            f'<div class="top3-row"><span class="lever-icon">{icon_medalla_numero(i + 1)}</span>'
-            f'<span class="pf-name">{p}</span>'
-            f'<span class="pf-meta">VPD {v:,.0f} · CVR {c * 100:.1f}%</span></div>'.replace(",", ".")
-            for i, (p, v, c) in enumerate(tops)
-        )
+        # Top 3 como barras verticales con íconos de ojo/carrito -- pedido
+        # explícito de Sabas (vigésima vuelta, aprobado como mockup): "VPD"
+        # se relenguaja a ojos (visitas del producto), y el número de
+        # carrito se CALCULA como ojos × CVR (pedidos reales estimados a
+        # partir de esas visitas), redondeado a entero -- no es un campo
+        # que venga así del Excel. Se reordena por carrito descendente
+        # ("el que más se mueve"), no por el ranking/VPD crudo que ya traía
+        # tpmap. Altura de cada barra proporcional al máximo de ojos del
+        # trío (mínimo 34px para que el texto entre incluso en el más chico).
+        prod_data = []
+        for nombre, vpd, cvr in tops:
+            ojos = round(vpd)
+            carrito = round(vpd * cvr)
+            prod_data.append((nombre, ojos, carrito))
+        prod_data.sort(key=lambda p: p[2], reverse=True)
+
+        max_ojos = max((p[1] for p in prod_data), default=1) or 1
+        bars = []
+        for i, (nombre, ojos, carrito) in enumerate(prod_data):
+            altura = max(34, round(ojos / max_ojos * 100))
+            # El chicharrón/último lugar del trío puede quedar con una barra
+            # muy baja -- por debajo de cierta altura el fondo naranja pleno
+            # se ve mejor en un tono pastel con texto oscuro (mismo criterio
+            # de contraste ya usado en el resto de Wingman para barras
+            # chicas), arriba de esa altura va naranja sólido con texto
+            # blanco.
+            es_chica = altura < 55
+            bg = "rgba(247,77,4,0.3)" if es_chica else COLORS["brand_orange"]
+            txt_color = COLORS["text"] if es_chica else COLORS["brand_white"]
+            nombre_html = html_lib.escape(nombre)
+            bars.append(
+                f'<div class="md-prod-bar-wrap">'
+                f'<div class="md-prod-bar" style="height:{altura}px;background:{bg};color:{txt_color};">'
+                f'<span class="metric">{ICON_OJO} {ojos}</span>'
+                f'<span class="metric">{ICON_CARRITO_MD} {carrito}</span>'
+                "</div>"
+                f'<div class="md-prod-name">{nombre_html}</div>'
+                f'<div class="md-prod-rank">#{i + 1}{" — el que más se mueve" if i == 0 else ""}</div>'
+                "</div>"
+            )
+        chart_html = f'<div class="md-prod-chart">{"".join(bars)}</div>'
+
+        # Insight: nombra a cada uno de los 3 con su propio dato real
+        # (ojos → carritos), sin promediar ni proyectar nada -- pedido
+        # explícito de Sabas tras descartar una proyección de CVR de marca
+        # que los datos no sostenían (ver conversación).
+        insight_parts = []
+        for i, (nombre, ojos, carrito) in enumerate(prod_data):
+            nombre_html = html_lib.escape(nombre)
+            if i == 0:
+                frase = f"<b>{nombre_html}:</b> {ojos} visitas → {carrito} pedidos, el que más mueve."
+            elif carrito >= ojos * 0.5:
+                frase = f"<b>{nombre_html}:</b> {ojos} visitas → {carrito} pedidos, buena conversión."
+            else:
+                frase = f"<b>{nombre_html}:</b> {ojos} visitas → solo {carrito} pedido{'s' if carrito != 1 else ''}, el que más se beneficiaría del descuento."
+            insight_parts.append(frase)
+        insight_html = f'<div class="md-prod-insight">{" ".join(insight_parts)}</div>'
+
+        tops_html = f"{chart_html}{insight_html}"
     else:
         tops_html = '<div class="card-copy">Sin productos rankeados para esta marca.</div>'
 
