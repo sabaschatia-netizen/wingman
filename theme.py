@@ -325,6 +325,13 @@ ICON_RENDIMIENTO = _icon(
     '<rect x="10" y="9" width="4" height="11" rx="1" stroke="currentColor" stroke-width="1.6" fill="none"/>'
     '<rect x="16" y="4" width="4" height="16" rx="1" stroke="currentColor" stroke-width="1.6" fill="none"/>'
 )
+# Lupa -- pedido explícito de Sabas (décima octava vuelta): reemplaza la
+# lupa 🔍 a color del botón de navegación del sidebar, renombrado de
+# "Buscador de Marcas" a "Ficha de Marca".
+ICON_FICHA_MARCA = _icon(
+    '<circle cx="10.5" cy="10.5" r="7" stroke="currentColor" stroke-width="1.8" fill="none"/>'
+    '<line x1="15.5" y1="15.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
+)
 # Expandir/pantalla completa -- reemplaza ⛶ en el botón "Pantalla
 # completa".
 ICON_EXPANDIR = _icon(
@@ -905,7 +912,7 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 }}
 .session-avatar {{
     width: 40px; height: 40px; border-radius: 50%;
-    background: {COLORS["brand_purple"]} !important;   /* morado fijo para todos los Farmers */
+    background: {COLORS["brand_orange"]} !important;   /* naranja fijo para todos los Farmers -- pedido explícito de Sabas (décima octava vuelta), antes morado */
     color: {COLORS["brand_white"]} !important;
     display: flex; align-items: center; justify-content: center;
     font-size: 14px; font-weight: 800; letter-spacing: 0.3px;

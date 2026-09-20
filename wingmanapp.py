@@ -1694,14 +1694,29 @@ with col_sidebar:
             unsafe_allow_html=True,
         )
 
-        # ── Navegación de 2 secciones: Gestión General / Buscador de Marcas ──
-        # Buscador de Marcas es la seccion por defecto (ya la trae
-        # st.session_state con setdefault mas abajo). Cambiar de seccion
-        # resetea la vista a "landing" dentro de esa seccion (nunca deja a
-        # alguien parado en una ficha de marca de otra seccion). Las keys
-        # internas (brand_finder / management) NO cambiaron -- solo la
-        # etiqueta visible -- para no tener que tocar el resto del código que
-        # ya compara contra esas keys.
+        # ── Navegación de 2 secciones: Rendimiento General / Ficha de Marca ──
+        # RENOMBRADAS (décima octava vuelta, pedido explícito de Sabas):
+        # "Buscador de Marcas" -> "Ficha de Marca", "Gestión General" ->
+        # "Rendimiento General" -- y el orden se invierte (antes Ficha de
+        # Marca/brand_finder arriba, ahora Rendimiento General/management
+        # arriba). Los emojis Unicode a color (🔍/📊) pasan al parámetro
+        # icon= nativo de st.button con Material Symbols
+        # (":material/search:"/":material/bar_chart:") -- mismo mecanismo
+        # ya usado en st.dialog (ver _tabla_fullscreen_dialog): st.button
+        # es un componente nativo de Streamlit que NO acepta HTML/SVG en
+        # su label (confirmado en vueltas anteriores), pero SÍ tiene su
+        # propio parámetro icon con soporte de Material Symbols, que
+        # resuelve esto sin la técnica de "botón HTML + JS enganchado"
+        # que el propio código ya documentó como poco confiable
+        # (ver el comentario de BUG REAL CORREGIDO más arriba en este
+        # archivo, sobre _tabla_fullscreen_dialog). Rendimiento General
+        # es ahora la sección por defecto (setdefault) porque quedó
+        # primera en el nuevo orden. Cambiar de sección resetea la vista
+        # a "landing" dentro de esa sección (nunca deja a alguien parado
+        # en una ficha de marca de otra sección). Las keys internas
+        # (brand_finder / management) NO cambiaron -- solo la etiqueta
+        # visible y el orden -- para no tener que tocar el resto del
+        # código que ya compara contra esas keys.
         #
         # "trabajables" ELIMINADA por completo (décima vuelta, pedido
         # explícito de Sabas): la sección completa -- las 4 tabs
@@ -1710,10 +1725,10 @@ with col_sidebar:
         # producto. El sidebar vuelve a los 2 ítems originales.
         st.session_state.setdefault("section", "management")
         NAV_SECTIONS = [
-            ("brand_finder", "🔍 Buscador de Marcas"),
-            ("management",   "📊 Gestión General"),
+            ("management",   "Rendimiento General", ":material/bar_chart:"),
+            ("brand_finder", "Ficha de Marca", ":material/search:"),
         ]
-        for sec_key, sec_label in NAV_SECTIONS:
+        for sec_key, sec_label, sec_icon in NAV_SECTIONS:
             active = st.session_state["section"] == sec_key
             # BUG REAL CORREGIDO (agosto 2026, sexto ajuste): el patrón viejo
             # st.markdown('<div class="...">') + st.button(...) + st.markdown
@@ -1729,7 +1744,7 @@ with col_sidebar:
             # ningún div wrapper manual. La clase "active_class" se agrega
             # como marcador extra vía CSS custom (ver theme.py, selector por
             # key exacto) en vez de por wrapper.
-            if st.button(sec_label, key=f"nav_{sec_key}", use_container_width=True):
+            if st.button(sec_label, key=f"nav_{sec_key}", icon=sec_icon, use_container_width=True):
                 st.session_state["section"] = sec_key
                 st.session_state["view"] = "landing"
                 st.rerun()
@@ -2091,8 +2106,8 @@ def render_brand_coverage_and_contact(farmer_or_list):
 if st.session_state["view"] == "landing":
     section = st.session_state["section"]
     section_label = {
-        "brand_finder": "Buscador de Marcas",
-    }.get(section, "Gestión General")
+        "brand_finder": "Ficha de Marca",
+    }.get(section, "Rendimiento General")
     header_name = "Supervisor" if IS_SUPERVISOR else dl.farmer_display(selected)
     header(header_name, section_label, "")
 
