@@ -2991,20 +2991,31 @@ with tab_campaign:
         # se relenguaja a ojos (visitas del producto), y el número de
         # carrito se CALCULA como ojos × CVR (pedidos reales estimados a
         # partir de esas visitas), redondeado a entero -- no es un campo
-        # que venga así del Excel. Se reordena por carrito descendente
-        # ("el que más se mueve"), no por el ranking/VPD crudo que ya traía
-        # tpmap. Altura de cada barra proporcional al máximo de ojos del
-        # trío (mínimo 34px para que el texto entre incluso en el más chico).
+        # que venga así del Excel. Altura de cada barra proporcional al
+        # máximo de ojos del trío (mínimo 34px para que el texto entre
+        # incluso en el más chico).
+        #
+        # BUG REAL CORREGIDO (vigésima primera vuelta, pedido explícito de
+        # Sabas -- vio "Combo 1" y "Promo 4" con el mismo número de
+        # carritos pero quedando en el orden que traía tpmap en vez de por
+        # su tasa real): el orden es por TASA de conversión (CVR real del
+        # Excel, carritos ÷ ojos), no por la cantidad ABSOLUTA de carritos
+        # -- "no importa que tenga más VPD, lo importante es la
+        # conversión". Ordenar por el carrito ya redondeado a entero podía
+        # empatar productos con distinto CVR real (ej. 1/4 y 1/9 redondean
+        # ambos a "1 carrito" pero son 25% y 11% -- bien distintos), así
+        # que se ordena por el cvr original del Excel, no por el carrito
+        # entero derivado.
         prod_data = []
         for nombre, vpd, cvr in tops:
             ojos = round(vpd)
             carrito = round(vpd * cvr)
-            prod_data.append((nombre, ojos, carrito))
-        prod_data.sort(key=lambda p: p[2], reverse=True)
+            prod_data.append((nombre, ojos, carrito, cvr))
+        prod_data.sort(key=lambda p: p[3], reverse=True)
 
         max_ojos = max((p[1] for p in prod_data), default=1) or 1
         bars = []
-        for i, (nombre, ojos, carrito) in enumerate(prod_data):
+        for i, (nombre, ojos, carrito, cvr) in enumerate(prod_data):
             altura = max(34, round(ojos / max_ojos * 100))
             # El chicharrón/último lugar del trío puede quedar con una barra
             # muy baja -- por debajo de cierta altura el fondo naranja pleno
@@ -3023,7 +3034,7 @@ with tab_campaign:
                 f'<span class="metric">{ICON_CARRITO_MD} {carrito}</span>'
                 "</div>"
                 f'<div class="md-prod-name">{nombre_html}</div>'
-                f'<div class="md-prod-rank">#{i + 1}{" — el que más se mueve" if i == 0 else ""}</div>'
+                f'<div class="md-prod-rank">#{i + 1}{" — el que más convierte" if i == 0 else ""}</div>'
                 "</div>"
             )
         chart_html = f'<div class="md-prod-chart">{"".join(bars)}</div>'
@@ -3033,11 +3044,11 @@ with tab_campaign:
         # explícito de Sabas tras descartar una proyección de CVR de marca
         # que los datos no sostenían (ver conversación).
         insight_parts = []
-        for i, (nombre, ojos, carrito) in enumerate(prod_data):
+        for i, (nombre, ojos, carrito, cvr) in enumerate(prod_data):
             nombre_html = html_lib.escape(nombre)
             if i == 0:
-                frase = f"<b>{nombre_html}:</b> {ojos} visitas → {carrito} pedidos, el que más mueve."
-            elif carrito >= ojos * 0.5:
+                frase = f"<b>{nombre_html}:</b> {ojos} visitas → {carrito} pedidos, el que más convierte."
+            elif cvr >= 0.5:
                 frase = f"<b>{nombre_html}:</b> {ojos} visitas → {carrito} pedidos, buena conversión."
             else:
                 frase = f"<b>{nombre_html}:</b> {ojos} visitas → solo {carrito} pedido{'s' if carrito != 1 else ''}, el que más se beneficiaría del descuento."
