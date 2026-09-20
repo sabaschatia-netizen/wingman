@@ -1227,25 +1227,57 @@ def _is_pro_campaign_name(text):
 @st.cache_data(ttl=86400, show_spinner=False)
 def md_campaign_names():
     """
-    {nkey: {'md': 'Nombre1 | Nombre2', 'md_pro': '...'}} -- una marca puede
+    {key: {'md': 'Nombre1 | Nombre2', 'md_pro': '...'}} -- una marca puede
     tener varias campanas activas en MD NAMES, por eso NO se deduplica por
     marca como load_ltor. Se muestran hasta 2 nombres por palanca, igual que
     Growth OS. Sin match = '-'.
+
+    BUG REAL CORREGIDO (vigésima segunda vuelta, pedido explícito de Sabas
+    -- "revisé y estaba filtrando mal, actualizando una data que no se usa
+    para nada"): MD NAMES nunca trajo "Brand Name" como nombre de columna
+    (columnas reales: Country/Wealthy/Category/Campaign ID/Name/Segment/
+    Tier Classification/Markdown LMTD/Markdown MTD/Delta/Delta Net) --
+    pick_col(df, "Brand Name") devolvía None SIEMPRE, así que la función
+    retornaba {} en cada llamada sin que ningún error lo mostrara: el
+    resultado era que TODA la cartera mostraba "Campaign -" sin importar
+    la promo real, y una marca podía verse "Inactive" (según MD/MD PRO,
+    que sí calculan bien) mientras en Manager sí tenía nombre de campaña
+    real -- porque esa campaña vivía en MD NAMES, una hoja que Wingman
+    nunca llegó a leer de verdad. El comentario viejo en portfolio_for()
+    ("MD NAMES no trae Brand ID") documentaba el motivo original del
+    diseño por nombre, pero ya no es cierto: el export actual de MD NAMES
+    SÍ trae Brand ID (confirmado con el archivo real que Sabas subió,
+    columnas Country/Wealthy/Category/Brand ID/Store ID/Campaign ID/
+    Name/...). Fix: cruzar por key (brand_key sobre Brand ID) en vez de
+    por nkey (nombre normalizado) -- mismo patrón que ya usan MD/MD PRO
+    (_load_md, columna BRAND ID) y el resto del sistema, mucho más
+    confiable que el cruce por texto de nombre (que fallaba silenciosamente
+    ante acentos/mayúsculas/espacios distintos entre hojas). Si algún día
+    Brand ID volviera a faltar (por si el export cambia de nuevo), cae de
+    vuelta al cruce por nombre como respaldo, para no romper por completo
+    si la estructura del Excel cambia otra vez sin aviso.
     """
     df = _read("md_names")
     if df.empty:
         return {}
+    c_id   = pick_col(df, "Brand ID", "brand id")
     c_name = pick_col(df, "Brand Name")
     c_camp = pick_col(df, "Name", "campaign name", "promo", "promotion")
-    if not (c_name and c_camp):
+    if not c_camp:
+        return {}
+    if not (c_id or c_name):
         return {}
 
-    df = _drop_junk(df, c_name)
-    df["nkey"] = df[c_name].apply(name_key)
-    df = df[df["nkey"] != ""]
+    if c_id:
+        df = _drop_junk(df, c_id)
+        df["match_key"] = df[c_id].apply(brand_key)
+    else:
+        df = _drop_junk(df, c_name)
+        df["match_key"] = df[c_name].apply(name_key)
+    df = df[df["match_key"] != ""]
 
     out = {}
-    for nkey, g in df.groupby("nkey"):
+    for match_key, g in df.groupby("match_key"):
         names = []
         for v in g[c_camp].tolist():
             text = str(v).strip()
@@ -1255,7 +1287,7 @@ def md_campaign_names():
         md_names_ = [n for n in names if not _is_pro_campaign_name(n)]
         md_display = " | ".join(md_names_[:2]) if md_names_ else (names[0] if names else "-")
         pro_display = " | ".join(pro_names[:2]) if pro_names else "-"
-        out[nkey] = {"md": md_display, "md_pro": pro_display}
+        out[match_key] = {"md": md_display, "md_pro": pro_display}
     return out
 
 
@@ -3608,11 +3640,12 @@ def portfolio_for(farmer_email):
     df["penetracion_md"] = (df["markdown_md"] / df["gmv_md"]).where(df["gmv_md"] > 0, 0.0)
     df["penetracion_mdpro"] = (df["markdown_mdpro"] / df["gmv_mdpro"]).where(df["gmv_mdpro"] > 0, 0.0)
 
-    # Nombres de campaña MD/MD PRO, cruzados por nombre de marca (MD NAMES no
-    # trae Brand ID). Sin match = "-", igual que Growth OS.
+    # Nombres de campaña MD/MD PRO -- cruzados por Brand ID (key), no por
+    # nombre de marca -- fix del bug real de md_campaign_names() de más
+    # arriba (MD NAMES sí trae Brand ID en el export actual).
     camp_map = md_campaign_names()
-    df["campaign_md"] = df["nkey"].map(lambda k: camp_map.get(k, {}).get("md", "-"))
-    df["campaign_mdpro"] = df["nkey"].map(lambda k: camp_map.get(k, {}).get("md_pro", "-"))
+    df["campaign_md"] = df["key"].map(lambda k: camp_map.get(k, {}).get("md", "-"))
+    df["campaign_mdpro"] = df["key"].map(lambda k: camp_map.get(k, {}).get("md_pro", "-"))
 
     # ── Cruces por nombre ──
     for loader, cols in [
