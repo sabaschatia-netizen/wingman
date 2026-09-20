@@ -693,12 +693,20 @@ def _rend_pill(valor, color):
 
 
 def _rend_pill_a(valor, color):
-    # Ícono SVG monocromático GRIS fijo (se mantiene igual que antes de
-    # la inversión de colores -- el ícono nunca tomó el color de estado,
-    # solo el fondo/texto de la pill cambiaron de lugar).
+    # Ícono SVG en BLANCO (vigésima cuarta vuelta, pedido explícito de
+    # Sabas -- "arreglar los emojis en blanco también"): hasta acá el
+    # ícono se quedaba gris fijo (heredado de la clase .lever-icon,
+    # color: COLORS["muted"], que pisa por especificidad de clase el
+    # currentColor blanco que ya trae el fondo de la pill vía
+    # herencia normal) -- correcto cuando la pill era pastel con texto
+    # gris, pero quedó desactualizado al invertir la pill de nuevo a
+    # fondo eléctrico + texto blanco (vigésima tercera vuelta). Fix:
+    # color blanco explícito en el style inline del ícono, que sí gana
+    # por especificidad sobre la clase .lever-icon.
     icon_svg = _RENDIMIENTO_ICON.get(color, "")
     icon_html = (
-        f'<span class="lever-icon" style="margin-left:4px;width:13px;height:13px;vertical-align:-2px;">{icon_svg}</span>'
+        f'<span class="lever-icon" style="margin-left:4px;width:13px;height:13px;'
+        f'vertical-align:-2px;color:{COLORS["brand_white"]};">{icon_svg}</span>'
         if icon_svg else ""
     )
     return _rend_pill(f"{valor}{icon_html}", color)
