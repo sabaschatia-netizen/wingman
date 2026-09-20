@@ -1439,29 +1439,58 @@ div[data-testid="stDialog"] {{
 .action-bullet.has-icon svg {{ width: 10px; height: 10px; }}
 
 /* ── TABS (Home / 360 Action / Analytics / Campaign Designer / Outreach) ──
-   Distribuidas a lo ancho de toda la barra -- pedido explícito de
-   Sabas (décima cuarta vuelta): antes quedaban agrupadas a la
-   izquierda con gap fijo; ahora cada tab ocupa espacio proporcional
-   (flex:1) y el texto queda centrado dentro de su tramo, repartiendo
-   las 5 a lo largo del ancho completo del contenedor. */
-.stTabs [data-baseweb="tab-list"] {{
-    gap: 6px; border-bottom: 1px solid {COLORS["border"]};
-    width: 100% !important;
+   Distribuidas a lo ancho + estilo "folder" -- pedido explícito de
+   Sabas, aprobado como mockup visual antes de escribir el código.
+   Cada tab tiene esquinas superiores redondeadas (pestaña de carpeta);
+   la tab ACTIVA se ve más grande/elevada (fondo blanco, sombra hacia
+   arriba, texto morado, línea naranja debajo); las inactivas quedan
+   más chatas, sin fondo sólido, texto gris -- como pestañas "detrás"
+   de la activa.
+
+   CORRECTIVO IMPORTANTE (misma vuelta -- confirmado inspeccionando el
+   DOM real con un navegador headless): esta versión de Streamlit YA NO
+   usa data-baseweb="tab-list"/"tab" -- esos selectores nunca tuvieron
+   efecto, es la razón real por la que el intento anterior de
+   distribuir las tabs a lo ancho no se vió reflejado en la app. La
+   estructura real es role="tablist" (contenedor) y role="tab"
+   (data-testid="stTab", cada pestaña individual) -- confirmado
+   navegando la app real con Playwright, no asumido. */
+.stTabs [role="tablist"] {{
+    gap: 4px !important; border-bottom: 2px solid {COLORS["border"]} !important;
+    width: 100% !important; align-items: flex-end !important;
 }}
-.stTabs [data-baseweb="tab"] {{
+.stTabs [role="tab"] {{
     color: {COLORS["muted"]} !important;
     flex: 1 1 0 !important; min-width: 0 !important;
     display: flex !important; justify-content: center !important;
+    background: rgba(255,255,255,0.4) !important;
+    border-radius: 10px 10px 0 0 !important;
+    padding: 11px 12px !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+    transition: background .15s, box-shadow .15s, padding .15s;
 }}
-.stTabs [aria-selected="true"] {{
+.stTabs [role="tab"][aria-selected="true"] {{
     color: {COLORS["brand_purple"]} !important;
+    background: {COLORS["card"]} !important;
+    border-radius: 14px 14px 0 0 !important;
+    padding: 14px 16px 16px !important;
+    font-weight: 800 !important;
+    font-size: 1.05em !important;
+    box-shadow: 0 -4px 14px rgba(0,0,0,0.08) !important;
+    position: relative !important;
+    z-index: 1;
 }}
-.stTabs [data-baseweb="tab-highlight"] {{
-    background-color: {COLORS["brand_purple"]} !important;
+/* Línea naranja SOLO bajo la tab activa -- el highlight nativo de
+   Streamlit (barra que se desliza entre tabs) se oculta; se reemplaza
+   por un borde inferior en la tab activa, que es donde Sabas la
+   quiere, no como una barra independiente. */
+.stTabs [data-baseweb="tab-highlight"] {{ display: none !important; }}
+.stTabs [role="tab"][aria-selected="true"]::after {{
+    content: ""; position: absolute; left: 14px; right: 14px; bottom: 6px;
+    height: 3px; border-radius: 2px; background: {COLORS["brand_orange"]};
 }}
-.stTabs [data-baseweb="tab-border"] {{
-    background-color: {COLORS["border"]} !important;
-}}
+.stTabs [data-baseweb="tab-border"] {{ display: none !important; }}
 
 /* Ocultar chrome de Streamlit */
 #MainMenu, footer, header {{ visibility: hidden; }}
