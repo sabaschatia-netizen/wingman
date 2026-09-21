@@ -1098,11 +1098,19 @@ def render_tabla_farmers_supervisor(pais):
 def render_login_tracker_supervisor():
     """
     Tabla de login/logout de TODO el equipo (28 farmers, no filtrada por
-    país) -- pedido explícito de Sabas (agosto 2026): 4 columnas (Farmer,
-    Última entrada, Tiempo de uso, Última salida), con SOLO el último
-    valor conocido por farmer (no historial acumulado). Dentro de un
+    país) -- pedido explícito de Sabas (agosto 2026, ajustada vigésima
+    cuarta vuelta): 6 columnas (Farmer, Estado, Hora, Última entrada,
+    Última salida, Tiempo de uso), con SOLO el último valor conocido por
+    farmer (no historial acumulado -- confirmado explícitamente que se
+    mantiene así, no se pasa a un historial de eventos). Dentro de un
     st.expander colapsado por defecto ("una opción desplegable... para no
     saturar"), debajo de la tabla de Rendimiento País.
+
+    "Estado" es una pill semáforo (verde "Acceso" / rojo "Salida" / gris
+    "Sin datos"), derivada de cuál de las 2 marcas de tiempo es más
+    reciente -- el sistema no guarda un booleano explícito de "está
+    adentro ahora". "Hora" muestra la marca de tiempo que corresponde a
+    ese estado (la entrada si está en verde, la salida si está en rojo).
 
     Ver load_login_log/registrar_login/registrar_logout en data_layer.py
     para el mecanismo de persistencia (GitHub via API, porque el disco
@@ -1132,23 +1140,60 @@ def render_login_tracker_supervisor():
         # (los que nunca entraron aparecen con "—" en sus 3 columnas) --
         # así el supervisor ve de un vistazo quién no ha usado la
         # herramienta en absoluto, no solo quién sí.
+        # Semáforo + Tipo de movimiento (vigésima cuarta vuelta, pedido
+        # explícito de Sabas): el sistema NO guarda un booleano explícito
+        # de "está adentro ahora" -- se deriva comparando cuál de las 2
+        # marcas de tiempo es más reciente. VERDE + "Acceso" si la
+        # última entrada es más reciente que la última salida (o si
+        # nunca salió después de entrar); ROJO + "Salida" si ya salió y
+        # no volvió a entrar. Farmer sin ningún registro aún -> gris,
+        # "Sin datos".
         log_idx = log.set_index("farmer")
-        filas = []
+        filas_html = []
         for email in sorted(activos):
             if email in log_idx.index:
                 row = log_idx.loc[email]
-                entrada = row["ultima_entrada"] if pd.notna(row["ultima_entrada"]) else "—"
-                salida = row["ultima_salida"] if pd.notna(row["ultima_salida"]) else "—"
+                entrada_raw = row["ultima_entrada"] if pd.notna(row["ultima_entrada"]) else None
+                salida_raw = row["ultima_salida"] if pd.notna(row["ultima_salida"]) else None
                 tiempo = f'{row["tiempo_uso_min"]:.0f} min' if pd.notna(row["tiempo_uso_min"]) else "—"
             else:
-                entrada = salida = tiempo = "—"
-            filas.append({
-                "Farmer": _correo_corto(email),
-                "Última entrada": entrada,
-                "Tiempo de uso": tiempo,
-                "Última salida": salida,
-            })
-        st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
+                entrada_raw = salida_raw = None
+                tiempo = "—"
+
+            entrada_ts = pd.to_datetime(entrada_raw, errors="coerce") if entrada_raw else None
+            salida_ts = pd.to_datetime(salida_raw, errors="coerce") if salida_raw else None
+
+            if entrada_ts is None and salida_ts is None:
+                estado_color, estado_texto, hora_mostrada = "gray", "Sin datos", "—"
+            elif entrada_ts is not None and (salida_ts is None or entrada_ts > salida_ts):
+                estado_color, estado_texto, hora_mostrada = "green", "Acceso", entrada_raw
+            else:
+                estado_color, estado_texto, hora_mostrada = "red", "Salida", salida_raw
+
+            entrada_fmt = entrada_raw or "—"
+            salida_fmt = salida_raw or "—"
+
+            filas_html.append(
+                "<tr>"
+                f'<td>{html_lib.escape(_correo_corto(email))}</td>'
+                f'<td>{_rend_pill(html_lib.escape(estado_texto), estado_color)}</td>'
+                f'<td>{html_lib.escape(str(hora_mostrada))}</td>'
+                f'<td>{html_lib.escape(str(entrada_fmt))}</td>'
+                f'<td>{html_lib.escape(str(salida_fmt))}</td>'
+                f'<td>{html_lib.escape(str(tiempo))}</td>'
+                "</tr>"
+            )
+
+        tabla_html = (
+            '<table class="sup-table">'
+            "<thead><tr>"
+            "<th>Farmer</th><th>Estado</th><th>Hora</th>"
+            "<th>Última entrada</th><th>Última salida</th><th>Tiempo de uso</th>"
+            "</tr></thead>"
+            f'<tbody>{"".join(filas_html)}</tbody>'
+            "</table>"
+        )
+        st.markdown(tabla_html, unsafe_allow_html=True)
 
 
 def render_rendimiento_farmer(farmer_email):
