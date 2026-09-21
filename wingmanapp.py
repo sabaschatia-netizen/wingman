@@ -1132,6 +1132,21 @@ def render_login_tracker_supervisor():
     activos = set(dl.list_farmers_activos())
 
     with st.expander("🕒 Actividad del equipo (login/logout)"):
+        # Diagnóstico temporal (vigésima cuarta vuelta, pedido explícito
+        # de Sabas: "ya duré 2 minutos logueado y sigue diciendo que no
+        # hay registros"): _github_get_file() atrapa CUALQUIER excepción
+        # silenciosamente (token sin permisos, repo/rama mal escrito,
+        # timeout, etc.) y devuelve un log vacío sin avisar nada en
+        # pantalla -- solo queda registrado en session_state (data_issues,
+        # ver data_layer.py), que hoy no se mostraba en ningún lado de la
+        # UI. Se expone acá el detalle real del error (si lo hay) para
+        # diagnosticar sin tener que adivinar la causa a ciegas.
+        issues = dl.data_issues()
+        if "login_log (leer)" in issues:
+            st.error(f"Error real al leer el registro de GitHub: {issues['login_log (leer)']}")
+        if "login_log (escribir)" in issues:
+            st.error(f"Error real al escribir el registro de GitHub: {issues['login_log (escribir)']}")
+
         if log.empty:
             st.info("Todavía no hay registros de actividad -- van a aparecer a medida que el equipo entre a Wingman.")
             return
