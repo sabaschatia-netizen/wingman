@@ -2310,27 +2310,41 @@ if st.session_state["view"] == "landing":
 
                 col_funnel, col_tabla = st.columns([1, 1])
                 with col_funnel:
-                    # Bloques clickeables (pedido explícito: "no debe ser
-                    # con los botones, debe ser cuando yo presione el
-                    # bloque... el bloque debe tener su hover") -- mismo
-                    # mecanismo que NAV_SECTIONS: el key del st.button ya
-                    # genera una clase CSS estable (.st-key-comercial_blk_*)
-                    # que se puede re-skinnear por completo vía CSS para
-                    # que deje de verse como un botón nativo y se vea como
-                    # la card del funnel, con su propio hover.
+                    # Click en CUALQUIER punto del bloque (pedido explícito
+                    # de Sabas: "no quiero un botón abajo del bloque, quiero
+                    # que yo pueda cliquear el bloque como tal, en
+                    # cualquier punto"). Streamlit no deja que un <div> HTML
+                    # dispare Python directamente -- el st.button real sigue
+                    # existiendo, pero se estira con position:absolute para
+                    # cubrir el bloque entero por encima (opacity:0).
+                    #
+                    # BUG REAL EVITADO (visto y corregido antes de
+                    # entregar, mismo problema que ya documentamos con
+                    # NAV_SECTIONS): st.markdown() y st.button() crean cada
+                    # uno su propio stElementContainer AISLADO -- un
+                    # position:relative puesto solo en el HTML del markdown
+                    # NO envuelve al botón de verdad, son hermanos, no
+                    # padre-hijo. Fix real: st.container(key=...) SÍ genera
+                    # un <div> de verdad que contiene a ambos como hijos
+                    # (.st-key-comercial_blk_base engloba tanto el
+                    # st.markdown como el st.button de adentro), así el
+                    # position:relative/absolute sí se resuelven contra el
+                    # mismo bloque.
                     st.markdown(
                         f"""
                         <style>
-                        .st-key-comercial_blk_base button, .st-key-comercial_blk_contactado button, .st-key-comercial_blk_cierre button {{
-                            width: 100%; height: auto; white-space: normal; text-align: left;
-                            border-radius: 0; padding: 0; background: transparent; border: none;
-                            box-shadow: none; display: block;
+                        .st-key-comercial_blk_base, .st-key-comercial_blk_contactado, .st-key-comercial_blk_cierre {{
+                            position: relative;
                         }}
-                        .st-key-comercial_blk_base button:hover, .st-key-comercial_blk_contactado button:hover, .st-key-comercial_blk_cierre button:hover {{
-                            background: transparent; border: none; box-shadow: 0 4px 14px rgba(154,84,246,0.18);
+                        .st-key-comercial_blk_base .stButton, .st-key-comercial_blk_contactado .stButton, .st-key-comercial_blk_cierre .stButton {{
+                            position: absolute !important; top: 0; left: 0; width: 100%; height: 100%; z-index: 5;
                         }}
-                        .st-key-comercial_blk_base > div, .st-key-comercial_blk_contactado > div, .st-key-comercial_blk_cierre > div {{
-                            transition: box-shadow .15s ease; border-radius: 14px;
+                        .st-key-comercial_blk_base .stButton button, .st-key-comercial_blk_contactado .stButton button, .st-key-comercial_blk_cierre .stButton button {{
+                            width: 100%; height: 100%; opacity: 0; cursor: pointer;
+                            border-radius: 0; padding: 0; margin: 0; background: transparent; border: none;
+                        }}
+                        .st-key-comercial_blk_base:hover .comercial-blk-visual, .st-key-comercial_blk_contactado:hover .comercial-blk-visual, .st-key-comercial_blk_cierre:hover .comercial-blk-visual {{
+                            box-shadow: 0 4px 14px rgba(154,84,246,0.18);
                         }}
                         </style>
                         """,
@@ -2342,22 +2356,44 @@ if st.session_state["view"] == "landing":
                     borde_contactado = f'2px solid {COLORS["brand_purple"]}' if activo == "contactado" else f'1px solid {COLORS["card2"]}'
                     borde_cierre = f'2px solid {COLORS["success"]}' if activo == "cierre" else f'1px solid {COLORS["card2"]}'
 
-                    base_html = (
-                        f'<div style="background:{COLORS["card"]};border:{borde_base};border-radius:16px 16px 0 0;padding:16px 24px;box-sizing:border-box;">'
-                        f'<div style="font-size:12px;font-weight:700;color:{COLORS["muted"]};">Base prospectada · Ads (inicio de mes)</div>'
-                        f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
-                        f'<span style="font-size:26px;font-weight:800;color:{COLORS["text"]};">{c["base"]}</span>'
-                        f'<span style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">100%</span></div>'
-                        '<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-top:8px;">'
-                        f'<div style="width:{pct_contactado}%;background:{COLORS["brand_purple"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Contactado {c["contactado"]}</div>'
-                        f'<div style="width:{pct_no_cont}%;background:{COLORS["brand_purple_soft"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["text"]};">No Cont. {c["no_contactado"]}</div>'
-                        f'<div style="width:{pct_sin_gest}%;background:{COLORS["card2"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["muted"]};">Sin Gest. {c["sin_gestionar"]}</div>'
-                        "</div></div>"
-                    )
-                    st.markdown(base_html, unsafe_allow_html=True)
-                    if st.button("Base prospectada", key="comercial_blk_base", use_container_width=True):
-                        st.session_state["comercial_ads_vista"] = "base"
-                        st.rerun()
+                    # Leyenda debajo de cada barra (mismo patrón cp-legend-*
+                    # ya usado en Contact Performance) en vez de texto
+                    # adentro de cada segmento -- pedido explícito: "no
+                    # pongas texto dentro de los bloques la barra de
+                    # progreso, coloca solo el número, y dentro del bloque
+                    # colocas el insight donde diga a qué bloque
+                    # corresponde cada color".
+                    def _leyenda(items):
+                        chips = "".join(
+                            f'<div class="cp-legend-item"><div class="cp-legend-dot" style="background:{color};"></div>'
+                            f'<span>{label} · {valor}</span></div>'
+                            for label, valor, color in items
+                        )
+                        return f'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;">{chips}</div>'
+
+                    with st.container(key="comercial_blk_base"):
+                        base_html = (
+                            f'<div class="comercial-blk-visual" style="width:440px;background:{COLORS["card"]};border:{borde_base};border-radius:16px 16px 0 0;padding:16px 24px;box-sizing:border-box;transition:box-shadow .15s ease;">'
+                            f'<div style="font-size:12px;font-weight:700;color:{COLORS["muted"]};">Base prospectada · Ads (inicio de mes)</div>'
+                            f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
+                            f'<span style="font-size:26px;font-weight:800;color:{COLORS["text"]};">{c["base"]}</span>'
+                            f'<span style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">100%</span></div>'
+                            '<div style="display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;">'
+                            f'<div style="width:{pct_contactado}%;background:{COLORS["brand_purple"]};"></div>'
+                            f'<div style="width:{pct_no_cont}%;background:{COLORS["brand_purple_soft"]};"></div>'
+                            f'<div style="width:{pct_sin_gest}%;background:{COLORS["card2"]};"></div>'
+                            "</div>"
+                            + _leyenda([
+                                ("Contactado", c["contactado"], COLORS["brand_purple"]),
+                                ("No Contactado", c["no_contactado"], COLORS["brand_purple_soft"]),
+                                ("Sin Gestionar", c["sin_gestionar"], COLORS["card2"]),
+                            ])
+                            + "</div>"
+                        )
+                        st.markdown(base_html, unsafe_allow_html=True)
+                        if st.button("Base prospectada", key="comercial_blk_base_btn"):
+                            st.session_state["comercial_ads_vista"] = "base"
+                            st.rerun()
 
                     st.markdown(
                         '<div style="display:flex;justify-content:center;">'
@@ -2366,22 +2402,29 @@ if st.session_state["view"] == "landing":
                         unsafe_allow_html=True,
                     )
 
-                    contactado_html = (
-                        f'<div style="background:{COLORS["card"]};border:{borde_contactado};border-top:none;padding:14px 22px;box-sizing:border-box;">'
-                        f'<div style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">Contactados</div>'
-                        f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
-                        f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["contactado"]}</span>'
-                        f'<span style="font-size:10px;font-weight:700;color:{COLORS["muted"]};">{pct_contactado}% de la base</span></div>'
-                        '<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-top:8px;">'
-                        f'<div style="width:{pct_rechazado}%;background:{COLORS["brand_orange"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Rechazado {c["rechazado"]}</div>'
-                        f'<div style="width:{pct_pnm}%;background:{COLORS["blue"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Palanca no mencionada {c["palanca_no_mencionada"]}</div>'
-                        f'<div style="width:{pct_cerrado}%;background:{COLORS["success"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["text"]};">Cerrado {c["cerrado"]}</div>'
-                        "</div></div>"
-                    )
-                    st.markdown(contactado_html, unsafe_allow_html=True)
-                    if st.button("Contactados", key="comercial_blk_contactado", use_container_width=True):
-                        st.session_state["comercial_ads_vista"] = "contactado"
-                        st.rerun()
+                    with st.container(key="comercial_blk_contactado"):
+                        contactado_html = (
+                            f'<div class="comercial-blk-visual" style="width:400px;background:{COLORS["card"]};border:{borde_contactado};border-top:none;padding:14px 22px;box-sizing:border-box;transition:box-shadow .15s ease;">'
+                            f'<div style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">Contactados</div>'
+                            f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
+                            f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["contactado"]}</span>'
+                            f'<span style="font-size:10px;font-weight:700;color:{COLORS["muted"]};">{pct_contactado}% de la base</span></div>'
+                            '<div style="display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;">'
+                            f'<div style="width:{pct_rechazado}%;background:{COLORS["brand_orange"]};"></div>'
+                            f'<div style="width:{pct_pnm}%;background:{COLORS["blue"]};"></div>'
+                            f'<div style="width:{pct_cerrado}%;background:{COLORS["success"]};"></div>'
+                            "</div>"
+                            + _leyenda([
+                                ("Rechazado", c["rechazado"], COLORS["brand_orange"]),
+                                ("Palanca no mencionada", c["palanca_no_mencionada"], COLORS["blue"]),
+                                ("Cerrado", c["cerrado"], COLORS["success"]),
+                            ])
+                            + "</div>"
+                        )
+                        st.markdown(contactado_html, unsafe_allow_html=True)
+                        if st.button("Contactados", key="comercial_blk_contactado_btn"):
+                            st.session_state["comercial_ads_vista"] = "contactado"
+                            st.rerun()
 
                     st.markdown(
                         '<div style="display:flex;justify-content:center;">'
@@ -2390,19 +2433,20 @@ if st.session_state["view"] == "landing":
                         unsafe_allow_html=True,
                     )
 
-                    cierre_html = (
-                        f'<div style="background:{COLORS["card"]};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(34,197,94,0.1);">'
-                        f'<div style="font-size:10.5px;font-weight:700;color:{COLORS["muted"]};">Cierre (Checkout)</div>'
-                        f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
-                        f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["cerrado"]}</span>'
-                        f'<span style="font-size:9.5px;font-weight:700;color:{COLORS["muted"]};">{pct_cierre_base}% base · {win_rate}% de contactados</span></div>'
-                        f'<div style="margin-top:8px;"><span style="background:{COLORS["success"]};color:white;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;">Win rate {win_rate}%</span></div>'
-                        "</div>"
-                    )
-                    st.markdown(cierre_html, unsafe_allow_html=True)
-                    if st.button("Cierre", key="comercial_blk_cierre", use_container_width=True):
-                        st.session_state["comercial_ads_vista"] = "cierre"
-                        st.rerun()
+                    with st.container(key="comercial_blk_cierre"):
+                        cierre_html = (
+                            f'<div class="comercial-blk-visual" style="width:320px;background:{COLORS["card"]};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(34,197,94,0.1);transition:box-shadow .15s ease;">'
+                            f'<div style="font-size:10.5px;font-weight:700;color:{COLORS["muted"]};">Cierre (Checkout)</div>'
+                            f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
+                            f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["cerrado"]}</span>'
+                            f'<span style="font-size:9.5px;font-weight:700;color:{COLORS["muted"]};">{pct_cierre_base}% base · {win_rate}% de contactados</span></div>'
+                            f'<div style="margin-top:8px;"><span style="background:{COLORS["success"]};color:white;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;">Win rate {win_rate}%</span></div>'
+                            "</div>"
+                        )
+                        st.markdown(cierre_html, unsafe_allow_html=True)
+                        if st.button("Cierre", key="comercial_blk_cierre_btn"):
+                            st.session_state["comercial_ads_vista"] = "cierre"
+                            st.rerun()
 
                 with col_tabla:
                     vista = st.session_state["comercial_ads_vista"]
