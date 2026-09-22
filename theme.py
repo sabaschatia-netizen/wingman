@@ -1196,6 +1196,52 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .cp-legend-item {{ display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }}
 .cp-legend-dot {{ width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }}
 
+/* Bloques clickeables del funnel de Rendimiento Comercial -- técnica
+   real tomada de Eagle (mismo problema, ya resuelto ahí con Playwright
+   y varias vueltas de prueba real, ver eagleapp.py/theme.py de Eagle):
+   CSS Grid, no position:absolute. Un `height:100%` sobre un elemento
+   position:absolute solo se resuelve contra un ancestro con altura
+   EXPLÍCITA -- nuestro contenedor (.st-key-comercial_blk_*) mide su
+   propio contenido (height:auto), así que ese enfoque nunca cubre la
+   card completa. La celda de un CSS Grid sí hace `stretch` por defecto
+   incluso con alto automático -- por eso la card y el botón comparten
+   la MISMA celda (grid-column:1; grid-row:1) en vez de superponerse
+   con absolute/inset. Selector `[class*="st-key-comercial_blk_"]`
+   (contiene, no clase exacta) porque Streamlit agrega esa clase junto
+   a otras propias, no sola. */
+div[class*="st-key-comercial_blk_"] {{
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+}}
+div[class*="st-key-comercial_blk_"] [data-testid="stElementContainer"] {{
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    margin: 0 !important; padding: 0 !important; min-width: 0 !important;
+    height: 100% !important;
+}}
+div[class*="st-key-comercial_blk_"] .stMarkdown div:has(> .comercial-blk-visual) {{
+    margin-bottom: 0 !important;
+}}
+div[class*="st-key-comercial_blk_"] .stButton {{
+    z-index: 5 !important;
+    height: 100% !important;
+}}
+div[class*="st-key-comercial_blk_"] .stButton button {{
+    width: 100% !important; height: 100% !important;
+    background: transparent !important; border: none !important;
+    color: transparent !important; box-shadow: none !important;
+    border-radius: 14px !important; padding: 0 !important; margin: 0 !important;
+}}
+div[class*="st-key-comercial_blk_"] .stButton button p {{ color: transparent !important; }}
+div[class*="st-key-comercial_blk_"]:has(.stButton button:hover) .comercial-blk-visual {{
+    box-shadow: 0 4px 14px rgba(154,84,246,0.18);
+}}
+div[class*="st-key-comercial_blk_base"] {{ width: 440px !important; }}
+div[class*="st-key-comercial_blk_contactado"] {{ width: 400px !important; }}
+div[class*="st-key-comercial_blk_cierre"] {{ width: 320px !important; }}
+
 /* .analytics-supercard eliminada -- pedido explícito de Sabas (décima
    quinta vuelta, mismo criterio que .action-supercard en 360° Action):
    la card contenedora gigante se quita, las cards internas (Funnel,

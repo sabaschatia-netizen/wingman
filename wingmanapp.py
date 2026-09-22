@@ -2310,109 +2310,23 @@ if st.session_state["view"] == "landing":
 
                 col_funnel, col_tabla = st.columns([1, 1])
                 with col_funnel:
-                    # Click en CUALQUIER punto del bloque (pedido explícito
-                    # de Sabas: "no quiero un botón abajo del bloque, quiero
-                    # que yo pueda cliquear el bloque como tal, en
-                    # cualquier punto"). Streamlit no deja que un <div> HTML
-                    # dispare Python directamente -- el st.button real sigue
-                    # existiendo, pero se estira con position:absolute para
-                    # cubrir el bloque entero por encima (opacity:0).
-                    #
-                    # BUG REAL EVITADO (visto y corregido antes de
-                    # entregar, mismo problema que ya documentamos con
-                    # NAV_SECTIONS): st.markdown() y st.button() crean cada
-                    # uno su propio stElementContainer AISLADO -- un
-                    # position:relative puesto solo en el HTML del markdown
-                    # NO envuelve al botón de verdad, son hermanos, no
-                    # padre-hijo. Fix real: st.container(key=...) SÍ genera
-                    # un <div> de verdad que contiene a ambos como hijos
-                    # (.st-key-comercial_blk_base engloba tanto el
-                    # st.markdown como el st.button de adentro), así el
-                    # position:relative/absolute sí se resuelven contra el
-                    # mismo bloque.
-                    # ANCHO Y CENTRADO en el propio contenedor de
-                    # Streamlit (.st-key-comercial_blk_*), no en el <div>
-                    # HTML interno -- BUG REAL CORREGIDO (confirmado por
-                    # Sabas probando el click real: "solo funciona la
-                    # esquina inferior izquierda... en cierre ni siquiera
-                    # hay un punto"). El width:440px que antes estaba en
-                    # el <div class="comercial-blk-visual"> HTML interno
-                    # NO define el tamaño del contenedor de Streamlit que
-                    # lo envuelve -- ese contenedor sigue siendo tan ancho
-                    # como la columna entera (col_funnel). El botón
-                    # absoluto (100%/100% respecto al contenedor de
-                    # Streamlit) terminaba cubriendo esa área ancha
-                    # completa, que no coincidía visualmente con la card
-                    # más angosta dibujada adentro -- de ahí que solo
-                    # "funcionara" clickear donde el área ancha del
-                    # contenedor y el área visual de la card casualmente
-                    # se solapaban (la esquina inferior izquierda). Fix
-                    # real: el ANCHO fijo y el CENTRADO se mueven al
-                    # contenedor de Streamlit mismo (max-width + margin:
-                    # auto + display:flex;justify-content:center), así el
-                    # botón absoluto (100% de ESE contenedor ya angosto y
-                    # centrado) coincide exacto con el área visual en
-                    # TODA la card, no solo en una esquina.
-                    # BUG REAL CORREGIDO (confirmado por Sabas probando de
-                    # nuevo: "me marca la manito en la esquina inferior
-                    # izquierda... incluso ni ahí, sino afuera"):
-                    # display:flex;justify-content:center convertía al
-                    # <div class="comercial-blk-visual"> (bloque visual) y
-                    # al .stButton en 2 HIJOS FLEX hermanos uno al lado del
-                    # otro, en vez de que el botón absoluto se superpusiera
-                    # sobre el bloque -- y con flex, la altura del
-                    # contenedor se calcula por el contenido en flujo
-                    # normal, mientras que un hijo position:absolute NO
-                    # cuenta para ese cálculo, generando una altura
-                    # ambigua/colapsada que dejaba el área clickeable real
-                    # desplazada fuera del bloque visible. Fix real: nada
-                    # de flex -- el contenedor usa WIDTH fijo (no
-                    # max-width, para que tenga un tamaño explícito desde
-                    # el inicio, no dependiente del contenido) y
-                    # margin:0 auto puro para centrar, sin flexbox de por
-                    # medio.
-                    # BUG REAL CORREGIDO -- tercera vuelta (confirmado con
-                    # la documentación oficial de Streamlit: el "width" por
-                    # defecto de un st.container es "stretch", es decir
-                    # ocupa el 100% del ancho del padre por diseño, no se
-                    # ajusta al contenido -- mi CSS anterior fijaba el
-                    # width en .st-key-comercial_blk_* pero sin !important
-                    # y sin apuntar también al nodo interno real
-                    # [data-testid="stVerticalBlockBorderWrapper"], así
-                    # que el "stretch" por defecto seguía ganando en la
-                    # práctica -- el contenedor real seguía siendo tan
-                    # ancho como la columna, y por eso el botón absoluto
-                    # (100%/100% de ESE ancho real) quedaba desalineado
-                    # del bloque angosto dibujado adentro. Fix: apuntar al
-                    # data-testid real, con !important, y forzar
-                    # display:block (no stretch/flex) para que el ancho
-                    # fijo se respete sin ambigüedad.
-                    st.markdown(
-                        f"""
-                        <style>
-                        .st-key-comercial_blk_base, .st-key-comercial_blk_contactado, .st-key-comercial_blk_cierre,
-                        .st-key-comercial_blk_base > div, .st-key-comercial_blk_contactado > div, .st-key-comercial_blk_cierre > div {{
-                            position: relative !important; margin: 0 auto !important; display: block !important;
-                        }}
-                        .st-key-comercial_blk_base, .st-key-comercial_blk_base > div {{ width: 440px !important; }}
-                        .st-key-comercial_blk_contactado, .st-key-comercial_blk_contactado > div {{ width: 400px !important; }}
-                        .st-key-comercial_blk_cierre, .st-key-comercial_blk_cierre > div {{ width: 320px !important; }}
-                        .st-key-comercial_blk_base .stButton, .st-key-comercial_blk_contactado .stButton, .st-key-comercial_blk_cierre .stButton {{
-                            position: absolute !important; top: 0 !important; left: 0 !important;
-                            width: 100% !important; height: 100% !important; z-index: 5 !important; margin: 0 !important;
-                        }}
-                        .st-key-comercial_blk_base .stButton button, .st-key-comercial_blk_contactado .stButton button, .st-key-comercial_blk_cierre .stButton button {{
-                            width: 100% !important; height: 100% !important; opacity: 0; cursor: pointer;
-                            border-radius: 0; padding: 0; margin: 0; background: transparent; border: none;
-                        }}
-                        .st-key-comercial_blk_base:hover .comercial-blk-visual, .st-key-comercial_blk_contactado:hover .comercial-blk-visual, .st-key-comercial_blk_cierre:hover .comercial-blk-visual {{
-                            box-shadow: 0 4px 14px rgba(154,84,246,0.18);
-                        }}
-                        </style>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
+                    # Bloques clickeables en TODA su área -- CSS Grid, no
+                    # position:absolute (ver el bloque completo de reglas
+                    # en theme.py, sección "Bloques clickeables del
+                    # funnel"). La técnica real viene de Eagle, que ya
+                    # peleó este mismo problema con pruebas de navegador
+                    # real (Playwright) -- position:absolute con
+                    # height:100% nunca se resuelve bien contra un
+                    # ancestro de altura automática, por eso 3 intentos
+                    # anteriores con ese enfoque no funcionaron del todo
+                    # (confirmado por Sabas probando cada vez: el área
+                    # clickeable quedaba desplazada o reducida a una
+                    # esquina). Acá solo hace falta abrir el
+                    # st.container(key=...), dibujar la card, y el botón
+                    # justo después, DENTRO del mismo with -- el CSS ya
+                    # aplicado globalmente hace el resto (ancho fijo,
+                    # centrado, grid, botón transparente cubriendo toda
+                    # la celda).
                     activo = st.session_state["comercial_ads_vista"]
                     borde_base = f'2px solid {COLORS["brand_purple"]}' if activo == "base" else f'1px solid {COLORS["card2"]}'
                     borde_contactado = f'2px solid {COLORS["brand_purple"]}' if activo == "contactado" else f'1px solid {COLORS["card2"]}'
@@ -2436,7 +2350,7 @@ if st.session_state["view"] == "landing":
 
                     with st.container(key="comercial_blk_base"):
                         base_html = (
-                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_base};border-radius:16px 16px 0 0;padding:16px 24px;box-sizing:border-box;transition:box-shadow .15s ease;">'
+                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_base};border-radius:16px 16px 0 0;padding:16px 24px;box-sizing:border-box;">'
                             f'<div style="font-size:12px;font-weight:700;color:{COLORS["muted"]};">Base prospectada · Ads (inicio de mes)</div>'
                             f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
                             f'<span style="font-size:26px;font-weight:800;color:{COLORS["text"]};">{c["base"]}</span>'
@@ -2454,7 +2368,7 @@ if st.session_state["view"] == "landing":
                             + "</div>"
                         )
                         st.markdown(base_html, unsafe_allow_html=True)
-                        if st.button("Base prospectada", key="comercial_blk_base_btn"):
+                        if st.button(" ", key="comercial_blk_base_btn"):
                             st.session_state["comercial_ads_vista"] = "base"
                             st.rerun()
 
@@ -2467,7 +2381,7 @@ if st.session_state["view"] == "landing":
 
                     with st.container(key="comercial_blk_contactado"):
                         contactado_html = (
-                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_contactado};border-top:none;padding:14px 22px;box-sizing:border-box;transition:box-shadow .15s ease;">'
+                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_contactado};border-top:none;padding:14px 22px;box-sizing:border-box;">'
                             f'<div style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">Contactados</div>'
                             f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
                             f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["contactado"]}</span>'
@@ -2485,7 +2399,7 @@ if st.session_state["view"] == "landing":
                             + "</div>"
                         )
                         st.markdown(contactado_html, unsafe_allow_html=True)
-                        if st.button("Contactados", key="comercial_blk_contactado_btn"):
+                        if st.button(" ", key="comercial_blk_contactado_btn"):
                             st.session_state["comercial_ads_vista"] = "contactado"
                             st.rerun()
 
@@ -2498,7 +2412,7 @@ if st.session_state["view"] == "landing":
 
                     with st.container(key="comercial_blk_cierre"):
                         cierre_html = (
-                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(34,197,94,0.1);transition:box-shadow .15s ease;">'
+                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(34,197,94,0.1);">'
                             f'<div style="font-size:10.5px;font-weight:700;color:{COLORS["muted"]};">Cierre (Checkout)</div>'
                             f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
                             f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["cerrado"]}</span>'
@@ -2507,7 +2421,7 @@ if st.session_state["view"] == "landing":
                             "</div>"
                         )
                         st.markdown(cierre_html, unsafe_allow_html=True)
-                        if st.button("Cierre", key="comercial_blk_cierre_btn"):
+                        if st.button(" ", key="comercial_blk_cierre_btn"):
                             st.session_state["comercial_ads_vista"] = "cierre"
                             st.rerun()
 
