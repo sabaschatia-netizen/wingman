@@ -2266,7 +2266,31 @@ if st.session_state["view"] == "landing":
         tab_ads, tab_md = st.tabs(["Ads", "Markdown"])
 
         with tab_ads:
-            farmer_para_funnel = selected if not IS_SUPERVISOR else st.session_state.get("selected", selected)
+            # Selector de Farmer para Supervisor (vigésima sexta vuelta,
+            # pedido explícito de Sabas: "en la vista de supervisor no me
+            # deja ver la sección... deberíamos tener la misma opción que
+            # en rendimiento general -- seleccionar entre Chile, Argentina
+            # y Uruguay, y abajo sí carga el perfil de cada uno"). Mismo
+            # patrón exacto que ya usa Rendimiento General
+            # (render_conosur_map + farmers_por_pais) -- reutilizado tal
+            # cual, no reinventado.
+            if IS_SUPERVISOR:
+                st.session_state.setdefault("supervisor_pais", "AR")
+                render_conosur_map()
+
+                pais_comercial = st.session_state["supervisor_pais"]
+                farmers_pais = dl.farmers_por_pais(pais_comercial)
+                farmer_labels = {f: dl.farmer_display(f) for f in farmers_pais}
+                if not farmers_pais:
+                    st.info("No hay Farmers con cartera activa en este país.")
+                    st.stop()
+                farmer_para_funnel = st.selectbox(
+                    "Farmer", farmers_pais, format_func=lambda f: farmer_labels.get(f, f),
+                    key="comercial_farmer_select",
+                )
+            else:
+                farmer_para_funnel = selected
+
             datos = dl.rendimiento_comercial_ads_for(farmer_para_funnel)
             c = datos["counts"]
 
@@ -2282,65 +2306,181 @@ if st.session_state["view"] == "landing":
                 pct_cierre_base = round(c["cerrado"] / c["base"] * 100, 1) if c["base"] else 0
                 win_rate = pct_cerrado
 
-                funnel_html = (
-                    '<div style="display:flex;flex-direction:column;align-items:center;">'
-                    f'<div style="background:{COLORS["card"]};border:2px solid {COLORS["brand_purple"]};border-radius:16px 16px 0 0;padding:16px 24px;width:440px;box-sizing:border-box;">'
-                    f'<div style="font-size:12px;font-weight:700;color:{COLORS["muted"]};">Base prospectada · Ads (inicio de mes)</div>'
-                    f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
-                    f'<span style="font-size:26px;font-weight:800;color:{COLORS["text"]};">{c["base"]}</span>'
-                    f'<span style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">100%</span></div>'
-                    '<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-top:8px;">'
-                    f'<div style="width:{pct_contactado}%;background:{COLORS["brand_purple"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Contactado {c["contactado"]}</div>'
-                    f'<div style="width:{pct_no_cont}%;background:{COLORS["brand_purple_soft"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["text"]};">No Cont. {c["no_contactado"]}</div>'
-                    f'<div style="width:{pct_sin_gest}%;background:{COLORS["card2"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["muted"]};">Sin Gest. {c["sin_gestionar"]}</div>'
-                    "</div></div>"
-                    '<div style="width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:9px solid #E4E1D8;"></div>'
-                    f'<div style="background:{COLORS["card"]};border:1px solid {COLORS["card2"]};border-top:none;padding:14px 22px;width:400px;box-sizing:border-box;">'
-                    f'<div style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">Contactados</div>'
-                    f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
-                    f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["contactado"]}</span>'
-                    f'<span style="font-size:10px;font-weight:700;color:{COLORS["muted"]};">{pct_contactado}% de la base</span></div>'
-                    '<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-top:8px;">'
-                    f'<div style="width:{pct_rechazado}%;background:{COLORS["brand_orange"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Rechazado {c["rechazado"]}</div>'
-                    f'<div style="width:{pct_pnm}%;background:{COLORS["blue"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Palanca no mencionada {c["palanca_no_mencionada"]}</div>'
-                    f'<div style="width:{pct_cerrado}%;background:{COLORS["success"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["text"]};">Cerrado {c["cerrado"]}</div>'
-                    "</div></div>"
-                    '<div style="width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:9px solid #E4E1D8;"></div>'
-                    f'<div style="background:{COLORS["card"]};border:1px solid {COLORS["card2"]};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;width:320px;box-sizing:border-box;box-shadow:0 4px 14px rgba(34,197,94,0.1);">'
-                    f'<div style="font-size:10.5px;font-weight:700;color:{COLORS["muted"]};">Cierre (Checkout)</div>'
-                    f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
-                    f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["cerrado"]}</span>'
-                    f'<span style="font-size:9.5px;font-weight:700;color:{COLORS["muted"]};">{pct_cierre_base}% base · {win_rate}% de contactados</span></div>'
-                    f'<div style="margin-top:8px;"><span style="background:{COLORS["success"]};color:white;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;">Win rate {win_rate}%</span></div>'
-                    "</div></div>"
-                )
+                st.session_state.setdefault("comercial_ads_vista", "base")
 
                 col_funnel, col_tabla = st.columns([1, 1])
                 with col_funnel:
-                    st.markdown(funnel_html, unsafe_allow_html=True)
-                with col_tabla:
-                    vista = st.radio(
-                        "Vista", ["Base prospectada", "Contactados", "Cierre"],
-                        horizontal=True, label_visibility="collapsed", key="comercial_ads_vista",
+                    # Bloques clickeables (pedido explícito: "no debe ser
+                    # con los botones, debe ser cuando yo presione el
+                    # bloque... el bloque debe tener su hover") -- mismo
+                    # mecanismo que NAV_SECTIONS: el key del st.button ya
+                    # genera una clase CSS estable (.st-key-comercial_blk_*)
+                    # que se puede re-skinnear por completo vía CSS para
+                    # que deje de verse como un botón nativo y se vea como
+                    # la card del funnel, con su propio hover.
+                    st.markdown(
+                        f"""
+                        <style>
+                        .st-key-comercial_blk_base button, .st-key-comercial_blk_contactado button, .st-key-comercial_blk_cierre button {{
+                            width: 100%; height: auto; white-space: normal; text-align: left;
+                            border-radius: 0; padding: 0; background: transparent; border: none;
+                            box-shadow: none; display: block;
+                        }}
+                        .st-key-comercial_blk_base button:hover, .st-key-comercial_blk_contactado button:hover, .st-key-comercial_blk_cierre button:hover {{
+                            background: transparent; border: none; box-shadow: 0 4px 14px rgba(154,84,246,0.18);
+                        }}
+                        .st-key-comercial_blk_base > div, .st-key-comercial_blk_contactado > div, .st-key-comercial_blk_cierre > div {{
+                            transition: box-shadow .15s ease; border-radius: 14px;
+                        }}
+                        </style>
+                        """,
+                        unsafe_allow_html=True,
                     )
-                    if vista == "Base prospectada":
+
+                    activo = st.session_state["comercial_ads_vista"]
+                    borde_base = f'2px solid {COLORS["brand_purple"]}' if activo == "base" else f'1px solid {COLORS["card2"]}'
+                    borde_contactado = f'2px solid {COLORS["brand_purple"]}' if activo == "contactado" else f'1px solid {COLORS["card2"]}'
+                    borde_cierre = f'2px solid {COLORS["success"]}' if activo == "cierre" else f'1px solid {COLORS["card2"]}'
+
+                    base_html = (
+                        f'<div style="background:{COLORS["card"]};border:{borde_base};border-radius:16px 16px 0 0;padding:16px 24px;box-sizing:border-box;">'
+                        f'<div style="font-size:12px;font-weight:700;color:{COLORS["muted"]};">Base prospectada · Ads (inicio de mes)</div>'
+                        f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
+                        f'<span style="font-size:26px;font-weight:800;color:{COLORS["text"]};">{c["base"]}</span>'
+                        f'<span style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">100%</span></div>'
+                        '<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-top:8px;">'
+                        f'<div style="width:{pct_contactado}%;background:{COLORS["brand_purple"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Contactado {c["contactado"]}</div>'
+                        f'<div style="width:{pct_no_cont}%;background:{COLORS["brand_purple_soft"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["text"]};">No Cont. {c["no_contactado"]}</div>'
+                        f'<div style="width:{pct_sin_gest}%;background:{COLORS["card2"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["muted"]};">Sin Gest. {c["sin_gestionar"]}</div>'
+                        "</div></div>"
+                    )
+                    st.markdown(base_html, unsafe_allow_html=True)
+                    if st.button("Base prospectada", key="comercial_blk_base", use_container_width=True):
+                        st.session_state["comercial_ads_vista"] = "base"
+                        st.rerun()
+
+                    st.markdown(
+                        '<div style="display:flex;justify-content:center;">'
+                        '<div style="width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:9px solid #E4E1D8;"></div>'
+                        "</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    contactado_html = (
+                        f'<div style="background:{COLORS["card"]};border:{borde_contactado};border-top:none;padding:14px 22px;box-sizing:border-box;">'
+                        f'<div style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">Contactados</div>'
+                        f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
+                        f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["contactado"]}</span>'
+                        f'<span style="font-size:10px;font-weight:700;color:{COLORS["muted"]};">{pct_contactado}% de la base</span></div>'
+                        '<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-top:8px;">'
+                        f'<div style="width:{pct_rechazado}%;background:{COLORS["brand_orange"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Rechazado {c["rechazado"]}</div>'
+                        f'<div style="width:{pct_pnm}%;background:{COLORS["blue"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Palanca no mencionada {c["palanca_no_mencionada"]}</div>'
+                        f'<div style="width:{pct_cerrado}%;background:{COLORS["success"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["text"]};">Cerrado {c["cerrado"]}</div>'
+                        "</div></div>"
+                    )
+                    st.markdown(contactado_html, unsafe_allow_html=True)
+                    if st.button("Contactados", key="comercial_blk_contactado", use_container_width=True):
+                        st.session_state["comercial_ads_vista"] = "contactado"
+                        st.rerun()
+
+                    st.markdown(
+                        '<div style="display:flex;justify-content:center;">'
+                        '<div style="width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:9px solid #E4E1D8;"></div>'
+                        "</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    cierre_html = (
+                        f'<div style="background:{COLORS["card"]};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(34,197,94,0.1);">'
+                        f'<div style="font-size:10.5px;font-weight:700;color:{COLORS["muted"]};">Cierre (Checkout)</div>'
+                        f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
+                        f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["cerrado"]}</span>'
+                        f'<span style="font-size:9.5px;font-weight:700;color:{COLORS["muted"]};">{pct_cierre_base}% base · {win_rate}% de contactados</span></div>'
+                        f'<div style="margin-top:8px;"><span style="background:{COLORS["success"]};color:white;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;">Win rate {win_rate}%</span></div>'
+                        "</div>"
+                    )
+                    st.markdown(cierre_html, unsafe_allow_html=True)
+                    if st.button("Cierre", key="comercial_blk_cierre", use_container_width=True):
+                        st.session_state["comercial_ads_vista"] = "cierre"
+                        st.rerun()
+
+                with col_tabla:
+                    vista = st.session_state["comercial_ads_vista"]
+                    # Pills de color (pedido explícito de Sabas): ID/Nombre/
+                    # Target siempre en gris -- solo el Estado lleva el color
+                    # semántico (Contactado morado oscuro, No Contactado
+                    # morado clarito, Sin Gestionar gris, Rechazado naranja,
+                    # Palanca no mencionada azul, Cerrado verde -- mismo
+                    # mapeo que ya usa el funnel arriba).
+                    color_estado = {
+                        "Contactado": (COLORS["brand_purple"], "white"),
+                        "No Contactado": (COLORS["brand_purple_soft"], COLORS["text"]),
+                        "Sin Gestionar": (COLORS["card2"], COLORS["muted"]),
+                        "Rechazado": (COLORS["brand_orange"], "white"),
+                        "Palanca no mencionada": (COLORS["blue"], "white"),
+                        "Cerrado": (COLORS["success"], "white"),
+                    }
+
+                    def _pill_gris(valor):
+                        return (
+                            f'<span style="background:{COLORS["card2"]};color:{COLORS["muted"]};'
+                            f'font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;'
+                            f'display:inline-block;">{html_lib.escape(str(valor))}</span>'
+                        )
+
+                    def _pill_estado(valor):
+                        bg, fg = color_estado.get(valor, (COLORS["card2"], COLORS["muted"]))
+                        return (
+                            f'<span style="background:{bg};color:{fg};font-size:11px;font-weight:800;'
+                            f'padding:3px 10px;border-radius:999px;display:inline-block;">{html_lib.escape(str(valor))}</span>'
+                        )
+
+                    if vista == "base":
                         filas = datos["base"]
-                        cols_df = ["id", "nombre", "target", "estado"]
-                        nombres_col = {"id": "ID", "nombre": "Nombre", "target": "Target", "estado": "Estado"}
-                    elif vista == "Contactados":
+                        titulo = "Base prospectada"
+                    elif vista == "contactado":
                         filas = [f for f in datos["contactado"] if f["estado"] != "Cerrado"]
-                        cols_df = ["id", "nombre", "target", "estado"]
-                        nombres_col = {"id": "ID", "nombre": "Nombre", "target": "Target", "estado": "Estado"}
+                        titulo = "Contactados"
                     else:
                         filas = datos["cierre"]
-                        cols_df = ["id", "nombre", "valor"]
-                        nombres_col = {"id": "ID", "nombre": "Nombre", "valor": "Valor"}
+                        titulo = "Cierre"
 
-                    if filas:
-                        tabla_df = pd.DataFrame(filas)[cols_df].rename(columns=nombres_col)
-                        st.dataframe(tabla_df, use_container_width=True, hide_index=True, height=440)
-                    else:
+                    st.markdown(f'<div style="font-size:13px;font-weight:800;color:{COLORS["text"]};margin-bottom:8px;">{titulo} · {len(filas)} marcas</div>', unsafe_allow_html=True)
+
+                    if not filas:
                         st.info("Sin marcas en esta vista.")
+                    else:
+                        if vista == "cierre":
+                            filas_html = "".join(
+                                '<div style="display:grid;grid-template-columns:70px 1fr 90px;gap:8px;padding:7px 4px;'
+                                f'border-bottom:1px solid {COLORS["card2"]};align-items:center;font-size:12px;">'
+                                f'{_pill_gris(f["id"])}<span>{html_lib.escape(f["nombre"])}</span>'
+                                f'<span style="font-weight:800;color:{COLORS["success"]};">{html_lib.escape(f["valor"])}</span></div>'
+                                for f in filas
+                            )
+                            header_html = (
+                                '<div style="display:grid;grid-template-columns:70px 1fr 90px;gap:8px;padding:0 4px 6px;'
+                                f'font-size:10px;font-weight:700;color:{COLORS["muted"]};text-transform:uppercase;">'
+                                "<span>ID</span><span>Nombre</span><span>Valor</span></div>"
+                            )
+                        else:
+                            filas_html = "".join(
+                                '<div style="display:grid;grid-template-columns:70px 1fr 60px 150px;gap:8px;padding:7px 4px;'
+                                f'border-bottom:1px solid {COLORS["card2"]};align-items:center;font-size:12px;">'
+                                f'{_pill_gris(f["id"])}<span>{html_lib.escape(f["nombre"])}</span>'
+                                f'{_pill_gris(f["target"])}{_pill_estado(f["estado"])}</div>'
+                                for f in filas
+                            )
+                            header_html = (
+                                '<div style="display:grid;grid-template-columns:70px 1fr 60px 150px;gap:8px;padding:0 4px 6px;'
+                                f'font-size:10px;font-weight:700;color:{COLORS["muted"]};text-transform:uppercase;">'
+                                "<span>ID</span><span>Nombre</span><span>Target</span><span>Estado</span></div>"
+                            )
+                        st.markdown(
+                            f'<div style="max-height:480px;overflow-y:auto;border:1px solid {COLORS["card2"]};border-radius:12px;padding:10px 12px;">'
+                            f"{header_html}{filas_html}</div>",
+                            unsafe_allow_html=True,
+                        )
 
         with tab_md:
             st.info("🚧 En construcción.")

@@ -5186,7 +5186,7 @@ def rendimiento_comercial_ads_for(farmer_email):
     df_rel = _read("export_ads_relation")
     brand_target = {}
     if not df_rel.empty:
-        c_rel_farmer = pick_col(df_rel, "OWNER", "FARMER")
+        c_rel_farmer = pick_col(df_rel, "KAM", "OWNER", "FARMER")
         c_rel_brand = pick_col(df_rel, "BRAND ID-NAME", "BRAND")
         c_rel_target = pick_col(df_rel, "Targets Bookings")
         if c_rel_farmer and c_rel_brand and c_rel_target:
