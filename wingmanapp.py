@@ -2330,12 +2330,38 @@ if st.session_state["view"] == "landing":
                     # st.markdown como el st.button de adentro), así el
                     # position:relative/absolute sí se resuelven contra el
                     # mismo bloque.
+                    # ANCHO Y CENTRADO en el propio contenedor de
+                    # Streamlit (.st-key-comercial_blk_*), no en el <div>
+                    # HTML interno -- BUG REAL CORREGIDO (confirmado por
+                    # Sabas probando el click real: "solo funciona la
+                    # esquina inferior izquierda... en cierre ni siquiera
+                    # hay un punto"). El width:440px que antes estaba en
+                    # el <div class="comercial-blk-visual"> HTML interno
+                    # NO define el tamaño del contenedor de Streamlit que
+                    # lo envuelve -- ese contenedor sigue siendo tan ancho
+                    # como la columna entera (col_funnel). El botón
+                    # absoluto (100%/100% respecto al contenedor de
+                    # Streamlit) terminaba cubriendo esa área ancha
+                    # completa, que no coincidía visualmente con la card
+                    # más angosta dibujada adentro -- de ahí que solo
+                    # "funcionara" clickear donde el área ancha del
+                    # contenedor y el área visual de la card casualmente
+                    # se solapaban (la esquina inferior izquierda). Fix
+                    # real: el ANCHO fijo y el CENTRADO se mueven al
+                    # contenedor de Streamlit mismo (max-width + margin:
+                    # auto + display:flex;justify-content:center), así el
+                    # botón absoluto (100% de ESE contenedor ya angosto y
+                    # centrado) coincide exacto con el área visual en
+                    # TODA la card, no solo en una esquina.
                     st.markdown(
                         f"""
                         <style>
                         .st-key-comercial_blk_base, .st-key-comercial_blk_contactado, .st-key-comercial_blk_cierre {{
-                            position: relative;
+                            position: relative; display: flex; justify-content: center; margin: 0 auto;
                         }}
+                        .st-key-comercial_blk_base {{ max-width: 440px; }}
+                        .st-key-comercial_blk_contactado {{ max-width: 400px; }}
+                        .st-key-comercial_blk_cierre {{ max-width: 320px; }}
                         .st-key-comercial_blk_base .stButton, .st-key-comercial_blk_contactado .stButton, .st-key-comercial_blk_cierre .stButton {{
                             position: absolute !important; top: 0; left: 0; width: 100%; height: 100%; z-index: 5;
                         }}
@@ -2373,7 +2399,7 @@ if st.session_state["view"] == "landing":
 
                     with st.container(key="comercial_blk_base"):
                         base_html = (
-                            f'<div class="comercial-blk-visual" style="width:440px;background:{COLORS["card"]};border:{borde_base};border-radius:16px 16px 0 0;padding:16px 24px;box-sizing:border-box;transition:box-shadow .15s ease;">'
+                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_base};border-radius:16px 16px 0 0;padding:16px 24px;box-sizing:border-box;transition:box-shadow .15s ease;">'
                             f'<div style="font-size:12px;font-weight:700;color:{COLORS["muted"]};">Base prospectada · Ads (inicio de mes)</div>'
                             f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
                             f'<span style="font-size:26px;font-weight:800;color:{COLORS["text"]};">{c["base"]}</span>'
@@ -2404,7 +2430,7 @@ if st.session_state["view"] == "landing":
 
                     with st.container(key="comercial_blk_contactado"):
                         contactado_html = (
-                            f'<div class="comercial-blk-visual" style="width:400px;background:{COLORS["card"]};border:{borde_contactado};border-top:none;padding:14px 22px;box-sizing:border-box;transition:box-shadow .15s ease;">'
+                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_contactado};border-top:none;padding:14px 22px;box-sizing:border-box;transition:box-shadow .15s ease;">'
                             f'<div style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">Contactados</div>'
                             f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
                             f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["contactado"]}</span>'
@@ -2435,7 +2461,7 @@ if st.session_state["view"] == "landing":
 
                     with st.container(key="comercial_blk_cierre"):
                         cierre_html = (
-                            f'<div class="comercial-blk-visual" style="width:320px;background:{COLORS["card"]};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(34,197,94,0.1);transition:box-shadow .15s ease;">'
+                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(34,197,94,0.1);transition:box-shadow .15s ease;">'
                             f'<div style="font-size:10.5px;font-weight:700;color:{COLORS["muted"]};">Cierre (Checkout)</div>'
                             f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
                             f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["cerrado"]}</span>'
