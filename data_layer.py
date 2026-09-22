@@ -191,6 +191,7 @@ SHEETS = {
     "pitchdata": "PITCHDATA",
     "toprest": "TOPREST",
     "opp_start": "OPP START",
+    "ads_comercial": "ADS COMERCIAL",
 }
 
 _JUNK = ("total", "nan", "none", "filtros aplicados", "metrica", "metrica")
@@ -5223,7 +5224,48 @@ def rendimiento_comercial_ads_for(farmer_email):
                 if c_tipo_never and str(r.get(c_tipo_never) or "").strip() == "No activo":
                     tiene_rechazo.add(k)
 
-    # Cierre (CHECKOUT, Tipo de Contratacion == "Adquisicion")
+    # Cierre: NÚMERO desde ADS COMERCIAL (vigésima séptima vuelta, pedido
+    # explícito de Sabas: "el bloque de cierre ya no va a tomar checkout,
+    # sino que va a tomar el número mayor que tenga cada comercial en esa
+    # hoja de Ads Comercial") -- MÁXIMO de "ATT ESTRATEGIA" (ACQUIRE)
+    # entre las 4 semanas del mes, no la última columna a ciegas (el
+    # acumulado semana a semana normalmente ya es creciente, pero tomar
+    # el máximo real es más robusto que asumir que la última semana
+    # siempre es la más alta). La estructura de esta hoja es distinta a
+    # todas las demás: 4 filas de "header" apiladas (ESTRATEGIA_ADS /
+    # MONTH / WEEK / columna real), por eso se lee con header=None y se
+    # arma el mapeo a mano, en vez de con pick_col() como el resto.
+    #
+    # El DETALLE de la tabla (cuáles marcas, con nombre y valor) sigue
+    # saliendo de CHECKOUT -- ADS COMERCIAL no lo tiene, es un agregado
+    # por Farmer, no por marca. Si el número de ADS COMERCIAL es mayor a
+    # la cantidad de marcas que CHECKOUT logra identificar para este
+    # Farmer, se completa con filas "Sin dato disponible en Checkout"
+    # (pedido explícito) en vez de inventar marcas que no existen.
+    df_adscom = _read("ads_comercial", header=None)
+    cierre_total_ads_comercial = 0
+    if not df_adscom.empty and len(df_adscom) >= 4:
+        fila_estrategia = df_adscom.iloc[0]
+        fila_header = df_adscom.iloc[3]
+        n_cols = len(fila_header)
+        col_owner = next((i for i in range(n_cols) if str(fila_header.iloc[i]).strip().upper() == "OWNER"), None)
+        cols_att_acquire = [
+            i for i in range(n_cols)
+            if str(fila_header.iloc[i]).strip() == "ATT ESTRATEGIA"
+            and str(fila_estrategia.iloc[i]).strip().upper() == "ACQUIRE"
+        ]
+        if col_owner is not None and cols_att_acquire:
+            for i in range(4, len(df_adscom)):
+                fila = df_adscom.iloc[i]
+                owner = fila.iloc[col_owner]
+                if owner != farmer_email:
+                    continue
+                valores_semana = [to_num(fila.iloc[c], default=0) for c in cols_att_acquire]
+                cierre_total_ads_comercial = int(max(valores_semana)) if valores_semana else 0
+                break
+
+    # Detalle de marcas (CHECKOUT) -- para saber CUÁLES y su valor, no
+    # para el número total (ese ya viene fijo de ADS COMERCIAL arriba).
     df_check = _read("checkout")
     cerradas_valor = {}
     if not df_check.empty:
@@ -5262,7 +5304,6 @@ def rendimiento_comercial_ads_for(farmer_email):
             continue
         if num in cerradas_valor:
             estado_c = "Cerrado"
-            cerrado_n += 1
             cierre_rows.append({"id": key, "nombre": nombre, "valor": f"${cerradas_valor[num]:,.0f}"})
         elif key in tiene_rechazo:
             estado_c = "Rechazado"
@@ -5272,7 +5313,29 @@ def rendimiento_comercial_ads_for(farmer_email):
             pnm_n += 1
         contactado_rows.append({"id": key, "nombre": nombre, "target": fmt_target(num), "estado": estado_c})
 
-    cierre_rows.sort(key=lambda r: -float(r["valor"].replace("$", "").replace(",", "")))
+    # El NÚMERO de cerrado es el de ADS COMERCIAL (fijo, ya calculado
+    # arriba), no len(cierre_rows) -- pedido explícito de Sabas. Si
+    # CHECKOUT identificó MENOS marcas concretas que ese número, se
+    # completa con filas de relleno "Sin dato disponible en Checkout"
+    # (pedido explícito: "si en checkout no están algunas las colocas
+    # como sin dato disponible en checkout") en vez de mostrar una tabla
+    # más corta que el número grande sin ninguna explicación. Si
+    # CHECKOUT tiene MÁS marcas que el número de ADS COMERCIAL (fuentes
+    # desalineadas), se muestran todas igual -- nunca se ocultan datos
+    # reales para forzar que el conteo cuadre.
+    cerrado_n = cierre_total_ads_comercial
+    faltantes = cerrado_n - len(cierre_rows)
+    if faltantes > 0:
+        for _ in range(faltantes):
+            cierre_rows.append({"id": "—", "nombre": "Sin dato disponible en Checkout", "valor": "—"})
+
+    def _valor_ordenable(r):
+        v = r["valor"]
+        if v == "—":
+            return -1
+        return float(v.replace("$", "").replace(",", ""))
+
+    cierre_rows.sort(key=_valor_ordenable, reverse=True)
     contactado_n = rechazado_n + pnm_n + cerrado_n
 
     return {
