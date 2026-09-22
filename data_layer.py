@@ -190,6 +190,7 @@ SHEETS = {
     "checkout": "CHECKOUT",
     "pitchdata": "PITCHDATA",
     "toprest": "TOPREST",
+    "opp_start": "OPP START",
 }
 
 _JUNK = ("total", "nan", "none", "filtros aplicados", "metrica", "metrica")
@@ -5091,3 +5092,194 @@ def load_login_log():
         return _login_log_df_vacio()
     df, _sha = _github_get_file()
     return df
+
+
+def rendimiento_comercial_ads_for(farmer_email):
+    """
+    Funnel de Rendimiento Comercial · Ads -- pedido explícito de Sabas
+    (vigésima quinta vuelta), calculado a partir de datos reales, no
+    inventados: Base -> Contactados (Rechazado / Palanca no mencionada /
+    Cerrado) -> Cierre, con Cierre como subconjunto REAL de Contactados
+    (no un conteo aparte, a diferencia de un diseño anterior descartado
+    -- ver la sesión larga de validación con Sabas).
+
+    Fuentes:
+      - Base: hoja OPP START (reemplaza EXPORT ADS -- es un snapshot fijo
+        de "inicio de mes", no del día de hoy, así que las marcas que
+        cierran DURANTE el mes siguen apareciendo en la base del período
+        en vez de desaparecer del conjunto en cuanto cierran). Columna
+        "Bookings Totales Corregidos" == 0 -> entra a la base. > 0 ->
+        excluida (ya tenía actividad, no es adquisición nueva real).
+      - Contactados / Rechazado: hoja PRODUCTIVITY, columnas "¿Contactado?"
+        (SI) y "Tipo Never Ads" ("No activo" -- pedido explícito: "todo lo
+        que sea no activo de Never Ads cuenta como rechazado").
+      - Cierre: hoja CHECKOUT, "Tipo de Contratacion" == "Adquisicion"
+        (sin tilde, valor real del archivo) -- reemplaza a los archivos
+        WoW externos que se descartaron ("los WoW no se van a usar").
+      - Target por marca: hoja EXPORT ADS RELATION, columna
+        "Targets Bookings" -- "—" si la marca no aparece ahí.
+
+    Devuelve dict con:
+      base / contactado / cierre: listas de {id, nombre, target, estado}
+        (cierre trae {id, nombre, valor} en vez de target/estado).
+      counts: {base, contactado, no_contactado, sin_gestionar, rechazado,
+        palanca_no_mencionada, cerrado} -- ya listos para las barras,
+        sin que el caller tenga que recalcular nada.
+
+    Nunca revienta: si alguna hoja falta o está vacía, devuelve el
+    esqueleto con listas vacías y counts en 0, igual que el resto de
+    funciones de esta capa.
+    """
+    vacio = {
+        "base": [], "contactado": [], "cierre": [],
+        "counts": {"base": 0, "contactado": 0, "no_contactado": 0, "sin_gestionar": 0,
+                   "rechazado": 0, "palanca_no_mencionada": 0, "cerrado": 0},
+    }
+
+    df_opp = _read("opp_start")
+    if df_opp.empty:
+        return vacio
+    c_kam = pick_col(df_opp, "KAM")
+    c_brand = pick_col(df_opp, "BRAND", "Brand")
+    c_book = pick_col(df_opp, "Bookings Totales Corregidos")
+    if not (c_kam and c_brand and c_book):
+        return vacio
+
+    df_det = _read("detalle")
+    brand_a_key, brand_a_nombre = {}, {}
+    if not df_det.empty:
+        c_det_brand = pick_col(df_det, "Brand")
+        c_det_correo = pick_col(df_det, "Correo", "Email")
+        if c_det_brand and c_det_correo:
+            for _, r in df_det.iterrows():
+                brand_txt, correo = r.get(c_det_brand), r.get(c_det_correo)
+                if not brand_txt or correo != farmer_email:
+                    continue
+                m = re.match(r"^(\d+)\s*-\s*(.+)$", str(brand_txt).strip())
+                if m:
+                    num = int(m.group(1))
+                    brand_a_key[num] = brand_key(num)
+                    brand_a_nombre[num] = m.group(2).strip()
+
+    if not brand_a_key:
+        return vacio
+
+    # Base: bookings == 0 exacto en OPP START (None tratado igual que 0,
+    # sin dato no descalifica) -- pedido explícito: bookings > 0 real
+    # SÍ descalifica (ya tenía actividad, no es adquisición nueva).
+    brand_bookings_inicio = {}
+    for _, r in df_opp.iterrows():
+        kam, brand = r.get(c_kam), r.get(c_brand)
+        if kam != farmer_email or not brand or str(brand).strip() == "Total":
+            continue
+        m = re.match(r"^(\d+)", str(brand).strip())
+        if m:
+            brand_bookings_inicio[int(m.group(1))] = to_num(r.get(c_book), default=None)
+
+    base_nums = set()
+    for num in brand_a_key:
+        bk = brand_bookings_inicio.get(num)
+        if bk is None or bk == 0:
+            base_nums.add(num)
+
+    # Target por marca (EXPORT ADS RELATION)
+    df_rel = _read("export_ads_relation")
+    brand_target = {}
+    if not df_rel.empty:
+        c_rel_farmer = pick_col(df_rel, "OWNER", "FARMER")
+        c_rel_brand = pick_col(df_rel, "BRAND ID-NAME", "BRAND")
+        c_rel_target = pick_col(df_rel, "Targets Bookings")
+        if c_rel_farmer and c_rel_brand and c_rel_target:
+            for _, r in df_rel.iterrows():
+                farmer, brand = r.get(c_rel_farmer), r.get(c_rel_brand)
+                if farmer != farmer_email or not brand or str(brand).strip() == "Total":
+                    continue
+                m = re.match(r"^(\d+)", str(brand).strip())
+                if m:
+                    brand_target[int(m.group(1))] = to_num(r.get(c_rel_target), default=None)
+
+    def fmt_target(num):
+        t = brand_target.get(num)
+        return "—" if t is None else f"${t:,.0f}"
+
+    # Contactados / Rechazado (PRODUCTIVITY)
+    df_prod = _read("productivity")
+    contactadas_si, tiene_registro, tiene_rechazo = set(), set(), set()
+    if not df_prod.empty:
+        c_code = pick_col(df_prod, "Code")
+        c_prod_farmer = pick_col(df_prod, "Farmer", "KAM")
+        c_contactado = pick_col(df_prod, "¿Contactado?", "Contactado")
+        c_tipo_never = pick_col(df_prod, "Tipo Never Ads")
+        if c_code and c_prod_farmer:
+            for _, r in df_prod.iterrows():
+                farmer = r.get(c_prod_farmer)
+                code = r.get(c_code)
+                if farmer != farmer_email or not code:
+                    continue
+                k = brand_key(code)
+                tiene_registro.add(k)
+                if c_contactado and str(r.get(c_contactado) or "").strip().upper() == "SI":
+                    contactadas_si.add(k)
+                if c_tipo_never and str(r.get(c_tipo_never) or "").strip() == "No activo":
+                    tiene_rechazo.add(k)
+
+    # Cierre (CHECKOUT, Tipo de Contratacion == "Adquisicion")
+    df_check = _read("checkout")
+    cerradas_valor = {}
+    if not df_check.empty:
+        c_check_farmer = pick_col(df_check, "FARMER")
+        c_tipo = pick_col(df_check, "Tipo de Contratacion")
+        c_check_brand = pick_col(df_check, "Brand ID")
+        c_presupuesto = pick_col(df_check, "Presupuesto ARS")
+        if c_check_farmer and c_tipo and c_check_brand:
+            for _, r in df_check.iterrows():
+                farmer, tipo, brand_id = r.get(c_check_farmer), r.get(c_tipo), r.get(c_check_brand)
+                if farmer != farmer_email or tipo != "Adquisicion" or brand_id is None:
+                    continue
+                m = re.match(r"^(\d+)", str(brand_id).strip())
+                if m:
+                    num = int(m.group(1))
+                    valor = to_num(r.get(c_presupuesto), default=0.0) if c_presupuesto else 0.0
+                    cerradas_valor[num] = cerradas_valor.get(num, 0.0) + valor
+
+    base_rows, contactado_rows, cierre_rows = [], [], []
+    rechazado_n = pnm_n = cerrado_n = no_contactado_n = sin_gestionar_n = 0
+
+    for num in base_nums:
+        key = brand_a_key[num]
+        nombre = brand_a_nombre[num]
+        if key in contactadas_si:
+            estado_base = "Contactado"
+        elif key in tiene_registro:
+            estado_base = "No Contactado"
+            no_contactado_n += 1
+        else:
+            estado_base = "Sin Gestionar"
+            sin_gestionar_n += 1
+        base_rows.append({"id": key, "nombre": nombre, "target": fmt_target(num), "estado": estado_base})
+
+        if key not in contactadas_si:
+            continue
+        if num in cerradas_valor:
+            estado_c = "Cerrado"
+            cerrado_n += 1
+            cierre_rows.append({"id": key, "nombre": nombre, "valor": f"${cerradas_valor[num]:,.0f}"})
+        elif key in tiene_rechazo:
+            estado_c = "Rechazado"
+            rechazado_n += 1
+        else:
+            estado_c = "Palanca no mencionada"
+            pnm_n += 1
+        contactado_rows.append({"id": key, "nombre": nombre, "target": fmt_target(num), "estado": estado_c})
+
+    cierre_rows.sort(key=lambda r: -float(r["valor"].replace("$", "").replace(",", "")))
+    contactado_n = rechazado_n + pnm_n + cerrado_n
+
+    return {
+        "base": base_rows, "contactado": contactado_rows, "cierre": cierre_rows,
+        "counts": {
+            "base": len(base_rows), "contactado": contactado_n,
+            "no_contactado": no_contactado_n, "sin_gestionar": sin_gestionar_n,
+            "rechazado": rechazado_n, "palanca_no_mencionada": pnm_n, "cerrado": cerrado_n,
+        },
+    }

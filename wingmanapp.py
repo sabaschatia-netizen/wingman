@@ -1834,6 +1834,7 @@ with col_sidebar:
         NAV_SECTIONS = [
             ("management",   "Rendimiento General", ":material/bar_chart:"),
             ("brand_finder", "Ficha de Marca", ":material/search:"),
+            ("comercial",    "Rendimiento Comercial", ":material/emoji_events:"),
         ]
         for sec_key, sec_label, sec_icon in NAV_SECTIONS:
             active = st.session_state["section"] == sec_key
@@ -2214,6 +2215,7 @@ if st.session_state["view"] == "landing":
     section = st.session_state["section"]
     section_label = {
         "brand_finder": "Ficha de Marca",
+        "comercial": "Rendimiento Comercial",
     }.get(section, "Rendimiento General")
     header_name = "Supervisor" if IS_SUPERVISOR else dl.farmer_display(selected)
     header(header_name, section_label, "")
@@ -2244,6 +2246,104 @@ if st.session_state["view"] == "landing":
                     st.info(f"No encontré ninguna marca con el ID {qkey} {donde}.")
             else:
                 st.info("Escribe un ID válido (ej. AR97338 o simplemente 97338).")
+
+    # =====================================================
+    # SECCIÓN: RENDIMIENTO COMERCIAL — funnel Ads real + MD en construcción
+    # =====================================================
+    # Pedido explícito de Sabas (vigésima quinta vuelta): 3ra sección del
+    # sidebar, con 2 tabs (Ads/MD). Ads usa rendimiento_comercial_ads_for
+    # (ver data_layer.py) -- Base (OPP START, snapshot fijo de inicio de
+    # mes) -> Contactados (Rechazado / Palanca no mencionada / Cerrado,
+    # de PRODUCTIVITY + CHECKOUT) -> Cierre, con Cierre como subconjunto
+    # REAL de Contactados (no un conteo aparte). MD queda "en
+    # construcción" -- pedido explícito, todavía no se armó esa fuente.
+    #
+    # Solo vista de Farmer por ahora (no vista de Supervisor agregada) --
+    # el email real del Farmer logueado (o el seleccionado, si es
+    # Supervisor viendo "Ficha de Marca" cross-farmer) es el mismo
+    # `selected` que ya usa el resto del código.
+    elif section == "comercial":
+        tab_ads, tab_md = st.tabs(["Ads", "Markdown"])
+
+        with tab_ads:
+            farmer_para_funnel = selected if not IS_SUPERVISOR else st.session_state.get("selected", selected)
+            datos = dl.rendimiento_comercial_ads_for(farmer_para_funnel)
+            c = datos["counts"]
+
+            if c["base"] == 0:
+                st.info("Sin datos de Rendimiento Comercial disponibles para este Farmer.")
+            else:
+                pct_contactado = round(c["contactado"] / c["base"] * 100, 1) if c["base"] else 0
+                pct_no_cont = round(c["no_contactado"] / c["base"] * 100, 1) if c["base"] else 0
+                pct_sin_gest = round(c["sin_gestionar"] / c["base"] * 100, 1) if c["base"] else 0
+                pct_rechazado = round(c["rechazado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+                pct_pnm = round(c["palanca_no_mencionada"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+                pct_cerrado = round(c["cerrado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+                pct_cierre_base = round(c["cerrado"] / c["base"] * 100, 1) if c["base"] else 0
+                win_rate = pct_cerrado
+
+                funnel_html = (
+                    '<div style="display:flex;flex-direction:column;align-items:center;">'
+                    f'<div style="background:{COLORS["card"]};border:2px solid {COLORS["brand_purple"]};border-radius:16px 16px 0 0;padding:16px 24px;width:440px;box-sizing:border-box;">'
+                    f'<div style="font-size:12px;font-weight:700;color:{COLORS["muted"]};">Base prospectada · Ads (inicio de mes)</div>'
+                    f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
+                    f'<span style="font-size:26px;font-weight:800;color:{COLORS["text"]};">{c["base"]}</span>'
+                    f'<span style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">100%</span></div>'
+                    '<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-top:8px;">'
+                    f'<div style="width:{pct_contactado}%;background:{COLORS["brand_purple"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Contactado {c["contactado"]}</div>'
+                    f'<div style="width:{pct_no_cont}%;background:{COLORS["brand_purple_soft"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["text"]};">No Cont. {c["no_contactado"]}</div>'
+                    f'<div style="width:{pct_sin_gest}%;background:{COLORS["card2"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["muted"]};">Sin Gest. {c["sin_gestionar"]}</div>'
+                    "</div></div>"
+                    '<div style="width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:9px solid #E4E1D8;"></div>'
+                    f'<div style="background:{COLORS["card"]};border:1px solid {COLORS["card2"]};border-top:none;padding:14px 22px;width:400px;box-sizing:border-box;">'
+                    f'<div style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">Contactados</div>'
+                    f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
+                    f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["contactado"]}</span>'
+                    f'<span style="font-size:10px;font-weight:700;color:{COLORS["muted"]};">{pct_contactado}% de la base</span></div>'
+                    '<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-top:8px;">'
+                    f'<div style="width:{pct_rechazado}%;background:{COLORS["brand_orange"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Rechazado {c["rechazado"]}</div>'
+                    f'<div style="width:{pct_pnm}%;background:{COLORS["blue"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:white;">Palanca no mencionada {c["palanca_no_mencionada"]}</div>'
+                    f'<div style="width:{pct_cerrado}%;background:{COLORS["success"]};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:{COLORS["text"]};">Cerrado {c["cerrado"]}</div>'
+                    "</div></div>"
+                    '<div style="width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:9px solid #E4E1D8;"></div>'
+                    f'<div style="background:{COLORS["card"]};border:1px solid {COLORS["card2"]};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;width:320px;box-sizing:border-box;box-shadow:0 4px 14px rgba(34,197,94,0.1);">'
+                    f'<div style="font-size:10.5px;font-weight:700;color:{COLORS["muted"]};">Cierre (Checkout)</div>'
+                    f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
+                    f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["cerrado"]}</span>'
+                    f'<span style="font-size:9.5px;font-weight:700;color:{COLORS["muted"]};">{pct_cierre_base}% base · {win_rate}% de contactados</span></div>'
+                    f'<div style="margin-top:8px;"><span style="background:{COLORS["success"]};color:white;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;">Win rate {win_rate}%</span></div>'
+                    "</div></div>"
+                )
+
+                col_funnel, col_tabla = st.columns([1, 1])
+                with col_funnel:
+                    st.markdown(funnel_html, unsafe_allow_html=True)
+                with col_tabla:
+                    vista = st.radio(
+                        "Vista", ["Base prospectada", "Contactados", "Cierre"],
+                        horizontal=True, label_visibility="collapsed", key="comercial_ads_vista",
+                    )
+                    if vista == "Base prospectada":
+                        filas = datos["base"]
+                        cols_df = ["id", "nombre", "target", "estado"]
+                        nombres_col = {"id": "ID", "nombre": "Nombre", "target": "Target", "estado": "Estado"}
+                    elif vista == "Contactados":
+                        filas = [f for f in datos["contactado"] if f["estado"] != "Cerrado"]
+                        cols_df = ["id", "nombre", "target", "estado"]
+                        nombres_col = {"id": "ID", "nombre": "Nombre", "target": "Target", "estado": "Estado"}
+                    else:
+                        filas = datos["cierre"]
+                        cols_df = ["id", "nombre", "valor"]
+                        nombres_col = {"id": "ID", "nombre": "Nombre", "valor": "Valor"}
+
+                    if filas:
+                        tabla_df = pd.DataFrame(filas)[cols_df].rename(columns=nombres_col)
+                        st.dataframe(tabla_df, use_container_width=True, hide_index=True, height=440)
+                    else:
+                        st.info("Sin marcas en esta vista.")
+
+        with tab_md:
+            st.info("🚧 En construcción.")
 
     # =====================================================
     # SECCIÓN: MANAGEMENT DASHBOARD — Brand Coverage + Contact Performance
