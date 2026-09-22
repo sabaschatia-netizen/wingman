@@ -2353,20 +2353,56 @@ if st.session_state["view"] == "landing":
                     # botón absoluto (100% de ESE contenedor ya angosto y
                     # centrado) coincide exacto con el área visual en
                     # TODA la card, no solo en una esquina.
+                    # BUG REAL CORREGIDO (confirmado por Sabas probando de
+                    # nuevo: "me marca la manito en la esquina inferior
+                    # izquierda... incluso ni ahí, sino afuera"):
+                    # display:flex;justify-content:center convertía al
+                    # <div class="comercial-blk-visual"> (bloque visual) y
+                    # al .stButton en 2 HIJOS FLEX hermanos uno al lado del
+                    # otro, en vez de que el botón absoluto se superpusiera
+                    # sobre el bloque -- y con flex, la altura del
+                    # contenedor se calcula por el contenido en flujo
+                    # normal, mientras que un hijo position:absolute NO
+                    # cuenta para ese cálculo, generando una altura
+                    # ambigua/colapsada que dejaba el área clickeable real
+                    # desplazada fuera del bloque visible. Fix real: nada
+                    # de flex -- el contenedor usa WIDTH fijo (no
+                    # max-width, para que tenga un tamaño explícito desde
+                    # el inicio, no dependiente del contenido) y
+                    # margin:0 auto puro para centrar, sin flexbox de por
+                    # medio.
+                    # BUG REAL CORREGIDO -- tercera vuelta (confirmado con
+                    # la documentación oficial de Streamlit: el "width" por
+                    # defecto de un st.container es "stretch", es decir
+                    # ocupa el 100% del ancho del padre por diseño, no se
+                    # ajusta al contenido -- mi CSS anterior fijaba el
+                    # width en .st-key-comercial_blk_* pero sin !important
+                    # y sin apuntar también al nodo interno real
+                    # [data-testid="stVerticalBlockBorderWrapper"], así
+                    # que el "stretch" por defecto seguía ganando en la
+                    # práctica -- el contenedor real seguía siendo tan
+                    # ancho como la columna, y por eso el botón absoluto
+                    # (100%/100% de ESE ancho real) quedaba desalineado
+                    # del bloque angosto dibujado adentro. Fix: apuntar al
+                    # data-testid real, con !important, y forzar
+                    # display:block (no stretch/flex) para que el ancho
+                    # fijo se respete sin ambigüedad.
                     st.markdown(
                         f"""
                         <style>
-                        .st-key-comercial_blk_base, .st-key-comercial_blk_contactado, .st-key-comercial_blk_cierre {{
-                            position: relative; display: flex; justify-content: center; margin: 0 auto;
+                        .st-key-comercial_blk_base, .st-key-comercial_blk_contactado, .st-key-comercial_blk_cierre,
+                        .st-key-comercial_blk_base > div, .st-key-comercial_blk_contactado > div, .st-key-comercial_blk_cierre > div {{
+                            position: relative !important; margin: 0 auto !important; display: block !important;
                         }}
-                        .st-key-comercial_blk_base {{ max-width: 440px; }}
-                        .st-key-comercial_blk_contactado {{ max-width: 400px; }}
-                        .st-key-comercial_blk_cierre {{ max-width: 320px; }}
+                        .st-key-comercial_blk_base, .st-key-comercial_blk_base > div {{ width: 440px !important; }}
+                        .st-key-comercial_blk_contactado, .st-key-comercial_blk_contactado > div {{ width: 400px !important; }}
+                        .st-key-comercial_blk_cierre, .st-key-comercial_blk_cierre > div {{ width: 320px !important; }}
                         .st-key-comercial_blk_base .stButton, .st-key-comercial_blk_contactado .stButton, .st-key-comercial_blk_cierre .stButton {{
-                            position: absolute !important; top: 0; left: 0; width: 100%; height: 100%; z-index: 5;
+                            position: absolute !important; top: 0 !important; left: 0 !important;
+                            width: 100% !important; height: 100% !important; z-index: 5 !important; margin: 0 !important;
                         }}
                         .st-key-comercial_blk_base .stButton button, .st-key-comercial_blk_contactado .stButton button, .st-key-comercial_blk_cierre .stButton button {{
-                            width: 100%; height: 100%; opacity: 0; cursor: pointer;
+                            width: 100% !important; height: 100% !important; opacity: 0; cursor: pointer;
                             border-radius: 0; padding: 0; margin: 0; background: transparent; border: none;
                         }}
                         .st-key-comercial_blk_base:hover .comercial-blk-visual, .st-key-comercial_blk_contactado:hover .comercial-blk-visual, .st-key-comercial_blk_cierre:hover .comercial-blk-visual {{
@@ -2391,11 +2427,12 @@ if st.session_state["view"] == "landing":
                     # corresponde cada color".
                     def _leyenda(items):
                         chips = "".join(
-                            f'<div class="cp-legend-item"><div class="cp-legend-dot" style="background:{color};"></div>'
+                            '<div class="cp-legend-item" style="font-size:10.5px;gap:5px;">'
+                            f'<div class="cp-legend-dot" style="width:8px;height:8px;background:{color};"></div>'
                             f'<span>{label} · {valor}</span></div>'
                             for label, valor, color in items
                         )
-                        return f'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;">{chips}</div>'
+                        return f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">{chips}</div>'
 
                     with st.container(key="comercial_blk_base"):
                         base_html = (
