@@ -5096,6 +5096,7 @@ def load_login_log():
     return df
 
 
+@st.cache_data(ttl=86400, show_spinner=False)
 def rendimiento_comercial_ads_for(farmer_email):
     """
     Funnel de Rendimiento Comercial · Ads -- pedido explícito de Sabas
@@ -5104,6 +5105,29 @@ def rendimiento_comercial_ads_for(farmer_email):
     Cerrado) -> Cierre, con Cierre como subconjunto REAL de Contactados
     (no un conteo aparte, a diferencia de un diseño anterior descartado
     -- ver la sesión larga de validación con Sabas).
+
+    @st.cache_data(ttl=86400) (pedido explícito de Sabas, trigésima
+    primera vuelta: "revisa el tema del caché para que todo cargue con
+    la máxima velocidad posible") -- mismo patrón que ya usa el resto de
+    esta capa (load_*), aplicado acá por primera vez a una función "_for"
+    porque es la única que recorre 5 hojas completas con iterrows
+    (DETALLE, OPP START, EXPORT ADS RELATION, PRODUCTIVITY, ADS
+    COMERCIAL, CHECKOUT) en CADA click de UI dentro de Rendimiento
+    Comercial (cambiar de bloque, cambiar de tab, cambiar de Farmer) --
+    _read() ya cachea la LECTURA de cada hoja en Parquet, pero no evita
+    repetir ese recorrido Python entero cada vez. Con este decorador, dos
+    llamadas seguidas con el mismo farmer_email devuelven el resultado ya
+    calculado sin tocar ninguna hoja.
+
+    Diferencia real frente a _read(): _read() invalida su cache SOLO
+    cuando el mtime del XLSX cambia (se regenera solo al subir un Excel
+    nuevo). Este decorador usa un TTL fijo de 24h, igual que el resto de
+    load_* de este archivo -- no detecta un Excel nuevo por sí solo. Si
+    se sube un Excel nuevo y hace falta ver el funnel actualizado ANTES
+    de que pasen 24h, hay que reiniciar la app (o agregar un botón de
+    "refrescar datos" que llame a st.cache_data.clear() -- no existe
+    ninguno en la app hoy, ni para esta función ni para las demás load_*
+    que ya usan el mismo TTL fijo).
 
     Fuentes:
       - Base: hoja OPP START (reemplaza EXPORT ADS -- es un snapshot fijo
@@ -5362,6 +5386,7 @@ def rendimiento_comercial_ads_for(farmer_email):
     }
 
 
+@st.cache_data(ttl=86400, show_spinner=False)
 def rendimiento_comercial_md_for(farmer_email):
     """
     Funnel de Rendimiento Comercial · Markdown -- pedido explícito de
@@ -5370,6 +5395,11 @@ def rendimiento_comercial_md_for(farmer_email):
     target por marca (pedido explícito: "en las tablas de MD no hay
     target... con la sola pill del status basta") y sin fila de Total
     en Cierre (pedido explícito: "la fila Total solo aplica a Ads").
+
+    @st.cache_data(ttl=86400) -- mismo motivo y mismas limitaciones que
+    en rendimiento_comercial_ads_for (ver docstring de esa función):
+    evita repetir el recorrido con iterrows sobre MD START y PRODUCTIVITY
+    en cada click de UI.
 
     Fuentes:
       - Base: hoja MD START (snapshot fijo de inicio de mes, mismo

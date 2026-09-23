@@ -1706,12 +1706,30 @@ def render_loading_watcher():
             return false;
           }}
 
+          // Timings del watcher (pedido explícito de Sabas, trigésima
+          // primera vuelta: "si con el caché el tiempo disminuye,
+          // recorta los loaders parciales -- actualmente están en
+          // 0.4s") -- recortados de 450/650ms a 250/350ms tras meter
+          // @st.cache_data en rendimiento_comercial_ads_for/md_for
+          // (ver data_layer.py): con cache-hit, el trabajo real que
+          // Streamlit hace en un click de Rendimiento Comercial (cambiar
+          // de bloque/tab/país/Farmer) pasa de recorrer 5 hojas con
+          // iterrows a devolver un resultado ya calculado, así que el
+          // margen de seguridad ya no necesita ser tan generoso. No se
+          // toca el 5000ms de más abajo -- ese es el respaldo para el
+          // caso RARO en que Streamlit termine tan rápido que el
+          // polling de 80ms ni lo detecte "busy" (cache-miss real, TTL
+          // vencido a las 24h, o cualquier otro trigger de la app fuera
+          // de Rendimiento Comercial que use este mismo watcher) -- 
+          // acortar ESE número sí arriesga cerrar el overlay antes de
+          // tiempo en esos casos, que es justo lo que este watchdog
+          // existe para evitar.
           function navTick() {{
             if (!W.__gwPendingNav) return;
             var now = Date.now();
             if (streamlitBusy()) {{ S.sawBusy = true; S.lastAct = now; return; }}
-            if (now - S.shownAt < 450) return;
-            if (now - S.lastAct < 650) return;
+            if (now - S.shownAt < 250) return;
+            if (now - S.lastAct < 350) return;
             if (!S.sawBusy && now - S.shownAt < 5000) return;
             W.__gwPendingNav = false;
             W.requestAnimationFrame(function() {{
