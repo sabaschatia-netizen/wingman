@@ -2837,18 +2837,20 @@ if st.session_state["view"] == "landing":
             if not filas_sp:
                 st.info("No hay marcas con puntaje de Smart Priorities disponible para este Farmer.")
             else:
-                # 6 columnas -- pedido explícito de Sabas (trigésima
-                # cuarta vuelta): "esta tabla quedaría con seis. El ID,
-                # el nombre, el puntaje, Ads, Markdown y Churn". Ver
-                # smart_priorities_for en data_layer.py para el criterio
-                # exacto de cada pill.
-                cols_css = "1.2fr 2.6fr 0.9fr 1fr 1fr 1fr"
+                # 7 columnas -- pedido explícito de Sabas (trigésima
+                # cuarta vuelta, "el ID, el nombre, el puntaje, Ads,
+                # Markdown y Churn", ampliado en la trigésima sexta:
+                # "la última columna debe ser último contacto con la
+                # fecha"). Ver smart_priorities_for en data_layer.py
+                # para el criterio exacto de cada pill.
+                cols_css = "1.2fr 2.4fr 0.8fr 1fr 1fr 1fr 1fr"
                 header_html = (
                     f'<div style="display:grid;grid-template-columns:{cols_css};gap:8px;'
                     f'padding:0 4px 6px;font-size:10px;font-weight:700;color:{COLORS["muted"]};'
                     'text-transform:uppercase;">'
                     '<span>ID</span><span>Nombre</span><span>Puntaje</span>'
-                    '<span>Ads</span><span>Markdown</span><span>Churn</span></div>'
+                    '<span>Ads</span><span>Markdown</span><span>Churn</span>'
+                    '<span>Último contacto</span></div>'
                 )
                 st.markdown(
                     f'<div style="border:1px solid {COLORS["card2"]};border-radius:12px 12px 0 0;'
@@ -2899,7 +2901,7 @@ if st.session_state["view"] == "landing":
 
                 with st.container(key="smartpri_tabla", height=520, border=True):
                     for idx, f in enumerate(filas_sp):
-                        row_cols = st.columns([1.2, 2.6, 0.9, 1, 1, 1])
+                        row_cols = st.columns([1.2, 2.4, 0.8, 1, 1, 1, 1])
                         with row_cols[0]:
                             with st.container(key=f"smartpri_row_{idx}"):
                                 if st.button(f["id"], key=f"smartpri_row_btn_{idx}"):
@@ -2927,6 +2929,11 @@ if st.session_state["view"] == "landing":
                             st.markdown(f'<div style="padding-top:2px;">{_pill_smartpri(f["md"])}</div>', unsafe_allow_html=True)
                         with row_cols[5]:
                             st.markdown(f'<div style="padding-top:2px;">{_pill_smartpri(f["churn"])}</div>', unsafe_allow_html=True)
+                        with row_cols[6]:
+                            st.markdown(
+                                f'<div style="font-size:12px;color:{COLORS["muted"]};padding-top:2px;">{html_lib.escape(f["ultimo_contacto"])}</div>',
+                                unsafe_allow_html=True,
+                            )
 
     elif section == "comercial":
         # Selector de Farmer para Supervisor -- mismo patrón que ya usa
@@ -3493,7 +3500,7 @@ with tab_action:
             return f'<span class="{base_class} has-icon">{icon_svg_bullet}</span>'
         return f'<span class="{base_class}"></span>'
 
-    def _action_mini(icon_svg, name, pct, tag, title, detail, items=None, icon_purple=False, top_res_html="", extra_item=None):
+    def _action_mini(icon_svg, name, pct, tag, title, detail, items=None, icon_purple=False, top_res_html="", extra_items=None):
         color = _tag_color(tag)
         border_class = _tag_border_class(tag)
         icon_class = "action-card-icon icon-purple" if icon_purple else "action-card-icon"
@@ -3545,24 +3552,32 @@ with tab_action:
                 f'<div class="action-card-title">{_bullet_html(tag, icon_purple)}{title}</div>'
                 f'<div class="action-card-detail">{detail}</div>'
             )
-            # extra_item (pedido explícito de Sabas, trigésima quinta
-            # vuelta): ítem de Promos vencidas/por vencer debajo del
-            # title/detail normal de Markdown, SIN reemplazarlos (a
-            # diferencia de "items", que sí reemplaza -- ese mecanismo es
-            # el que ya usan OPS/Menú, donde no hay title/detail
-            # separados que conservar). Mismo bullet con ícono según
-            # estado (warning/ojo/chulito) que el resto de la app.
-            if extra_item:
-                extra_texto, extra_estado = extra_item
-                peso_class = (
-                    "action-card-item-alert"
-                    if extra_estado in ("ALERT", "WATCH")
-                    else "action-card-item-normal"
-                )
-                cuerpo_html += (
-                    f'<div class="action-card-item {peso_class}">'
-                    f'{_bullet_html(extra_estado, icon_purple)}{extra_texto}</div>'
-                )
+            # extra_items (pedido explícito de Sabas, trigésima sexta
+            # vuelta, corrigiendo el diseño anterior: "promos por vencer
+            # debe ser otro ítem también, no debe ser un ítem completo
+            # para las dos... lo único que va en negrita es el título...
+            # los números de los códigos van en gris normal, sin
+            # negrita"): lista de ítems EXTRA debajo del title/detail
+            # normal de Markdown, SIN reemplazarlos (a diferencia de
+            # "items", que sí reemplaza -- ese mecanismo es el que ya
+            # usan OPS/Menú, donde no hay title/detail separados que
+            # conservar). Cada ítem es (titulo, contenido, estado) -- 3
+            # elementos, no 2 -- porque acá el peso SIEMPRE difiere
+            # dentro del mismo ítem (título en negrita, contenido en
+            # normal), a diferencia del resto de la app donde todo el
+            # texto del ítem entra o sale de negrita junto según su
+            # estado. El bullet (warning/ojo/chulito) usa el estado de
+            # ESE ítem puntual, no el tag general de la card.
+            if extra_items:
+                for item_titulo, item_contenido, item_estado in extra_items:
+                    contenido_html = f': {item_contenido}' if item_contenido else ''
+                    cuerpo_html += (
+                        f'<div class="action-card-item">'
+                        f'{_bullet_html(item_estado, icon_purple)}'
+                        f'<span class="action-card-item-alert">{item_titulo}</span>'
+                        f'<span class="action-card-item-normal">{contenido_html}</span>'
+                        f'</div>'
+                    )
         return (
             f'<div class="action-card {border_class}">'
             f'<div class="action-card-head"><span class="{icon_class}">{icon_svg}</span></div>'
@@ -3589,7 +3604,7 @@ with tab_action:
         '<div class="action-grid">'
         + _action_mini(ICON_OPS, "OPS General", ops["pct"], ops["tag"], ops["title"], ops["detail"], items=ops.get("items"))
         + _action_mini(ICON_MENU, "Menú", menu["pct"], menu["tag"], menu["title"], menu["detail"], items=menu.get("items"))
-        + _action_mini(ICON_MARKDOWN, "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"], extra_item=(md_c["items"][0] if md_c.get("items") else None))
+        + _action_mini(ICON_MARKDOWN, "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"], extra_items=md_c.get("items"))
         + _action_mini(ICON_ADS_LEVER, "Ads", None, ads_c["tag"], ads_c["title"], ads_c["detail"])
         + "</div>",
         unsafe_allow_html=True,

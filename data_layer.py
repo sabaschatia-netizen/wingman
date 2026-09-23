@@ -2383,16 +2383,34 @@ _MESES_ES = {
 
 def fmt_fecha_es(ts):
     """
-    "9 de septiembre del 2026" -- pedido explícito de Sabas (misma
-    vuelta): "no me lo vas a colocar así en número como 08-09-2026...
-    sino 9 de septiembre del 2026". Sin cero a la izquierda en el día
-    (Timestamp.day ya es int, "9" no "09"). None/NaT -> "" (el caller
-    decide si omite el bloque entero en vez de mostrar una cadena vacía
-    con su propia etiqueta al lado).
+    "09 de septiembre del 2026" -- pedido explícito de Sabas: "no me lo
+    vas a colocar así en número como 08-09-2026... sino 9 de septiembre
+    del 2026" (trigésima quinta vuelta), corregido en la trigésima sexta
+    a "09 de septiembre... 09 y 2026 en número" -- SÍ lleva cero a la
+    izquierda en el día (a diferencia del primer pedido, que decía "9"
+    sin cero -- este formato con cero es el vigente). Usado en la
+    esquina de la card de cabecera de Ficha de Marca. None/NaT -> "" (el
+    caller decide si omite el bloque entero en vez de mostrar una cadena
+    vacía con su propia etiqueta al lado).
     """
     if ts is None or pd.isna(ts):
         return ""
-    return f"{ts.day} de {_MESES_ES[ts.month]} del {ts.year}"
+    return f"{ts.day:02d} de {_MESES_ES[ts.month]} del {ts.year}"
+
+
+def fmt_fecha_ddmmaaaa(ts):
+    """
+    "09/09/2026" -- pedido explícito de Sabas (trigésima sexta vuelta,
+    para la columna "Último contacto" de la tabla Smart Priorities, a
+    diferencia de fmt_fecha_es que se usa en la card de cabecera): "ahí
+    sí la vas a colocar en formato fecha. Es decir, día, slash, número
+    del mes, slash, número del año". Ambos con cero a la izquierda.
+    None/NaT -> "—" (mismo placeholder que el resto de columnas de esta
+    tabla cuando no hay dato -- ver smart_priorities_for).
+    """
+    if ts is None or pd.isna(ts):
+        return "—"
+    return f"{ts.day:02d}/{ts.month:02d}/{ts.year}"
 
 
 def md_tactical_card(key, active, roi, campaign_name, mdpro=False):
@@ -2413,29 +2431,35 @@ def md_tactical_card(key, active, roi, campaign_name, mdpro=False):
     viejo, sin inventar consejo -- solo "Seguimiento" (si ya hay campaña
     activa) o "Sin campaña aún" (si no hay).
 
-    Ítem de Promos (pedido explícito de Sabas, trigésima quinta vuelta,
-    tras confirmar que PRIORITY DATA trae las columnas nuevas "Promo
-    vencida"/"Promo por vencer": "todas las tarjetas de Markdown en 360
-    Action van a tener ese ítem... si no hay dato disponible, marca el
-    ítem como si fuera un chulito. Si marca promo vencida, siempre lo
-    marca como alerta y promo por vencer siempre como ojo... si tiene
-    promo vencida siempre se convierte en Alert la tarjeta"):
-      - Ninguna de las dos con dato -> HEALTHY ("Sin promos vencidas ni
-        por vencer"), mismo chulito que el resto de items sanos.
-      - Solo "Promo por vencer" con dato -> WATCH, muestra los IDs tal
-        cual vienen en la celda (separador "\\n" -> ", " para que se lea
-        en una línea).
-      - "Promo vencida" con dato (con o sin "por vencer" acompañando) ->
-        ALERT siempre, fijo -- pedido explícito, no se evalúa cantidad ni
-        se combina con ninguna otra condición. Si las dos traen dato, el
-        texto del ítem menciona ambas.
-      Esta pill se agrega a "items" (mismo mecanismo que OPS/Menú: lista
-      de (texto, estado), un bullet por línea) y su estado entra en el
-      cálculo del tag final de la card completa bajo el mismo criterio
-      YA usado en ops_tactical_card ("el peor de los items domina") --
-      así que una promo vencida por sí sola alcanza para subir toda la
-      card a ALERT aunque el resto (Adquisición/Optimización/Seguimiento)
-      hubiera dado HEALTHY.
+    Ítems de Promos (pedido explícito de Sabas, trigésima sexta vuelta,
+    corrigiendo el diseño anterior: "como estás colocando promos vencidas
+    como un ítem, promos por vencer debe ser otro ítem también. No debe
+    ser un ítem completo para las dos"): DOS ítems independientes, no uno
+    combinado -- "Promos vencidas" y "Promos por vencer" son entradas
+    separadas en "items", cada una con su propia regla FIJA:
+      - "Promo vencida" sin dato -> ("Promos vencidas", "", "HEALTHY")
+        (chulito). Con dato -> ("Promos vencidas", "<ids tal cual, \\n ->
+        \", \">", "ALERT") -- SIEMPRE alerta si hay dato, fijo.
+      - "Promo por vencer" sin dato -> ("Promos por vencer", "",
+        "HEALTHY") (chulito). Con dato -> ("Promos por vencer", "<ids>",
+        "WATCH") -- SIEMPRE watch si hay dato, fijo. Independiente de si
+        "Promo vencida" también tiene dato o no -- ya no se combinan en
+        un solo texto como en el diseño anterior.
+      Formato de cada tupla: (titulo, contenido, estado) -- 3 elementos,
+      NO 2 como el resto de "items" de OPS/Menú (ver _bullet_html/
+      _action_mini en wingmanapp.py, que distingue por longitud de
+      tupla). Pedido explícito: "lo único que va en negrita es el
+      título... los números de los códigos van en gris normal, sin
+      negrita" -- por eso el título y el contenido van en campos
+      separados, para que el render les dé peso distinto SIEMPRE
+      (incluso en ALERT/WATCH), a diferencia del resto de items de esta
+      app donde todo el texto entra o sale de negrita junto.
+      El PEOR estado entre estos dos items entra en el cálculo del tag
+      final de la card completa, mismo criterio YA usado en
+      ops_tactical_card ("el peor de los items domina") -- una promo
+      vencida por sí sola alcanza para subir toda la card a ALERT aunque
+      el resto (Adquisición/Optimización/Seguimiento) hubiera dado
+      HEALTHY.
     """
     kind = "md_pro" if mdpro else "md"
     nombre = "Markdown Pro" if mdpro else "Markdown"
@@ -2444,21 +2468,15 @@ def md_tactical_card(key, active, roi, campaign_name, mdpro=False):
 
     promo_vencida, promo_por_vencer = _priority_promos_for(key, kind)
     if promo_vencida:
-        ids_v = promo_vencida.replace("\n", ", ")
-        if promo_por_vencer:
-            ids_pv = promo_por_vencer.replace("\n", ", ")
-            promo_texto = f"Promos vencidas: {ids_v} · Por vencer: {ids_pv}"
-        else:
-            promo_texto = f"Promos vencidas: {ids_v}"
-        promo_estado = "ALERT"
-    elif promo_por_vencer:
-        ids_pv = promo_por_vencer.replace("\n", ", ")
-        promo_texto = f"Promos por vencer: {ids_pv}"
-        promo_estado = "WATCH"
+        item_vencida = ("Promos vencidas", promo_vencida.replace("\n", ", "), "ALERT")
     else:
-        promo_texto = "Sin promos vencidas ni por vencer"
-        promo_estado = "HEALTHY"
-    promo_item = (promo_texto, promo_estado)
+        item_vencida = ("Promos vencidas", "", "HEALTHY")
+    if promo_por_vencer:
+        item_por_vencer = ("Promos por vencer", promo_por_vencer.replace("\n", ", "), "WATCH")
+    else:
+        item_por_vencer = ("Promos por vencer", "", "HEALTHY")
+    promo_items = [item_vencida, item_por_vencer]
+    promo_estado_peor = "ALERT" if promo_vencida else ("WATCH" if promo_por_vencer else "HEALTHY")
 
     def _peor_tag(tag_base, tag_promo):
         orden = {"ALERT": 3, "WATCH": 2, "HEALTHY": 1, "INACTIVE": 0}
@@ -2466,19 +2484,19 @@ def md_tactical_card(key, active, roi, campaign_name, mdpro=False):
 
     if not accion:
         if active:
-            tag = _peor_tag("HEALTHY", promo_estado)
-            return {"title": nombre, "detail": "Seguimiento", "tag": tag, "items": [promo_item]}
+            tag = _peor_tag("HEALTHY", promo_estado_peor)
+            return {"title": nombre, "detail": "Seguimiento", "tag": tag, "items": promo_items}
         # Sin campaña activa Y Priority Data no la pide -- pedido
         # explícito de Sabas (agosto 2026): estado neutro INACTIVE (gris),
         # no WATCH, con la nota especifica. La promo vencida/por vencer
         # igual puede escalar esto -- una marca inactiva en Ads/MD puede
         # perfectamente tener una campaña vieja que quedó vencida.
-        tag = _peor_tag("INACTIVE", promo_estado)
+        tag = _peor_tag("INACTIVE", promo_estado_peor)
         return {
             "title": f"{nombre} · Inactivo",
             "detail": "No hay prioridad comercial ahora, pero revisa qué le puedes ofrecer al aliado.",
             "tag": tag,
-            "items": [promo_item],
+            "items": promo_items,
         }
 
     title = f"{nombre} · {accion}"
@@ -2490,8 +2508,8 @@ def md_tactical_card(key, active, roi, campaign_name, mdpro=False):
     if mostrar_nota:
         detail += " Revisá Campaign Designer para definir estrategia."
     tag_base = "WATCH" if accion in ("Adquisición", "Optimización") else "HEALTHY"
-    tag = _peor_tag(tag_base, promo_estado)
-    return {"title": title, "detail": detail, "tag": tag, "items": [promo_item]}
+    tag = _peor_tag(tag_base, promo_estado_peor)
+    return {"title": title, "detail": detail, "tag": tag, "items": promo_items}
 
 
 def ads_tactical_card(key, active, roas, bookings_ars, currency="ARS"):
@@ -5781,8 +5799,15 @@ def smart_priorities_for(farmer_email):
     mostraría empatada al final con marcas que sí tienen 0 real.
 
     Retorna una lista de dicts {"id", "nombre", "puntaje", "ads", "md",
-    "churn"}, ya ordenada puntaje descendente (pedido explícito:
-    "organizado en orden descendente según el puntaje de prioridad").
+    "churn", "ultimo_contacto"}, ya ordenada puntaje descendente (pedido
+    explícito: "organizado en orden descendente según el puntaje de
+    prioridad").
+
+    "ultimo_contacto" (pedido explícito de Sabas, trigésima sexta vuelta:
+    "la última columna debe ser último contacto con la fecha... en
+    formato fecha") -- ya viene como texto "DD/MM/AAAA" (ver
+    fmt_fecha_ddmmaaaa y ultimo_contacto_for), "—" si la marca no tiene
+    ninguna fecha registrada en Priority Data.
 
     "ads" / "md" / "churn" -- pedido explícito de Sabas (trigésima
     cuarta vuelta): "vamos a añadir dos columnas más... Ads... Markdown...
@@ -5926,6 +5951,13 @@ def smart_priorities_for(farmer_email):
         f["ads"] = ads_estado.get(f["id"], "—")
         f["md"] = md_estado.get(f["id"], "—")
         f["churn"] = cmap.get(f["id"], "Tienda activa")
+        # "ultimo_contacto" (pedido explícito de Sabas, trigésima sexta
+        # vuelta: "la última columna debe ser último contacto con la
+        # fecha... en formato fecha... día/mes/año") -- ya formateado
+        # con fmt_fecha_ddmmaaaa (no fmt_fecha_es, ese es para la card de
+        # cabecera con el mes en texto) para que la UI lo muestre tal
+        # cual, sin repetir el parseo del serial de Excel en dos lugares.
+        f["ultimo_contacto"] = fmt_fecha_ddmmaaaa(ultimo_contacto_for(f["id"]))
 
     filas.sort(key=lambda f: -f["puntaje"])
     return filas
