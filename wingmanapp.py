@@ -1553,7 +1553,7 @@ def render_loading_watcher():
           function matchLocalTrigger(btn) {{
             for (var i = 0; i < LOCAL_TRIGGERS.length; i++) {{
               var t = LOCAL_TRIGGERS[i];
-              if (t.btnKey && btn.className.indexOf('st-key-' + t.btnKey) !== -1) return t;
+              if (t.btnKey && btn.closest('div[class*="st-key-' + t.btnKey + '"]')) return t;
               if (t.btnKeyPrefix) {{
                 var wrap = btn.closest('div[class*="st-key-' + t.btnKeyPrefix + '"]');
                 if (wrap) return t;
@@ -1583,7 +1583,7 @@ def render_loading_watcher():
               // sidebar, así que necesita su propio chequeo aparte del
               // filtro de sidebar de arriba.
               var brandRowWrap = btn.closest('div[class*="st-key-comercial_row_"]');
-              var isVolver = btn.className.indexOf('st-key-' + VOLVER_KEY) !== -1;
+              var isVolver = !!btn.closest('div[class*="st-key-' + VOLVER_KEY + '"]');
               var localTrigger = matchLocalTrigger(btn);
               if (!inSidebar && !brandRowWrap && !isVolver && !localTrigger) return;
               if (brandRowWrap || isVolver) {{ startNav((btn.innerText || btn.textContent || '').trim()); return; }}
