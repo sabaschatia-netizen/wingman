@@ -5617,9 +5617,52 @@ def smart_priorities_for(farmer_email):
     marca) se omite del ranking -- no se inventa un puntaje 0 que la
     mostraría empatada al final con marcas que sí tienen 0 real.
 
-    Retorna una lista de dicts {"id", "nombre", "puntaje"}, ya ordenada
-    puntaje descendente (pedido explícito: "organizado en orden
-    descendente según el puntaje de prioridad").
+    Retorna una lista de dicts {"id", "nombre", "puntaje", "ads", "md",
+    "churn"}, ya ordenada puntaje descendente (pedido explícito:
+    "organizado en orden descendente según el puntaje de prioridad").
+
+    "ads" / "md" / "churn" -- pedido explícito de Sabas (trigésima
+    cuarta vuelta): "vamos a añadir dos columnas más... Ads... Markdown...
+    Churn... ya nosotros tenemos ciertos criterios para determinar cuándo
+    una marca es adquisición y cuándo una marca es upselling".
+
+    "ads" (Adquisición / Upselling / Seguimiento) -- MISMO criterio EXACTO
+    que ya usa _camino_mas_corto() para "Adquisición Ads"/"Upselling Ads"
+    (Rendimiento País/Farmer), a nivel de marca individual, leído de
+    load_export_ads_relation():
+      - Adquisición: Targets Bookings > 0 Y las 4 columnas de Bookings
+        (Totales, Totales Corregidos, Reales sin gratis, Reales
+        Corregidos sin gratis) están en 0 -- la marca nunca tuvo Ads.
+      - Upselling: Bookings Reales Corregidos > 0 Y < Targets Bookings --
+        ya tiene Ads pero no llega al target.
+      - Seguimiento: cualquier otro caso (ya cumplió/superó el target, o
+        sin fila en EXPORT ADS RELATION para esta marca -- sin dato no
+        es lo mismo que "sin Ads", así que no se asume Adquisición).
+
+    "md" (Adquisición / Reajuste / Seguimiento -- pedido explícito de
+    Sabas, corrigiendo en la misma vuelta: "para Markdown es adquisición,
+    reajuste y seguimiento", NO "upselling") -- leído de load_md()
+    (GMV TOTAL $ y MARKDOWN $ ya agregados por marca, sumando todas sus
+    tiendas):
+      - Adquisición: MARKDOWN $ == 0 -- la marca nunca tuvo Markdown.
+      - Reajuste: MARKDOWN $ > 0 Y penetración (MARKDOWN $ / GMV TOTAL $)
+        < 10% -- mismo umbral de penetración que Smart Priorities usa
+        para "Reajuste MD" en el Excel fuente (ver docstring de la
+        función, "Pesos por defecto... Reajuste MD 10" en la
+        investigación de Anthropic sobre ese workbook), reconstruido acá
+        porque ese cálculo no vive en ningún otro lugar de este Wingman.
+      - Seguimiento: markdown activo con penetración >= 10%, o sin fila
+        en MD para esta marca (0 GMV con 0 markdown cuenta como
+        Adquisición vía la rama de arriba, no cae acá).
+
+    "churn" (PW1 / PW2 / PW3 / Churn / Tienda activa) -- MISMO criterio
+    EXACTO que ya usa portfolio_for() para "churn_status": churn_map()
+    (hoja CHURN, estado más reciente por marca vía mayor WEEK). Una marca
+    sin riesgo activo (no aparece en churn_map()) muestra "Tienda activa"
+    (pedido explícito), igual que portfolio_for() usa "Disponible" como
+    default -- mismo estado, nombre distinto porque acá se está
+    describiendo la marca en el contexto de esta tabla, no de Brand
+    Coverage.
     """
     df_det = _read("detalle")
     if df_det.empty:
@@ -5673,6 +5716,53 @@ def smart_priorities_for(farmer_email):
         if key not in puntaje_por_key:
             continue
         filas.append({"id": key, "nombre": brand_a_nombre[key], "puntaje": puntaje_por_key[key]})
+
+    # ── Ads (Adquisición / Upselling / Seguimiento) -- ver docstring ──
+    df_ear = load_export_ads_relation()
+    ads_estado = {}
+    if not df_ear.empty:
+        farmer_norm = str(farmer_email).strip().lower()
+        d = df_ear[df_ear["farmer"] == farmer_norm]
+        for _, r in d.iterrows():
+            key = brand_key(r.get("brand"))
+            if not key:
+                continue
+            tgt = r.get("target_bookings", 0.0)
+            bt = r.get("bookings_totales", 0.0)
+            btc = r.get("bookings_totales_corr", 0.0)
+            br = r.get("bookings_reales", 0.0)
+            brc = r.get("bookings_reales_corr", 0.0)
+            if tgt > 0 and bt == 0 and btc == 0 and br == 0 and brc == 0:
+                ads_estado[key] = "Adquisición"
+            elif brc > 0 and brc < tgt:
+                ads_estado[key] = "Upselling"
+            else:
+                ads_estado[key] = "Seguimiento"
+
+    # ── Markdown (Adquisición / Reajuste / Seguimiento) -- ver docstring ──
+    df_md = load_md()
+    md_estado = {}
+    if not df_md.empty:
+        for _, r in df_md.iterrows():
+            key = r.get("key")
+            if not key:
+                continue
+            gmv = r.get("gmv", 0.0)
+            mkd = r.get("markdown", 0.0)
+            if mkd == 0:
+                md_estado[key] = "Adquisición"
+            elif gmv > 0 and (mkd / gmv) < 0.10:
+                md_estado[key] = "Reajuste"
+            else:
+                md_estado[key] = "Seguimiento"
+
+    # ── Churn (PW1 / PW2 / PW3 / Churn / Tienda activa) -- ver docstring ──
+    cmap = churn_map()
+
+    for f in filas:
+        f["ads"] = ads_estado.get(f["id"], "—")
+        f["md"] = md_estado.get(f["id"], "—")
+        f["churn"] = cmap.get(f["id"], "Tienda activa")
 
     filas.sort(key=lambda f: -f["puntaje"])
     return filas

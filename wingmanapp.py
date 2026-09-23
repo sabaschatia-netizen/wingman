@@ -1529,12 +1529,17 @@ def render_loading_watcher():
             buildOverlay(label, anchorSelector);
           }}
 
-          // Botón "← Volver a Rendimiento Comercial" (pedido explícito de
-          // Sabas, trigésima vuelta: "ese es el mismo [overlay global]
-          // que debe cargar al volver al rendimiento comercial") -- vive
-          // en la Ficha de Marca, fuera del sidebar, así que necesita su
-          // propio chequeo por key igual que brandRowWrap.
+          // Botón "← Volver a Rendimiento Comercial" / "← Volver a Ficha
+          // de Marca" (pedido explícito de Sabas, trigésima vuelta: "ese
+          // es el mismo [overlay global] que debe cargar al volver al
+          // rendimiento comercial") -- vive en la Ficha de Marca, fuera
+          // del sidebar, así que necesita su propio chequeo por key
+          // igual que brandRowWrap. SIGUIENTE_KEY (trigésima cuarta
+          // vuelta): botón espejo en la esquina derecha ("→ AR123 ·
+          // Nombre"), mismo overlay global -- navega a otra Ficha de
+          // Marca completa, no una franja parcial de la misma pantalla.
           var VOLVER_KEY = 'btn_volver_comercial';
+          var SIGUIENTE_KEY = 'btn_siguiente_marca';
 
           // Triggers de loader LOCAL (pedido explícito de Sabas,
           // trigésima vuelta): cambiar tab Ads/MD, cambiar país del
@@ -1609,7 +1614,8 @@ def render_loading_watcher():
               // necesitan su propio chequeo aparte del filtro de arriba.
               var brandRowWrap = btn.closest('div[class*="st-key-comercial_row_"]') ||
                                   btn.closest('div[class*="st-key-smartpri_row_"]');
-              var isVolver = !!btn.closest('div[class*="st-key-' + VOLVER_KEY + '"]');
+              var isVolver = !!btn.closest('div[class*="st-key-' + VOLVER_KEY + '"]') ||
+                              !!btn.closest('div[class*="st-key-' + SIGUIENTE_KEY + '"]');
               var localTrigger = matchLocalTrigger(btn);
               if (!inSidebar && !brandRowWrap && !isVolver && !localTrigger) return;
               if (brandRowWrap || isVolver) {{ startNav((btn.innerText || btn.textContent || '').trim()); return; }}
@@ -2836,24 +2842,80 @@ if st.session_state["view"] == "landing":
             if not filas_sp:
                 st.info("No hay marcas con puntaje de Smart Priorities disponible para este Farmer.")
             else:
+                # 6 columnas -- pedido explícito de Sabas (trigésima
+                # cuarta vuelta): "esta tabla quedaría con seis. El ID,
+                # el nombre, el puntaje, Ads, Markdown y Churn". Ver
+                # smart_priorities_for en data_layer.py para el criterio
+                # exacto de cada pill.
+                cols_css = "1.2fr 2.6fr 0.9fr 1fr 1fr 1fr"
                 header_html = (
-                    '<div style="display:grid;grid-template-columns:1.4fr 3.2fr 1.2fr;gap:8px;'
+                    f'<div style="display:grid;grid-template-columns:{cols_css};gap:8px;'
                     f'padding:0 4px 6px;font-size:10px;font-weight:700;color:{COLORS["muted"]};'
                     'text-transform:uppercase;">'
-                    '<span>ID</span><span>Nombre</span><span>Puntaje</span></div>'
+                    '<span>ID</span><span>Nombre</span><span>Puntaje</span>'
+                    '<span>Ads</span><span>Markdown</span><span>Churn</span></div>'
                 )
                 st.markdown(
                     f'<div style="border:1px solid {COLORS["card2"]};border-radius:12px 12px 0 0;'
                     f'border-bottom:none;padding:10px 12px 0;">{header_html}</div>',
                     unsafe_allow_html=True,
                 )
+                # Lista liviana (solo id+nombre) para armar el botón "ver
+                # también" de la siguiente marca en la Ficha de Marca
+                # (pedido explícito, misma vuelta: "en la otra esquina...
+                # el ID y el nombre de la siguiente marca... me voy
+                # preparando para ver cuál es la marca que sigue") -- va
+                # en volver_a en vez de recalcular smart_priorities_for
+                # de nuevo dentro de la Ficha, y sin duplicar puntaje/
+                # ads/md/churn ahí, que la Ficha no necesita mostrar.
+                orden_ids = [{"id": f["id"], "nombre": f["nombre"]} for f in filas_sp]
+
+                # Pills de estado -- función LOCAL propia (no
+                # _pill_estado de _render_funnel_comercial: esa vive
+                # anidada en el scope de esa función, con su propio
+                # color_estado mapeado SOLO a los 6 estados del funnel
+                # comercial -- Contactado/Cerrado/etc; ninguno de esos
+                # nombres coincide con Adquisición/Upselling/Reajuste/
+                # Seguimiento/PW1/Churn/Tienda activa de esta tabla, así
+                # que reusarla habría caído siempre en su gris por
+                # defecto). Semántica de color: Adquisición = oportunidad
+                # (acento marca), Upselling/Reajuste/PW1 = atención
+                # (warning), Churn = riesgo (danger), Seguimiento/Tienda
+                # activa = neutro/positivo.
+                _smartpri_colores = {
+                    "Adquisición": (COLORS["brand_orange_soft"], COLORS["brand_orange"]),
+                    "Upselling": (COLORS["warning_soft"], "#92650A"),
+                    "Reajuste": (COLORS["warning_soft"], "#92650A"),
+                    "PW1": (COLORS["warning_soft"], "#92650A"),
+                    "PW2": (COLORS["warning_soft"], "#92650A"),
+                    "PW3": (COLORS["warning_soft"], "#92650A"),
+                    "Churn": (COLORS["danger_soft"], COLORS["danger"]),
+                    "Tienda activa": (COLORS["success_soft"], "#15803D"),
+                    "Seguimiento": (COLORS["card2"], COLORS["muted"]),
+                }
+
+                def _pill_smartpri(valor):
+                    bg, fg = _smartpri_colores.get(valor, (COLORS["card2"], COLORS["muted"]))
+                    return (
+                        f'<span style="background:{bg};color:{fg};font-size:11px;font-weight:800;'
+                        f'padding:3px 10px;border-radius:999px;display:inline-block;white-space:nowrap;">'
+                        f'{html_lib.escape(str(valor))}</span>'
+                    )
+
                 with st.container(key="smartpri_tabla", height=520, border=True):
                     for idx, f in enumerate(filas_sp):
-                        row_cols = st.columns([1.4, 3.2, 1.2])
+                        row_cols = st.columns([1.2, 2.6, 0.9, 1, 1, 1])
                         with row_cols[0]:
                             with st.container(key=f"smartpri_row_{idx}"):
                                 if st.button(f["id"], key=f"smartpri_row_btn_{idx}"):
-                                    go_to_brand(f["id"], volver_a={"section": "brand_finder"})
+                                    go_to_brand(
+                                        f["id"],
+                                        volver_a={
+                                            "section": "brand_finder",
+                                            "orden": orden_ids,
+                                            "pos": idx,
+                                        },
+                                    )
                         with row_cols[1]:
                             st.markdown(
                                 f'<div style="font-size:12px;padding-top:2px;">{html_lib.escape(f["nombre"])}</div>',
@@ -2864,6 +2926,12 @@ if st.session_state["view"] == "landing":
                                 f'<div style="font-size:12px;font-weight:800;padding-top:2px;">{f["puntaje"]:,.0f}</div>'.replace(",", "."),
                                 unsafe_allow_html=True,
                             )
+                        with row_cols[3]:
+                            st.markdown(f'<div style="padding-top:2px;">{_pill_smartpri(f["ads"])}</div>', unsafe_allow_html=True)
+                        with row_cols[4]:
+                            st.markdown(f'<div style="padding-top:2px;">{_pill_smartpri(f["md"])}</div>', unsafe_allow_html=True)
+                        with row_cols[5]:
+                            st.markdown(f'<div style="padding-top:2px;">{_pill_smartpri(f["churn"])}</div>', unsafe_allow_html=True)
 
     elif section == "comercial":
         # Selector de Farmer para Supervisor -- mismo patrón que ya usa
@@ -3111,21 +3179,66 @@ contact_html = (
 _volver_a = st.session_state.get("volver_a")
 if _volver_a:
     _volver_section = _volver_a.get("section", "comercial")
-    if _volver_section == "brand_finder":
-        if st.button("← Volver a Ficha de Marca", key="btn_volver_comercial"):
-            st.session_state["view"] = "landing"
-            st.session_state["section"] = "brand_finder"
-            st.session_state.pop("volver_a", None)
-            st.rerun()
+    # "Siguiente marca" -- pedido explícito de Sabas (trigésima cuarta
+    # vuelta): "replicar ese botón en la otra esquina... el ID y el
+    # nombre de la siguiente marca... si miro a la izquierda vuelvo a
+    # Smart Priorities, pero si miro a la derecha me voy preparando para
+    # ver cuál es la marca que sigue". Solo aplica cuando se llegó desde
+    # Smart Priorities (trae "orden" -- Rendimiento Comercial no manda
+    # esta clave, así que ahí simplemente no aparece el botón derecho).
+    # Al presionarlo, avanza el "pos" +1 sobre el MISMO "orden" -- la
+    # cadena de "siguiente" sigue funcionando aunque el usuario encadene
+    # varios clicks seguidos (marca 2 -> 3 -> 4...), sin volver a Smart
+    # Priorities entre medio.
+    _orden = _volver_a.get("orden")
+    _pos = _volver_a.get("pos")
+    _siguiente = None
+    if _orden and _pos is not None and _pos + 1 < len(_orden):
+        _siguiente = _orden[_pos + 1]
+
+    if _siguiente:
+        col_izq, col_der = st.columns([1, 1])
     else:
-        if st.button("← Volver a Rendimiento Comercial", key="btn_volver_comercial"):
-            st.session_state["view"] = "landing"
-            st.session_state["section"] = "comercial"
-            st.session_state["comercial_tab_activo"] = _volver_a.get("tab", "ads")
-            st.session_state["comercial_ads_vista"] = _volver_a.get("vista_ads", "base")
-            st.session_state["comercial_md_vista"] = _volver_a.get("vista_md", "base")
-            st.session_state.pop("volver_a", None)
-            st.rerun()
+        col_izq = st.container()
+        col_der = None
+
+    with col_izq:
+        if _volver_section == "brand_finder":
+            if st.button("← Volver a Ficha de Marca", key="btn_volver_comercial"):
+                st.session_state["view"] = "landing"
+                st.session_state["section"] = "brand_finder"
+                st.session_state.pop("volver_a", None)
+                st.rerun()
+        else:
+            if st.button("← Volver a Rendimiento Comercial", key="btn_volver_comercial"):
+                st.session_state["view"] = "landing"
+                st.session_state["section"] = "comercial"
+                st.session_state["comercial_tab_activo"] = _volver_a.get("tab", "ads")
+                st.session_state["comercial_ads_vista"] = _volver_a.get("vista_ads", "base")
+                st.session_state["comercial_md_vista"] = _volver_a.get("vista_md", "base")
+                st.session_state.pop("volver_a", None)
+                st.rerun()
+
+    if _siguiente and col_der is not None:
+        with col_der:
+            # Nombre truncado si es muy largo (pedido explícito: "si el
+            # nombre es muy largo, lo cortas, pero que se dé la
+            # sensación") -- 28 caracteres deja espacio para el ID +
+            # flecha sin desbordar el botón en la columna angosta.
+            _nombre_sig = _siguiente["nombre"]
+            _nombre_corto = _nombre_sig if len(_nombre_sig) <= 28 else _nombre_sig[:27].rstrip() + "…"
+            _label_siguiente = f'{_siguiente["id"]} · {_nombre_corto} →'
+            st.markdown(
+                '<div style="display:flex;justify-content:flex-end;">'
+                '<div style="width:100%;max-width:340px;">',
+                unsafe_allow_html=True,
+            )
+            if st.button(_label_siguiente, key="btn_siguiente_marca", use_container_width=True):
+                go_to_brand(
+                    _siguiente["id"],
+                    volver_a={"section": _volver_section, "orden": _orden, "pos": _pos + 1},
+                )
+            st.markdown("</div></div>", unsafe_allow_html=True)
 
 # Ícono de categoría como "primera letra" del título -- rediseño décima
 # tercera vuelta, pedido explícito de Sabas, aprobado como mockup visual
