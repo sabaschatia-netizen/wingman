@@ -1507,7 +1507,20 @@ def render_loading_watcher():
               var btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
               if (!btn) return;
               var sidebar = D.querySelector('.st-key-wingman-sidebar');
-              if (!sidebar || !sidebar.contains(btn)) return;
+              var inSidebar = sidebar && sidebar.contains(btn);
+              // ID de marca clickeado en la tabla de Rendimiento Comercial
+              // (pedido explícito de Sabas, vigésima novena vuelta: "si yo
+              // selecciono la marca y me manda a la Ficha de Marca, debería
+              // mostrarme el loader mientras eso carga... no podemos
+              // permitir que se quede en pantalla en blanco mientras
+              // carga") -- el botón vive dentro de un contenedor cuya
+              // clase contiene "st-key-comercial_row_" (ver
+              // _render_funnel_comercial en wingmanapp.py), fuera del
+              // sidebar, así que necesita su propio chequeo aparte del
+              // filtro de sidebar de arriba.
+              var brandRowWrap = btn.closest('div[class*="st-key-comercial_row_"]');
+              if (!inSidebar && !brandRowWrap) return;
+              if (brandRowWrap) {{ startNav((btn.innerText || btn.textContent || '').trim()); return; }}
               // Ya no existe el componente sidebar nativo de Streamlit (es una
               // columna de layout normal), así que no debería haber ningún
               // botón de colapsar/expandir -- estos filtros quedan como
@@ -2153,11 +2166,11 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                     # de usar números de píxel independientes que podían
                     # desalinearse sutilmente contra los ratios reales.
                     if vista == "cierre" and kind == "ads":
-                        cols_css = "1.1fr 3.5fr 1.3fr"
+                        cols_css = "1.4fr 3.2fr 1.3fr"
                     elif con_target:
-                        cols_css = "1.1fr 3.5fr 1fr 1.6fr"
+                        cols_css = "1.4fr 3.2fr 1fr 1.6fr"
                     else:
-                        cols_css = "1.1fr 3.5fr 1.6fr"
+                        cols_css = "1.4fr 3.2fr 1.6fr"
 
                     tabla_key = f"comercial_tabla_scroll_{kind}_{vista}"
 
@@ -2173,6 +2186,20 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                     # vía CSS al [data-testid="stVerticalBlock"] interno
                     # de ESE contenedor -- eso sí es un <div> de verdad
                     # que contiene a todos los hijos.
+                    #
+                    # BUG REAL CORREGIDO (confirmado por Sabas: "la tabla
+                    # se está mostrando completa... no una tabla gigante
+                    # que tuve que bajar toda la página"). El CSS custom
+                    # (max-height + overflow-y en el data-testid interno)
+                    # no se estaba aplicando de forma confiable -- la
+                    # documentación oficial de Streamlit confirma que
+                    # st.container(height=N) es el mecanismo NATIVO para
+                    # esto exacto: "si el contenido es más grande que la
+                    # altura especificada, el scroll se activa
+                    # automáticamente" -- mucho más confiable que CSS
+                    # custom sobre un data-testid interno cuya estructura
+                    # exacta puede variar según los widgets anidados
+                    # adentro (st.columns() dentro del container).
                     st.markdown(
                         f"""
                         <style>
@@ -2182,11 +2209,7 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                             width: 100%; text-align: left; background: transparent !important; border: none !important;
                             padding: 0 !important; margin: 0 !important; box-shadow: none !important; color: {color_principal} !important;
                             font-weight: 700 !important; font-size: 11px !important; text-decoration: underline;
-                        }}
-                        div[class*="st-key-{tabla_key}"] [data-testid="stVerticalBlock"] {{
-                            max-height: 440px !important; overflow-y: auto !important;
-                            border: 1px solid {COLORS["card2"]}; border-top: none;
-                            border-radius: 0 0 12px 12px; padding: 2px 12px 10px;
+                            white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
                         }}
                         </style>
                         """,
@@ -2208,9 +2231,9 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                     )
 
                     total_valor = 0.0
-                    with st.container(key=tabla_key):
+                    with st.container(key=tabla_key, height=440, border=True):
                         for idx, f in enumerate(filas):
-                            row_cols = st.columns([1.1, 3.5, 1, 1.6] if con_target else ([1.1, 3.5, 1.3] if (vista == "cierre" and kind == "ads") else [1.1, 3.5, 1.6]))
+                            row_cols = st.columns([1.4, 3.2, 1, 1.6] if con_target else ([1.4, 3.2, 1.3] if (vista == "cierre" and kind == "ads") else [1.4, 3.2, 1.6]))
                             with row_cols[0]:
                                 if f["id"] != "—":
                                     with st.container(key=f"comercial_row_{kind}_{vista}_{idx}"):
