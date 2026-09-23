@@ -1917,6 +1917,348 @@ col_main.__enter__()
 #
 # get_portfolio() se llama solo donde de verdad hace falta: el Buscador de
 # Marcas y la ficha de marca. Gestión General ya no lo toca.
+# =====================================================
+# SECCIÓN: RENDIMIENTO COMERCIAL — funnel Ads + Markdown, ambos reales
+# =====================================================
+# Pedido explícito de Sabas (vigésima quinta a vigésima octava
+# vuelta): 3ra sección del sidebar, con 2 tabs (Ads/MD), cada uno con
+# su propio funnel Base -> Contactados -> Cierre. Ads: OPP START +
+# PRODUCTIVITY + ADS COMERCIAL + CHECKOUT (ver
+# rendimiento_comercial_ads_for). MD: MD START + PRODUCTIVITY (ver
+# rendimiento_comercial_md_for) -- sin target por marca ni fila de
+# Total (pedido explícito: "en las tablas de MD no hay target...
+# con la sola pill del status basta", "la fila Total solo aplica a
+# Ads").
+def _render_funnel_comercial(kind, farmer_para_funnel):
+    """
+    kind: "ads" o "md". Dibuja el funnel de 3 bloques + tabla al
+    lado, con click-en-bloque, ID clickeable a la Ficha de Marca
+    (con botón Volver que recuerda tab+bloque), loader acotado solo
+    al cuadro de la tabla, y fila de Total en Cierre (solo Ads).
+    """
+    vista_key = f"comercial_{kind}_vista"
+    st.session_state.setdefault(vista_key, "base")
+
+    if kind == "ads":
+        datos = dl.rendimiento_comercial_ads_for(farmer_para_funnel)
+    else:
+        datos = dl.rendimiento_comercial_md_for(farmer_para_funnel)
+    c = datos["counts"]
+
+    if c["base"] == 0:
+        st.info("Sin datos de Rendimiento Comercial disponibles para este Farmer.")
+        return
+
+    pct_contactado = round(c["contactado"] / c["base"] * 100, 1) if c["base"] else 0
+    pct_no_cont = round(c["no_contactado"] / c["base"] * 100, 1) if c["base"] else 0
+    pct_sin_gest = round(c["sin_gestionar"] / c["base"] * 100, 1) if c["base"] else 0
+    pct_rechazado = round(c["rechazado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+    pct_pnm = round(c["palanca_no_mencionada"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+    pct_cerrado = round(c["cerrado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+    pct_cierre_base = round(c["cerrado"] / c["base"] * 100, 1) if c["base"] else 0
+    win_rate = pct_cerrado
+
+    # Colores (pedido explícito, vigésima octava vuelta): "los
+    # bloques ahora serán de color azul de la sidebar, y las letras
+    # blancas" (antes morado) -- eso libera COLORS["blue"] (el azul
+    # claro que usaba "Palanca no mencionada"), que ahora pasa a
+    # GRIS ("eso te hará cambiar el azul de contactados, entonces
+    # ese azul ahora ponlo gris que es palancas no mencionadas").
+    color_principal = COLORS["sidebar"]  # brand_blue #123E4A
+    color_principal_soft = "rgba(18,62,74,0.16)"
+    color_pnm = COLORS["muted"]
+
+    etiqueta_base = "Prospectados" if kind == "ads" else "Prospectados · MD"
+    etiqueta_cierre = "Adquiridos" if kind == "ads" else "Adquiridos · MD"
+
+    col_funnel, col_tabla = st.columns([1, 1])
+    with col_funnel:
+        activo = st.session_state[vista_key]
+        # Fondo AZUL COMPLETO en los 3 bloques (pedido explícito,
+        # confirmado 2 veces: "el FONDO COMPLETO de la card... con TODO
+        # el texto en blanco... los 3 bloques quedan con el mismo fondo
+        # azul sólido") -- antes solo la barra de progreso interna
+        # cambiaba de color, el resto de la card seguía blanca/gris.
+        # El bloque activo (el que está siendo visto en la tabla) se
+        # distingue con un borde blanco más grueso, ya que un borde
+        # morado/verde no se notaría sobre el mismo azul de fondo.
+        borde_base = "2px solid white" if activo == "base" else f"1px solid {color_principal}"
+        borde_contactado = "2px solid white" if activo == "contactado" else f"1px solid {color_principal}"
+        borde_cierre = "2px solid white" if activo == "cierre" else f"1px solid {color_principal}"
+
+        def _leyenda(items):
+            chips = "".join(
+                '<div class="cp-legend-item" style="font-size:10.5px;gap:5px;color:white;">'
+                f'<div class="cp-legend-dot" style="width:8px;height:8px;background:{color};border:1px solid rgba(255,255,255,0.4);"></div>'
+                f'<span>{label} · {valor}</span></div>'
+                for label, valor, color in items
+            )
+            return f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">{chips}</div>'
+
+        with st.container(key=f"comercial_blk_base_{kind}"):
+            base_html = (
+                f'<div class="comercial-blk-visual" style="width:100%;background:{color_principal};border:{borde_base};border-radius:16px 16px 0 0;padding:16px 24px;box-sizing:border-box;">'
+                f'<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.75);">{etiqueta_base} (inicio de mes)</div>'
+                f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
+                f'<span style="font-size:26px;font-weight:800;color:white;">{c["base"]}</span>'
+                f'<span style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.75);">100%</span></div>'
+                '<div style="display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;background:rgba(255,255,255,0.15);">'
+                f'<div style="width:{pct_contactado}%;background:white;"></div>'
+                f'<div style="width:{pct_no_cont}%;background:rgba(255,255,255,0.45);"></div>'
+                '<div style="background:transparent;"></div>'
+                "</div>"
+                + _leyenda([
+                    ("Contactado", c["contactado"], "white"),
+                    ("No Contactado", c["no_contactado"], "rgba(255,255,255,0.45)"),
+                    ("Sin Gestionar", c["sin_gestionar"], "rgba(255,255,255,0.15)"),
+                ])
+                + "</div>"
+            )
+            st.markdown(base_html, unsafe_allow_html=True)
+            if st.button(" ", key=f"comercial_blk_base_btn_{kind}"):
+                st.session_state[vista_key] = "base"
+                st.rerun()
+
+        st.markdown(
+            '<div style="display:flex;justify-content:center;">'
+            f'<div style="width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:9px solid {color_principal};"></div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        with st.container(key=f"comercial_blk_contactado_{kind}"):
+            contactado_html = (
+                f'<div class="comercial-blk-visual" style="width:100%;background:{color_principal};border:{borde_contactado};border-top:none;padding:14px 22px;box-sizing:border-box;">'
+                f'<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.75);">Contactados</div>'
+                f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
+                f'<span style="font-size:20px;font-weight:800;color:white;">{c["contactado"]}</span>'
+                f'<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.75);">{pct_contactado}% de la base</span></div>'
+                '<div style="display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;">'
+                f'<div style="width:{pct_rechazado}%;background:{COLORS["brand_orange"]};"></div>'
+                f'<div style="width:{pct_pnm}%;background:rgba(255,255,255,0.45);"></div>'
+                f'<div style="width:{pct_cerrado}%;background:{COLORS["success"]};"></div>'
+                "</div>"
+                + _leyenda([
+                    ("Rechazado", c["rechazado"], COLORS["brand_orange"]),
+                    ("Palanca no mencionada", c["palanca_no_mencionada"], "rgba(255,255,255,0.45)"),
+                    ("Cerrado", c["cerrado"], COLORS["success"]),
+                ])
+                + "</div>"
+            )
+            st.markdown(contactado_html, unsafe_allow_html=True)
+            if st.button(" ", key=f"comercial_blk_contactado_btn_{kind}"):
+                st.session_state[vista_key] = "contactado"
+                st.rerun()
+
+        st.markdown(
+            '<div style="display:flex;justify-content:center;">'
+            f'<div style="width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:9px solid {color_principal};"></div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        with st.container(key=f"comercial_blk_cierre_{kind}"):
+            fuente_cierre = "Ads Comercial" if kind == "ads" else "Productivity"
+            cierre_html = (
+                f'<div class="comercial-blk-visual" style="width:100%;background:{color_principal};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(18,62,74,0.25);">'
+                f'<div style="font-size:10.5px;font-weight:700;color:rgba(255,255,255,0.75);">{etiqueta_cierre} ({fuente_cierre})</div>'
+                f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
+                f'<span style="font-size:20px;font-weight:800;color:white;">{c["cerrado"]}</span>'
+                f'<span style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,0.75);">{pct_cierre_base}% base · {win_rate}% de contactados</span></div>'
+                f'<div style="margin-top:8px;"><span style="background:{COLORS["success"]};color:white;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;">Win rate {win_rate}%</span></div>'
+                "</div>"
+            )
+            st.markdown(cierre_html, unsafe_allow_html=True)
+            if st.button(" ", key=f"comercial_blk_cierre_btn_{kind}"):
+                st.session_state[vista_key] = "cierre"
+                st.rerun()
+
+    with col_tabla:
+        vista = st.session_state[vista_key]
+        color_estado = {
+            "Contactado": (color_principal, "white"),
+            "No Contactado": (color_principal_soft, COLORS["text"]),
+            "Sin Gestionar": (COLORS["card2"], COLORS["muted"]),
+            "Rechazado": (COLORS["brand_orange"], "white"),
+            "Palanca no mencionada": (color_pnm, "white"),
+            "Cerrado": (COLORS["success"], "white"),
+        }
+
+        def _pill_gris(valor):
+            return (
+                f'<span style="background:{COLORS["card2"]};color:{COLORS["muted"]};'
+                f'font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;'
+                f'display:inline-block;white-space:nowrap;">{html_lib.escape(str(valor))}</span>'
+            )
+
+        def _pill_estado(valor):
+            bg, fg = color_estado.get(valor, (COLORS["card2"], COLORS["muted"]))
+            return (
+                f'<span style="background:{bg};color:{fg};font-size:11px;font-weight:800;'
+                f'padding:3px 10px;border-radius:999px;display:inline-block;white-space:nowrap;">{html_lib.escape(str(valor))}</span>'
+            )
+
+        # ID clickeable → Ficha de Marca, con botón Volver (pedido
+        # explícito de Sabas, vigésima octava vuelta) -- un
+        # st.button real por fila (no HTML puro, para poder disparar
+        # go_to_brand), disfrazado de pill azul clickeable vía CSS
+        # ".comercial-id-btn" (mismo mecanismo de re-skin que ya usa
+        # el resto de la app, no position:absolute esta vez porque
+        # acá el botón SÍ debe verse, no cubrir un bloque entero).
+        titulos = {"base": etiqueta_base.split(" (")[0].split(" · ")[0], "contactado": "Contactados", "cierre": etiqueta_cierre.split(" (")[0].split(" · ")[0]}
+        titulo = titulos.get(vista, "")
+
+        # Loader acotado SOLO al cuadro de la tabla (pedido explícito
+        # de Sabas: "el loader debe estar estrictamente en ese
+        # cuadro de la tabla... yo selecciono el bloque, pero ahí
+        # en esos dos segunditos que carga la tabla, da mejor
+        # experiencia") -- st.spinner() dentro de un st.empty()
+        # acotado al contenedor de la tabla, no el
+        # render_loading_watcher() de pantalla completa que ya
+        # existe para el cambio de página entera.
+        tabla_placeholder = st.empty()
+        with tabla_placeholder.container():
+            with st.spinner(""):
+                # Delay artificial de 0.4s (confirmado explícitamente
+                # por Sabas: "sí, agregar un pequeño delay artificial...
+                # es estético, no resuelve ningún cálculo lento real")
+                # -- el cálculo real (datos = rendimiento_comercial_*_for)
+                # ya ocurrió arriba, antes de dibujar el funnel, y armar
+                # este HTML es casi instantáneo, así que sin este delay
+                # el spinner nunca alcanzaría a verse en pantalla.
+                time.sleep(0.4)
+
+                if vista == "base":
+                    filas = datos["base"]
+                elif vista == "contactado":
+                    filas = [f for f in datos["contactado"] if f["estado"] != "Cerrado"]
+                else:
+                    filas = datos["cierre"]
+
+                st.markdown(f'<div style="font-size:13px;font-weight:800;color:{COLORS["text"]};margin-bottom:8px;">{titulo} · {len(filas)} marcas</div>', unsafe_allow_html=True)
+
+                if not filas:
+                    st.info("Sin marcas en esta vista.")
+                else:
+                    # Anchos de columna equilibrados (pedido explícito:
+                    # "ajusta también el tamaño de las celdas para que
+                    # queden equilibradas, mira que ID se corta y baja
+                    # a dos líneas") -- ID más ancho (90px, cabe
+                    # "AR104180" sin cortar), Target más angosto en MD
+                    # (no existe esa columna en absoluto).
+                    con_target = kind == "ads" and vista != "cierre"
+                    # Mismas proporciones que row_cols (st.columns) de
+                    # abajo, expresadas como fracciones CSS Grid (fr) --
+                    # así el header y las filas quedan alineados en vez
+                    # de usar números de píxel independientes que podían
+                    # desalinearse sutilmente contra los ratios reales.
+                    if vista == "cierre" and kind == "ads":
+                        cols_css = "1.1fr 3.5fr 1.3fr"
+                    elif con_target:
+                        cols_css = "1.1fr 3.5fr 1fr 1.6fr"
+                    else:
+                        cols_css = "1.1fr 3.5fr 1.6fr"
+
+                    tabla_key = f"comercial_tabla_scroll_{kind}_{vista}"
+
+                    # BUG REAL EVITADO antes de entregar (mismo problema
+                    # que ya peleamos con los bloques del funnel): un
+                    # st.markdown() que abre un <div style="overflow-y:
+                    # auto"> y otro st.markdown() que lo cierra, con
+                    # st.columns()/st.button() en medio, NO envuelve nada
+                    # de verdad -- son elementos DOM hermanos, no padre-
+                    # hijo, así que el scroll interno nunca funcionaría.
+                    # Fix: TODO (header + filas) va dentro de un único
+                    # st.container(key=...) real, y el overflow se aplica
+                    # vía CSS al [data-testid="stVerticalBlock"] interno
+                    # de ESE contenedor -- eso sí es un <div> de verdad
+                    # que contiene a todos los hijos.
+                    st.markdown(
+                        f"""
+                        <style>
+                        div[class*="st-key-comercial_row_"] {{ display: grid !important; grid-template-columns: 1fr !important; }}
+                        div[class*="st-key-comercial_row_"] [data-testid="stElementContainer"] {{ grid-column: 1 !important; grid-row: 1 !important; margin: 0 !important; padding: 0 !important; }}
+                        div[class*="st-key-comercial_row_"] .stButton button {{
+                            width: 100%; text-align: left; background: transparent !important; border: none !important;
+                            padding: 0 !important; margin: 0 !important; box-shadow: none !important; color: {color_principal} !important;
+                            font-weight: 700 !important; font-size: 11px !important; text-decoration: underline;
+                        }}
+                        div[class*="st-key-{tabla_key}"] [data-testid="stVerticalBlock"] {{
+                            max-height: 440px !important; overflow-y: auto !important;
+                            border: 1px solid {COLORS["card2"]}; border-top: none;
+                            border-radius: 0 0 12px 12px; padding: 2px 12px 10px;
+                        }}
+                        </style>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                    header_cols = ["ID", "Nombre", "Valor"] if (vista == "cierre" and kind == "ads") else (
+                        ["ID", "Nombre", "Target", "Estado"] if con_target else ["ID", "Nombre", "Estado"]
+                    )
+                    header_html = (
+                        f'<div style="display:grid;grid-template-columns:{cols_css};gap:8px;padding:0 4px 6px;'
+                        f'font-size:10px;font-weight:700;color:{COLORS["muted"]};text-transform:uppercase;">'
+                        + "".join(f"<span>{h}</span>" for h in header_cols) + "</div>"
+                    )
+                    st.markdown(
+                        f'<div style="border:1px solid {COLORS["card2"]};border-radius:12px 12px 0 0;'
+                        f'border-bottom:none;padding:10px 12px 0;">{header_html}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                    total_valor = 0.0
+                    with st.container(key=tabla_key):
+                        for idx, f in enumerate(filas):
+                            row_cols = st.columns([1.1, 3.5, 1, 1.6] if con_target else ([1.1, 3.5, 1.3] if (vista == "cierre" and kind == "ads") else [1.1, 3.5, 1.6]))
+                            with row_cols[0]:
+                                if f["id"] != "—":
+                                    with st.container(key=f"comercial_row_{kind}_{vista}_{idx}"):
+                                        if st.button(f["id"], key=f"comercial_row_btn_{kind}_{vista}_{idx}"):
+                                            go_to_brand(
+                                                f["id"],
+                                                volver_a={
+                                                    "tab": st.session_state.get("comercial_tab_activo", "ads"),
+                                                    "vista_ads": st.session_state.get("comercial_ads_vista", "base"),
+                                                    "vista_md": st.session_state.get("comercial_md_vista", "base"),
+                                                },
+                                            )
+                                else:
+                                    st.markdown(_pill_gris("—"), unsafe_allow_html=True)
+                            with row_cols[1]:
+                                st.markdown(f'<div style="font-size:12px;padding-top:2px;">{html_lib.escape(f["nombre"])}</div>', unsafe_allow_html=True)
+                            if vista == "cierre" and kind == "ads":
+                                with row_cols[2]:
+                                    if f["valor"] != "—":
+                                        total_valor += float(f["valor"].replace("$", "").replace(",", ""))
+                                    st.markdown(f'<div style="font-size:12px;font-weight:800;color:{COLORS["success"]};padding-top:2px;">{html_lib.escape(f["valor"])}</div>', unsafe_allow_html=True)
+                            elif con_target:
+                                with row_cols[2]:
+                                    st.markdown(f'<div style="padding-top:2px;">{_pill_gris(f["target"])}</div>', unsafe_allow_html=True)
+                                with row_cols[3]:
+                                    st.markdown(f'<div style="padding-top:2px;">{_pill_estado(f["estado"])}</div>', unsafe_allow_html=True)
+                            else:
+                                with row_cols[2]:
+                                    st.markdown(f'<div style="padding-top:2px;">{_pill_estado(f["estado"])}</div>', unsafe_allow_html=True)
+
+                    # Fila de Total (pedido explícito, solo Ads en
+                    # Cierre: "añade una fila de total en cierre, que
+                    # sume todo lo adquirido si hay reporte" -- "la
+                    # fila Total solo aplica a la tabla de Cierre de
+                    # Ads"). "si hay reporte" -> si al menos una fila
+                    # tiene valor real (no todas son relleno "—").
+                    if vista == "cierre" and kind == "ads" and total_valor > 0:
+                        st.markdown(
+                            f'<div style="display:flex;justify-content:space-between;padding:10px 4px 0;'
+                            f'margin-top:6px;border-top:2px solid {COLORS["text"]};font-size:12.5px;font-weight:800;">'
+                            f'<span>Total adquirido</span><span style="color:{COLORS["success"]};">${total_valor:,.0f}</span></div>',
+                            unsafe_allow_html=True,
+                        )
+
+st.session_state.setdefault("comercial_tab_activo", "ads")
+
+
+
 def get_portfolio():
     """Cartera del usuario en sesion. Supervisor: TODAS las marcas de los
     27 farmers (puede buscar cualquiera). Farmer: solo la suya."""
@@ -1927,9 +2269,20 @@ def get_portfolio():
     return st.session_state["_portfolio_cache"]
 
 
-def go_to_brand(key):
+def go_to_brand(key, volver_a=None):
     st.session_state["active_brand"] = key
     st.session_state["view"] = "ficha"
+    # "volver_a" (pedido explícito de Sabas, vigésima octava vuelta:
+    # "un botón de volver, para volver a rendimiento comercial a ver la
+    # siguiente marca") -- guarda de dónde vino el click para que el
+    # botón Volver de la Ficha de Marca sepa restaurar EXACTAMENTE ese
+    # estado (section, tab Ads/MD, y bloque del funnel activo), en vez
+    # de usar go_to_landing() genérico que siempre resetea a la pantalla
+    # de aterrizaje sin memoria de dónde estaba el usuario.
+    if volver_a is not None:
+        st.session_state["volver_a"] = volver_a
+    else:
+        st.session_state.pop("volver_a", None)
     st.rerun()
 
 
@@ -2247,264 +2600,50 @@ if st.session_state["view"] == "landing":
             else:
                 st.info("Escribe un ID válido (ej. AR97338 o simplemente 97338).")
 
-    # =====================================================
-    # SECCIÓN: RENDIMIENTO COMERCIAL — funnel Ads real + MD en construcción
-    # =====================================================
-    # Pedido explícito de Sabas (vigésima quinta vuelta): 3ra sección del
-    # sidebar, con 2 tabs (Ads/MD). Ads usa rendimiento_comercial_ads_for
-    # (ver data_layer.py) -- Base (OPP START, snapshot fijo de inicio de
-    # mes) -> Contactados (Rechazado / Palanca no mencionada / Cerrado,
-    # de PRODUCTIVITY + CHECKOUT) -> Cierre, con Cierre como subconjunto
-    # REAL de Contactados (no un conteo aparte). MD queda "en
-    # construcción" -- pedido explícito, todavía no se armó esa fuente.
-    #
-    # Solo vista de Farmer por ahora (no vista de Supervisor agregada) --
-    # el email real del Farmer logueado (o el seleccionado, si es
-    # Supervisor viendo "Ficha de Marca" cross-farmer) es el mismo
-    # `selected` que ya usa el resto del código.
     elif section == "comercial":
-        tab_ads, tab_md = st.tabs(["Ads", "Markdown"])
+        # Selector de Farmer para Supervisor -- mismo patrón que ya usa
+        # Rendimiento General (render_conosur_map + farmers_por_pais).
+        if IS_SUPERVISOR:
+            st.session_state.setdefault("supervisor_pais", "AR")
+            render_conosur_map()
 
-        with tab_ads:
-            # Selector de Farmer para Supervisor (vigésima sexta vuelta,
-            # pedido explícito de Sabas: "en la vista de supervisor no me
-            # deja ver la sección... deberíamos tener la misma opción que
-            # en rendimiento general -- seleccionar entre Chile, Argentina
-            # y Uruguay, y abajo sí carga el perfil de cada uno"). Mismo
-            # patrón exacto que ya usa Rendimiento General
-            # (render_conosur_map + farmers_por_pais) -- reutilizado tal
-            # cual, no reinventado.
-            if IS_SUPERVISOR:
-                st.session_state.setdefault("supervisor_pais", "AR")
-                render_conosur_map()
+            pais_comercial = st.session_state["supervisor_pais"]
+            farmers_pais = dl.farmers_por_pais(pais_comercial)
+            farmer_labels = {f: dl.farmer_display(f) for f in farmers_pais}
+            if not farmers_pais:
+                st.info("No hay Farmers con cartera activa en este país.")
+                st.stop()
+            farmer_para_funnel = st.selectbox(
+                "Farmer", farmers_pais, format_func=lambda f: farmer_labels.get(f, f),
+                key="comercial_farmer_select",
+            )
+        else:
+            farmer_para_funnel = selected
 
-                pais_comercial = st.session_state["supervisor_pais"]
-                farmers_pais = dl.farmers_por_pais(pais_comercial)
-                farmer_labels = {f: dl.farmer_display(f) for f in farmers_pais}
-                if not farmers_pais:
-                    st.info("No hay Farmers con cartera activa en este país.")
-                    st.stop()
-                farmer_para_funnel = st.selectbox(
-                    "Farmer", farmers_pais, format_func=lambda f: farmer_labels.get(f, f),
-                    key="comercial_farmer_select",
-                )
-            else:
-                farmer_para_funnel = selected
+        # Tabs propios con botones, NO st.tabs() nativo -- st.tabs() no
+        # expone un key que persista cuál está activo entre reruns, y
+        # necesitamos recordarlo para el botón Volver de la Ficha de
+        # Marca (pedido explícito: "que quede en el MISMO bloque del
+        # funnel que tenía antes").
+        tcol1, tcol2 = st.columns(2)
+        with tcol1:
+            if st.button("Ads", key="comercial_tab_btn_ads", use_container_width=True,
+                         type="primary" if st.session_state["comercial_tab_activo"] == "ads" else "secondary"):
+                st.session_state["comercial_tab_activo"] = "ads"
+                st.rerun()
+        with tcol2:
+            if st.button("Markdown", key="comercial_tab_btn_md", use_container_width=True,
+                         type="primary" if st.session_state["comercial_tab_activo"] == "md" else "secondary"):
+                st.session_state["comercial_tab_activo"] = "md"
+                st.rerun()
 
-            datos = dl.rendimiento_comercial_ads_for(farmer_para_funnel)
-            c = datos["counts"]
+        st.markdown('<div style="margin-top:16px;"></div>', unsafe_allow_html=True)
 
-            if c["base"] == 0:
-                st.info("Sin datos de Rendimiento Comercial disponibles para este Farmer.")
-            else:
-                pct_contactado = round(c["contactado"] / c["base"] * 100, 1) if c["base"] else 0
-                pct_no_cont = round(c["no_contactado"] / c["base"] * 100, 1) if c["base"] else 0
-                pct_sin_gest = round(c["sin_gestionar"] / c["base"] * 100, 1) if c["base"] else 0
-                pct_rechazado = round(c["rechazado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
-                pct_pnm = round(c["palanca_no_mencionada"] / c["contactado"] * 100, 1) if c["contactado"] else 0
-                pct_cerrado = round(c["cerrado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
-                pct_cierre_base = round(c["cerrado"] / c["base"] * 100, 1) if c["base"] else 0
-                win_rate = pct_cerrado
+        if st.session_state["comercial_tab_activo"] == "ads":
+            _render_funnel_comercial("ads", farmer_para_funnel)
+        else:
+            _render_funnel_comercial("md", farmer_para_funnel)
 
-                st.session_state.setdefault("comercial_ads_vista", "base")
-
-                col_funnel, col_tabla = st.columns([1, 1])
-                with col_funnel:
-                    # Bloques clickeables en TODA su área -- CSS Grid, no
-                    # position:absolute (ver el bloque completo de reglas
-                    # en theme.py, sección "Bloques clickeables del
-                    # funnel"). La técnica real viene de Eagle, que ya
-                    # peleó este mismo problema con pruebas de navegador
-                    # real (Playwright) -- position:absolute con
-                    # height:100% nunca se resuelve bien contra un
-                    # ancestro de altura automática, por eso 3 intentos
-                    # anteriores con ese enfoque no funcionaron del todo
-                    # (confirmado por Sabas probando cada vez: el área
-                    # clickeable quedaba desplazada o reducida a una
-                    # esquina). Acá solo hace falta abrir el
-                    # st.container(key=...), dibujar la card, y el botón
-                    # justo después, DENTRO del mismo with -- el CSS ya
-                    # aplicado globalmente hace el resto (ancho fijo,
-                    # centrado, grid, botón transparente cubriendo toda
-                    # la celda).
-                    activo = st.session_state["comercial_ads_vista"]
-                    borde_base = f'2px solid {COLORS["brand_purple"]}' if activo == "base" else f'1px solid {COLORS["card2"]}'
-                    borde_contactado = f'2px solid {COLORS["brand_purple"]}' if activo == "contactado" else f'1px solid {COLORS["card2"]}'
-                    borde_cierre = f'2px solid {COLORS["success"]}' if activo == "cierre" else f'1px solid {COLORS["card2"]}'
-
-                    # Leyenda debajo de cada barra (mismo patrón cp-legend-*
-                    # ya usado en Contact Performance) en vez de texto
-                    # adentro de cada segmento -- pedido explícito: "no
-                    # pongas texto dentro de los bloques la barra de
-                    # progreso, coloca solo el número, y dentro del bloque
-                    # colocas el insight donde diga a qué bloque
-                    # corresponde cada color".
-                    def _leyenda(items):
-                        chips = "".join(
-                            '<div class="cp-legend-item" style="font-size:10.5px;gap:5px;">'
-                            f'<div class="cp-legend-dot" style="width:8px;height:8px;background:{color};"></div>'
-                            f'<span>{label} · {valor}</span></div>'
-                            for label, valor, color in items
-                        )
-                        return f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">{chips}</div>'
-
-                    with st.container(key="comercial_blk_base"):
-                        base_html = (
-                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_base};border-radius:16px 16px 0 0;padding:16px 24px;box-sizing:border-box;">'
-                            f'<div style="font-size:12px;font-weight:700;color:{COLORS["muted"]};">Base prospectada · Ads (inicio de mes)</div>'
-                            f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
-                            f'<span style="font-size:26px;font-weight:800;color:{COLORS["text"]};">{c["base"]}</span>'
-                            f'<span style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">100%</span></div>'
-                            '<div style="display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;">'
-                            f'<div style="width:{pct_contactado}%;background:{COLORS["brand_purple"]};"></div>'
-                            f'<div style="width:{pct_no_cont}%;background:{COLORS["brand_purple_soft"]};"></div>'
-                            f'<div style="width:{pct_sin_gest}%;background:{COLORS["card2"]};"></div>'
-                            "</div>"
-                            + _leyenda([
-                                ("Contactado", c["contactado"], COLORS["brand_purple"]),
-                                ("No Contactado", c["no_contactado"], COLORS["brand_purple_soft"]),
-                                ("Sin Gestionar", c["sin_gestionar"], COLORS["card2"]),
-                            ])
-                            + "</div>"
-                        )
-                        st.markdown(base_html, unsafe_allow_html=True)
-                        if st.button(" ", key="comercial_blk_base_btn"):
-                            st.session_state["comercial_ads_vista"] = "base"
-                            st.rerun()
-
-                    st.markdown(
-                        '<div style="display:flex;justify-content:center;">'
-                        '<div style="width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:9px solid #E4E1D8;"></div>'
-                        "</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                    with st.container(key="comercial_blk_contactado"):
-                        contactado_html = (
-                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_contactado};border-top:none;padding:14px 22px;box-sizing:border-box;">'
-                            f'<div style="font-size:11px;font-weight:700;color:{COLORS["muted"]};">Contactados</div>'
-                            f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
-                            f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["contactado"]}</span>'
-                            f'<span style="font-size:10px;font-weight:700;color:{COLORS["muted"]};">{pct_contactado}% de la base</span></div>'
-                            '<div style="display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;">'
-                            f'<div style="width:{pct_rechazado}%;background:{COLORS["brand_orange"]};"></div>'
-                            f'<div style="width:{pct_pnm}%;background:{COLORS["blue"]};"></div>'
-                            f'<div style="width:{pct_cerrado}%;background:{COLORS["success"]};"></div>'
-                            "</div>"
-                            + _leyenda([
-                                ("Rechazado", c["rechazado"], COLORS["brand_orange"]),
-                                ("Palanca no mencionada", c["palanca_no_mencionada"], COLORS["blue"]),
-                                ("Cerrado", c["cerrado"], COLORS["success"]),
-                            ])
-                            + "</div>"
-                        )
-                        st.markdown(contactado_html, unsafe_allow_html=True)
-                        if st.button(" ", key="comercial_blk_contactado_btn"):
-                            st.session_state["comercial_ads_vista"] = "contactado"
-                            st.rerun()
-
-                    st.markdown(
-                        '<div style="display:flex;justify-content:center;">'
-                        '<div style="width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:9px solid #E4E1D8;"></div>'
-                        "</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                    with st.container(key="comercial_blk_cierre"):
-                        cierre_html = (
-                            f'<div class="comercial-blk-visual" style="width:100%;background:{COLORS["card"]};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(34,197,94,0.1);">'
-                            f'<div style="font-size:10.5px;font-weight:700;color:{COLORS["muted"]};">Cierre (Checkout)</div>'
-                            f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
-                            f'<span style="font-size:20px;font-weight:800;color:{COLORS["text"]};">{c["cerrado"]}</span>'
-                            f'<span style="font-size:9.5px;font-weight:700;color:{COLORS["muted"]};">{pct_cierre_base}% base · {win_rate}% de contactados</span></div>'
-                            f'<div style="margin-top:8px;"><span style="background:{COLORS["success"]};color:white;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;">Win rate {win_rate}%</span></div>'
-                            "</div>"
-                        )
-                        st.markdown(cierre_html, unsafe_allow_html=True)
-                        if st.button(" ", key="comercial_blk_cierre_btn"):
-                            st.session_state["comercial_ads_vista"] = "cierre"
-                            st.rerun()
-
-                with col_tabla:
-                    vista = st.session_state["comercial_ads_vista"]
-                    # Pills de color (pedido explícito de Sabas): ID/Nombre/
-                    # Target siempre en gris -- solo el Estado lleva el color
-                    # semántico (Contactado morado oscuro, No Contactado
-                    # morado clarito, Sin Gestionar gris, Rechazado naranja,
-                    # Palanca no mencionada azul, Cerrado verde -- mismo
-                    # mapeo que ya usa el funnel arriba).
-                    color_estado = {
-                        "Contactado": (COLORS["brand_purple"], "white"),
-                        "No Contactado": (COLORS["brand_purple_soft"], COLORS["text"]),
-                        "Sin Gestionar": (COLORS["card2"], COLORS["muted"]),
-                        "Rechazado": (COLORS["brand_orange"], "white"),
-                        "Palanca no mencionada": (COLORS["blue"], "white"),
-                        "Cerrado": (COLORS["success"], "white"),
-                    }
-
-                    def _pill_gris(valor):
-                        return (
-                            f'<span style="background:{COLORS["card2"]};color:{COLORS["muted"]};'
-                            f'font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;'
-                            f'display:inline-block;">{html_lib.escape(str(valor))}</span>'
-                        )
-
-                    def _pill_estado(valor):
-                        bg, fg = color_estado.get(valor, (COLORS["card2"], COLORS["muted"]))
-                        return (
-                            f'<span style="background:{bg};color:{fg};font-size:11px;font-weight:800;'
-                            f'padding:3px 10px;border-radius:999px;display:inline-block;">{html_lib.escape(str(valor))}</span>'
-                        )
-
-                    if vista == "base":
-                        filas = datos["base"]
-                        titulo = "Base prospectada"
-                    elif vista == "contactado":
-                        filas = [f for f in datos["contactado"] if f["estado"] != "Cerrado"]
-                        titulo = "Contactados"
-                    else:
-                        filas = datos["cierre"]
-                        titulo = "Cierre"
-
-                    st.markdown(f'<div style="font-size:13px;font-weight:800;color:{COLORS["text"]};margin-bottom:8px;">{titulo} · {len(filas)} marcas</div>', unsafe_allow_html=True)
-
-                    if not filas:
-                        st.info("Sin marcas en esta vista.")
-                    else:
-                        if vista == "cierre":
-                            filas_html = "".join(
-                                '<div style="display:grid;grid-template-columns:70px 1fr 90px;gap:8px;padding:7px 4px;'
-                                f'border-bottom:1px solid {COLORS["card2"]};align-items:center;font-size:12px;">'
-                                f'{_pill_gris(f["id"])}<span>{html_lib.escape(f["nombre"])}</span>'
-                                f'<span style="font-weight:800;color:{COLORS["success"]};">{html_lib.escape(f["valor"])}</span></div>'
-                                for f in filas
-                            )
-                            header_html = (
-                                '<div style="display:grid;grid-template-columns:70px 1fr 90px;gap:8px;padding:0 4px 6px;'
-                                f'font-size:10px;font-weight:700;color:{COLORS["muted"]};text-transform:uppercase;">'
-                                "<span>ID</span><span>Nombre</span><span>Valor</span></div>"
-                            )
-                        else:
-                            filas_html = "".join(
-                                '<div style="display:grid;grid-template-columns:70px 1fr 60px 150px;gap:8px;padding:7px 4px;'
-                                f'border-bottom:1px solid {COLORS["card2"]};align-items:center;font-size:12px;">'
-                                f'{_pill_gris(f["id"])}<span>{html_lib.escape(f["nombre"])}</span>'
-                                f'{_pill_gris(f["target"])}{_pill_estado(f["estado"])}</div>'
-                                for f in filas
-                            )
-                            header_html = (
-                                '<div style="display:grid;grid-template-columns:70px 1fr 60px 150px;gap:8px;padding:0 4px 6px;'
-                                f'font-size:10px;font-weight:700;color:{COLORS["muted"]};text-transform:uppercase;">'
-                                "<span>ID</span><span>Nombre</span><span>Target</span><span>Estado</span></div>"
-                            )
-                        st.markdown(
-                            f'<div style="max-height:480px;overflow-y:auto;border:1px solid {COLORS["card2"]};border-radius:12px;padding:10px 12px;">'
-                            f"{header_html}{filas_html}</div>",
-                            unsafe_allow_html=True,
-                        )
-
-        with tab_md:
-            st.info("🚧 En construcción.")
 
     # =====================================================
     # SECCIÓN: MANAGEMENT DASHBOARD — Brand Coverage + Contact Performance
@@ -2673,6 +2812,23 @@ contact_html = (
     f'{google_html} / {link_html}</div></div>'
     "</div>"
 )
+
+# Botón "Volver" -- pedido explícito de Sabas (vigésima octava vuelta):
+# solo aparece si se llegó acá desde Rendimiento Comercial (go_to_brand
+# con volver_a) -- al presionarlo, restaura section="comercial" con el
+# MISMO tab (Ads/MD) y el MISMO bloque del funnel (base/contactado/
+# cierre) que tenía activo antes del click en el ID, no solo vuelve a
+# la pantalla de aterrizaje genérica como go_to_landing().
+_volver_a = st.session_state.get("volver_a")
+if _volver_a:
+    if st.button("← Volver a Rendimiento Comercial", key="btn_volver_comercial"):
+        st.session_state["view"] = "landing"
+        st.session_state["section"] = "comercial"
+        st.session_state["comercial_tab_activo"] = _volver_a.get("tab", "ads")
+        st.session_state["comercial_ads_vista"] = _volver_a.get("vista_ads", "base")
+        st.session_state["comercial_md_vista"] = _volver_a.get("vista_md", "base")
+        st.session_state.pop("volver_a", None)
+        st.rerun()
 
 # Ícono de categoría como "primera letra" del título -- rediseño décima
 # tercera vuelta, pedido explícito de Sabas, aprobado como mockup visual

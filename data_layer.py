@@ -192,6 +192,7 @@ SHEETS = {
     "toprest": "TOPREST",
     "opp_start": "OPP START",
     "ads_comercial": "ADS COMERCIAL",
+    "md_start": "MD START",
 }
 
 _JUNK = ("total", "nan", "none", "filtros aplicados", "metrica", "metrica")
@@ -5201,7 +5202,11 @@ def rendimiento_comercial_ads_for(farmer_email):
 
     def fmt_target(num):
         t = brand_target.get(num)
-        return "—" if t is None else f"${t:,.0f}"
+        # Target convertido a ARS (pedido explícito de Sabas, vigésima
+        # octava vuelta: "convertilos a pesos argentinos poniendolo a
+        # 1500 ARS x USD") -- Targets Bookings de EXPORT ADS RELATION
+        # viene en USD, igual que el resto de esa hoja.
+        return "—" if t is None else f"${t * 1500:,.0f}"
 
     # Contactados / Rechazado (PRODUCTIVITY)
     df_prod = _read("productivity")
@@ -5313,6 +5318,15 @@ def rendimiento_comercial_ads_for(farmer_email):
             pnm_n += 1
         contactado_rows.append({"id": key, "nombre": nombre, "target": fmt_target(num), "estado": estado_c})
 
+    # Orden descendente por target (pedido explícito de Sabas: "en ambos
+    # bloques vas a organizar las listas en orden descendente según
+    # Target") -- se ordena por el valor NUMÉRICO crudo (brand_target,
+    # en USD, antes del *1500 y del formato "$X" de fmt_target), no por
+    # el string ya formateado. Sin target ("—", o sea None) va al final.
+    id_a_num = {v: k for k, v in brand_a_key.items()}
+    base_rows.sort(key=lambda r: brand_target.get(id_a_num.get(r["id"]), -1) if brand_target.get(id_a_num.get(r["id"])) is not None else -1, reverse=True)
+    contactado_rows.sort(key=lambda r: brand_target.get(id_a_num.get(r["id"]), -1) if brand_target.get(id_a_num.get(r["id"])) is not None else -1, reverse=True)
+
     # El NÚMERO de cerrado es el de ADS COMERCIAL (fijo, ya calculado
     # arriba), no len(cierre_rows) -- pedido explícito de Sabas. Si
     # CHECKOUT identificó MENOS marcas concretas que ese número, se
@@ -5327,7 +5341,7 @@ def rendimiento_comercial_ads_for(farmer_email):
     faltantes = cerrado_n - len(cierre_rows)
     if faltantes > 0:
         for _ in range(faltantes):
-            cierre_rows.append({"id": "—", "nombre": "Sin dato disponible en Checkout", "valor": "—"})
+            cierre_rows.append({"id": "—", "nombre": "Sin soporte disponible en Checkout", "valor": "—"})
 
     def _valor_ordenable(r):
         v = r["valor"]
@@ -5337,6 +5351,160 @@ def rendimiento_comercial_ads_for(farmer_email):
 
     cierre_rows.sort(key=_valor_ordenable, reverse=True)
     contactado_n = rechazado_n + pnm_n + cerrado_n
+
+    return {
+        "base": base_rows, "contactado": contactado_rows, "cierre": cierre_rows,
+        "counts": {
+            "base": len(base_rows), "contactado": contactado_n,
+            "no_contactado": no_contactado_n, "sin_gestionar": sin_gestionar_n,
+            "rechazado": rechazado_n, "palanca_no_mencionada": pnm_n, "cerrado": cerrado_n,
+        },
+    }
+
+
+def rendimiento_comercial_md_for(farmer_email):
+    """
+    Funnel de Rendimiento Comercial · Markdown -- pedido explícito de
+    Sabas (vigésima octava vuelta): mismo esqueleto que
+    rendimiento_comercial_ads_for, pero con fuentes propias de MD, sin
+    target por marca (pedido explícito: "en las tablas de MD no hay
+    target... con la sola pill del status basta") y sin fila de Total
+    en Cierre (pedido explícito: "la fila Total solo aplica a Ads").
+
+    Fuentes:
+      - Base: hoja MD START (snapshot fijo de inicio de mes, mismo
+        criterio que OPP START para Ads), columna "MARKDOWN $" == 0 (o
+        sin dato) -> entra a la base.
+      - Contactados / Rechazado / Cerrado: TODO desde PRODUCTIVITY,
+        pedido explícito ("sigue tomando el cierre según productivity",
+        "mide igual que Rendimiento General") -- mismo criterio EXACTO
+        que ya usa conversion_ads_md_for() para "Conversión MD":
+        Contactado = "Markdown" == "SI"; de esas, Cerrado =
+        "¿Se aceptó lo ofrecido?" == "Sí"; Rechazado = "No aceptó
+        ninguno" (el mismo campo, valor complementario -- no hay
+        "Tipo Never MD" en PRODUCTIVITY, a diferencia de Ads que sí
+        tiene "Tipo Never Ads").
+      - Sin target: EXPORT ADS RELATION es específico de Ads, no hay
+        equivalente de MD -- se omite el campo "target" de las filas
+        (a diferencia de Ads, que sí lo trae).
+
+    Devuelve el mismo esqueleto que Ads, sin "target" en las filas y sin
+    valor en pesos en cierre (solo {id, nombre} ahí, ya que no hay plata
+    por marca -- "con la sola pill del status basta" se resuelve en el
+    caller usando el mismo estado "Cerrado" que ya viene en
+    contactado_rows, no hace falta una tabla de cierre aparte con
+    columna de valor).
+    """
+    vacio = {
+        "base": [], "contactado": [], "cierre": [],
+        "counts": {"base": 0, "contactado": 0, "no_contactado": 0, "sin_gestionar": 0,
+                   "rechazado": 0, "palanca_no_mencionada": 0, "cerrado": 0},
+    }
+
+    df_mdstart = _read("md_start")
+    if df_mdstart.empty:
+        return vacio
+    c_brand = pick_col(df_mdstart, "BRAND ID", "BRAND")
+    c_md = pick_col(df_mdstart, "MARKDOWN $")
+    if not (c_brand and c_md):
+        return vacio
+
+    df_det = _read("detalle")
+    brand_a_key, brand_a_nombre = {}, {}
+    if not df_det.empty:
+        c_det_brand = pick_col(df_det, "Brand")
+        c_det_correo = pick_col(df_det, "Correo", "Email")
+        if c_det_brand and c_det_correo:
+            for _, r in df_det.iterrows():
+                brand_txt, correo = r.get(c_det_brand), r.get(c_det_correo)
+                if not brand_txt or correo != farmer_email:
+                    continue
+                m = re.match(r"^(\d+)\s*-\s*(.+)$", str(brand_txt).strip())
+                if m:
+                    num = int(m.group(1))
+                    brand_a_key[num] = brand_key(num)
+                    brand_a_nombre[num] = m.group(2).strip()
+
+    if not brand_a_key:
+        return vacio
+
+    # Base: MARKDOWN $ == 0 exacto en MD START (None tratado igual que 0)
+    # -- una marca puede tener varias filas (varios stores), se suma por
+    # marca antes de comparar, mismo criterio que _load_md ya usa para
+    # la hoja MD de hoy.
+    brand_markdown_inicio = {}
+    for _, r in df_mdstart.iterrows():
+        brand = r.get(c_brand)
+        if not brand:
+            continue
+        m = re.match(r"^(\d+)", str(brand).strip())
+        if m:
+            num = int(m.group(1))
+            brand_markdown_inicio[num] = brand_markdown_inicio.get(num, 0.0) + to_num(r.get(c_md), default=0.0)
+
+    base_nums = {num for num in brand_a_key if brand_markdown_inicio.get(num, 0) == 0}
+
+    # Contactados / Rechazado / Cerrado -- TODO desde PRODUCTIVITY, mismo
+    # criterio que conversion_ads_md_for() usa para "Conversión MD".
+    df_prod = _read("productivity")
+    contactadas_si, tiene_registro, tiene_rechazo, tiene_cerrado = set(), set(), set(), set()
+    if not df_prod.empty:
+        c_code = pick_col(df_prod, "Code")
+        c_prod_farmer = pick_col(df_prod, "Farmer", "KAM")
+        c_md_val = pick_col(df_prod, "Markdown")
+        c_aceptado = pick_col(df_prod, "¿Se aceptó lo ofrecido?")
+        if c_code and c_prod_farmer:
+            for _, r in df_prod.iterrows():
+                farmer = r.get(c_prod_farmer)
+                code = r.get(c_code)
+                if farmer != farmer_email or not code:
+                    continue
+                k = brand_key(code)
+                tiene_registro.add(k)
+                md_si = c_md_val and str(r.get(c_md_val) or "").strip().upper() == "SI"
+                if md_si:
+                    contactadas_si.add(k)
+                    aceptado = str(r.get(c_aceptado) or "").strip().lower() if c_aceptado else ""
+                    if aceptado == "sí":
+                        tiene_cerrado.add(k)
+                    elif aceptado == "no aceptó ninguno":
+                        tiene_rechazo.add(k)
+
+    base_rows, contactado_rows = [], []
+    rechazado_n = pnm_n = cerrado_n = no_contactado_n = sin_gestionar_n = 0
+
+    for num in base_nums:
+        key = brand_a_key[num]
+        nombre = brand_a_nombre[num]
+        if key in contactadas_si:
+            estado_base = "Contactado"
+        elif key in tiene_registro:
+            estado_base = "No Contactado"
+            no_contactado_n += 1
+        else:
+            estado_base = "Sin Gestionar"
+            sin_gestionar_n += 1
+        base_rows.append({"id": key, "nombre": nombre, "estado": estado_base})
+
+        if key not in contactadas_si:
+            continue
+        if key in tiene_cerrado:
+            estado_c = "Cerrado"
+            cerrado_n += 1
+        elif key in tiene_rechazo:
+            estado_c = "Rechazado"
+            rechazado_n += 1
+        else:
+            estado_c = "Palanca no mencionada"
+            pnm_n += 1
+        contactado_rows.append({"id": key, "nombre": nombre, "estado": estado_c})
+
+    # Sin target en MD -- no hay orden por target posible ("con la sola
+    # pill del status basta", pedido explícito). Se deja el orden en el
+    # que se recorrió base_nums (sin garantía de orden específico, ya
+    # que no hay un criterio numérico para ordenar).
+    contactado_n = rechazado_n + pnm_n + cerrado_n
+    cierre_rows = [r for r in contactado_rows if r["estado"] == "Cerrado"]
 
     return {
         "base": base_rows, "contactado": contactado_rows, "cierre": cierre_rows,
