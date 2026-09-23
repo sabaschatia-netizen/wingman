@@ -1772,6 +1772,35 @@ def load_priority():
     sabe extraer el numero+pais de ese texto sin cambios. "Descripcion" paso
     de ser columna opcional (no existia en exports viejos) a existir siempre
     con tilde ("Descripción").
+
+    "Promo vencida" / "Promo por vencer" (columnas nuevas, corte de
+    septiembre 2026 -- pedido explícito de Sabas: "revisa el archivo
+    actualizado... la hoja de Priority Data trae unas nuevas columnas"):
+    antes NO existían en el Wingman -- ver la investigación de Anthropic
+    sobre Smart Priorities, que las documentaba como limitación conocida
+    ("SIN DATOS. Esta información proviene de la hoja SP del archivo
+    fuente de Sabas... que no tiene equivalente en el Wingman"). Cada
+    celda no es un booleano SI/NO como el resto de esta hoja: es una
+    lista de IDs de campaña separados por salto de línea ("\\n"), ej.
+    "3421100\\n3306280\\n3306279" -- varias promos vencidas/por vencer a
+    la vez para la misma marca. Se guardan tal cual vienen (sin parsear
+    los IDs individuales ni contarlos), para que quien las consuma decida
+    cómo mostrarlas -- "—" (no "") cuando la celda viene vacía, mismo
+    placeholder que el resto de pills de esta app.
+
+    "Último Contacto" (pedido explícito de Sabas, trigésima quinta
+    vuelta: "vas a tomar el último contacto... y lo vas a añadir en la
+    esquina superior derecha de la carta de cabecera"): viene como
+    serial de fecha de Excel (float, ej. 46274.0 -- días desde
+    1899-12-30), NO como texto ni datetime -- confirmado contra el
+    workbook real, columna 100% float en las 27219 filas. Se parsea acá
+    con ese epoch fijo a un Timestamp real (NaT si la celda viene vacía),
+    para que quien lo consuma (ultimo_contacto_for) no tenga que repetir
+    la conversión. Esta misma columna, sin parsear, era la limitación
+    documentada como "SIN DATO EN FORMATO TEXTO... se dejó en blanco para
+    evitar mostrar un valor mal formateado" en la investigación de
+    Anthropic sobre Smart Priorities -- ya no aplica, el dato llega bien
+    y se puede formatear.
     """
     df = _read("priority")
     if df.empty:
@@ -1780,6 +1809,9 @@ def load_priority():
     c_met  = pick_col(df, "Metric")
     c_val  = pick_col(df, "Prioridad BD", "prioridad")
     c_desc = pick_col(df, "Descripción", "Descripcion", "description")
+    c_vencida = pick_col(df, "Promo vencida")
+    c_por_vencer = pick_col(df, "Promo por vencer")
+    c_ultimo = pick_col(df, "Último Contacto", "Ultimo Contacto")
     if not (c_id and c_met):
         _issue("PRIORITY DATA", "Falta Brand/BID o Metric")
         return pd.DataFrame()
@@ -1790,6 +1822,18 @@ def load_priority():
     out["metric"] = df[c_met].astype(str).str.strip()
     out["value"]  = df[c_val].apply(to_num) if c_val else 0.0
     out["descripcion"] = df[c_desc].astype(str).str.strip() if c_desc else ""
+    out["promo_vencida"] = (
+        df[c_vencida].fillna("").astype(str).str.strip()
+        if c_vencida else ""
+    )
+    out["promo_por_vencer"] = (
+        df[c_por_vencer].fillna("").astype(str).str.strip()
+        if c_por_vencer else ""
+    )
+    out["ultimo_contacto"] = (
+        pd.to_datetime(df[c_ultimo], unit="D", origin="1899-12-30", errors="coerce")
+        if c_ultimo else pd.NaT
+    )
 
     out = out[(out["key"] != "") & (out["metric"].str.lower() != "total")]
     out["descripcion"] = out["descripcion"].replace({"nan": ""})
@@ -2284,6 +2328,73 @@ def _priority_descripcion_for(key, kind):
     return ""
 
 
+def _priority_promos_for(key, kind):
+    """
+    Promo vencida / Promo por vencer de PRIORITY DATA para esta marca y
+    este kind ("md" o "md_pro" -- pedido explícito de Sabas, trigésima
+    quinta vuelta: "todas las tarjetas de Markdown en 360 Action van a
+    tener ese ítem", Markdown y Markdown Pro por separado, cada una con
+    su propio dato, mismo split que ya usa _priority_descripcion_for
+    contra Metric="Promos (Markdown)" / "Promos Pro (Markdown Pro)").
+
+    Devuelve (vencida, por_vencer) -- cada uno el texto crudo de la celda
+    ("" si no hay fila para este kind o la celda viene vacía, NUNCA "nan").
+    """
+    for s in signals_for_brand(key):
+        if s.get("kind") == kind:
+            return s.get("promo_vencida", "") or "", s.get("promo_por_vencer", "") or ""
+    return "", ""
+
+
+def ultimo_contacto_for(key):
+    """
+    Fecha del último contacto con esta marca -- pedido explícito de Sabas
+    (trigésima quinta vuelta): "vas a tomar la fecha de último contacto,
+    y lo vas a añadir en la esquina superior derecha de la carta de
+    cabecera... 9 de septiembre del 2026", no el serial crudo.
+
+    PRIORITY DATA trae "Último Contacto" repetido en CADA fila de esa
+    marca (una por palanca -- Ads, Promos, Disponibilidad, etc., cada una
+    con SU PROPIA fecha de último contacto sobre ese tema puntual), no
+    consolidado en un solo lugar. Acá se toma el MÁXIMO (la fecha más
+    reciente) entre todas las filas de la marca -- es el contacto más
+    reciente con el aliado en general, sin importar sobre qué palanca fue
+    -- confirmado contra el workbook real que este máximo coincide
+    siempre con el de la fila Total de PRIORITY DATA (que load_priority()
+    descarta a propósito para el resto de usos de esta hoja), así que no
+    hace falta leer esa fila aparte.
+
+    Devuelve un pd.Timestamp, o None si la marca no tiene ninguna fecha
+    registrada (NO se inventa "sin datos" con texto -- el caller decide
+    si omite el dato por completo en ese caso).
+    """
+    fechas = [s.get("ultimo_contacto") for s in signals_for_brand(key)]
+    fechas = [f for f in fechas if pd.notna(f)]
+    if not fechas:
+        return None
+    return max(fechas)
+
+
+_MESES_ES = {
+    1: "enero", 2: "febrero", 3: "marzo", 4: "abril", 5: "mayo", 6: "junio",
+    7: "julio", 8: "agosto", 9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre",
+}
+
+
+def fmt_fecha_es(ts):
+    """
+    "9 de septiembre del 2026" -- pedido explícito de Sabas (misma
+    vuelta): "no me lo vas a colocar así en número como 08-09-2026...
+    sino 9 de septiembre del 2026". Sin cero a la izquierda en el día
+    (Timestamp.day ya es int, "9" no "09"). None/NaT -> "" (el caller
+    decide si omite el bloque entero en vez de mostrar una cadena vacía
+    con su propia etiqueta al lado).
+    """
+    if ts is None or pd.isna(ts):
+        return ""
+    return f"{ts.day} de {_MESES_ES[ts.month]} del {ts.year}"
+
+
 def md_tactical_card(key, active, roi, campaign_name, mdpro=False):
     """
     Card Markdown (o Markdown Pro si mdpro=True) de 360 Action.
@@ -2301,22 +2412,73 @@ def md_tactical_card(key, active, roi, campaign_name, mdpro=False):
     Sin señal en Priority Data para esta marca: se mantiene el criterio
     viejo, sin inventar consejo -- solo "Seguimiento" (si ya hay campaña
     activa) o "Sin campaña aún" (si no hay).
+
+    Ítem de Promos (pedido explícito de Sabas, trigésima quinta vuelta,
+    tras confirmar que PRIORITY DATA trae las columnas nuevas "Promo
+    vencida"/"Promo por vencer": "todas las tarjetas de Markdown en 360
+    Action van a tener ese ítem... si no hay dato disponible, marca el
+    ítem como si fuera un chulito. Si marca promo vencida, siempre lo
+    marca como alerta y promo por vencer siempre como ojo... si tiene
+    promo vencida siempre se convierte en Alert la tarjeta"):
+      - Ninguna de las dos con dato -> HEALTHY ("Sin promos vencidas ni
+        por vencer"), mismo chulito que el resto de items sanos.
+      - Solo "Promo por vencer" con dato -> WATCH, muestra los IDs tal
+        cual vienen en la celda (separador "\\n" -> ", " para que se lea
+        en una línea).
+      - "Promo vencida" con dato (con o sin "por vencer" acompañando) ->
+        ALERT siempre, fijo -- pedido explícito, no se evalúa cantidad ni
+        se combina con ninguna otra condición. Si las dos traen dato, el
+        texto del ítem menciona ambas.
+      Esta pill se agrega a "items" (mismo mecanismo que OPS/Menú: lista
+      de (texto, estado), un bullet por línea) y su estado entra en el
+      cálculo del tag final de la card completa bajo el mismo criterio
+      YA usado en ops_tactical_card ("el peor de los items domina") --
+      así que una promo vencida por sí sola alcanza para subir toda la
+      card a ALERT aunque el resto (Adquisición/Optimización/Seguimiento)
+      hubiera dado HEALTHY.
     """
     kind = "md_pro" if mdpro else "md"
     nombre = "Markdown Pro" if mdpro else "Markdown"
     descripcion = _priority_descripcion_for(key, kind)
     accion, mostrar_nota = _clasificar_accion_priority(descripcion)
 
+    promo_vencida, promo_por_vencer = _priority_promos_for(key, kind)
+    if promo_vencida:
+        ids_v = promo_vencida.replace("\n", ", ")
+        if promo_por_vencer:
+            ids_pv = promo_por_vencer.replace("\n", ", ")
+            promo_texto = f"Promos vencidas: {ids_v} · Por vencer: {ids_pv}"
+        else:
+            promo_texto = f"Promos vencidas: {ids_v}"
+        promo_estado = "ALERT"
+    elif promo_por_vencer:
+        ids_pv = promo_por_vencer.replace("\n", ", ")
+        promo_texto = f"Promos por vencer: {ids_pv}"
+        promo_estado = "WATCH"
+    else:
+        promo_texto = "Sin promos vencidas ni por vencer"
+        promo_estado = "HEALTHY"
+    promo_item = (promo_texto, promo_estado)
+
+    def _peor_tag(tag_base, tag_promo):
+        orden = {"ALERT": 3, "WATCH": 2, "HEALTHY": 1, "INACTIVE": 0}
+        return tag_base if orden.get(tag_base, 0) >= orden.get(tag_promo, 0) else tag_promo
+
     if not accion:
         if active:
-            return {"title": nombre, "detail": "Seguimiento", "tag": "HEALTHY"}
+            tag = _peor_tag("HEALTHY", promo_estado)
+            return {"title": nombre, "detail": "Seguimiento", "tag": tag, "items": [promo_item]}
         # Sin campaña activa Y Priority Data no la pide -- pedido
         # explícito de Sabas (agosto 2026): estado neutro INACTIVE (gris),
-        # no WATCH, con la nota especifica.
+        # no WATCH, con la nota especifica. La promo vencida/por vencer
+        # igual puede escalar esto -- una marca inactiva en Ads/MD puede
+        # perfectamente tener una campaña vieja que quedó vencida.
+        tag = _peor_tag("INACTIVE", promo_estado)
         return {
             "title": f"{nombre} · Inactivo",
             "detail": "No hay prioridad comercial ahora, pero revisa qué le puedes ofrecer al aliado.",
-            "tag": "INACTIVE",
+            "tag": tag,
+            "items": [promo_item],
         }
 
     title = f"{nombre} · {accion}"
@@ -2327,8 +2489,9 @@ def md_tactical_card(key, active, roi, campaign_name, mdpro=False):
         detail += f" · Campaña: {campaign_name}."
     if mostrar_nota:
         detail += " Revisá Campaign Designer para definir estrategia."
-    tag = "WATCH" if accion in ("Adquisición", "Optimización") else "HEALTHY"
-    return {"title": title, "detail": detail, "tag": tag}
+    tag_base = "WATCH" if accion in ("Adquisición", "Optimización") else "HEALTHY"
+    tag = _peor_tag(tag_base, promo_estado)
+    return {"title": title, "detail": detail, "tag": tag, "items": [promo_item]}
 
 
 def ads_tactical_card(key, active, roas, bookings_ars, currency="ARS"):

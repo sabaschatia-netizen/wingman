@@ -1534,12 +1534,8 @@ def render_loading_watcher():
           // es el mismo [overlay global] que debe cargar al volver al
           // rendimiento comercial") -- vive en la Ficha de Marca, fuera
           // del sidebar, así que necesita su propio chequeo por key
-          // igual que brandRowWrap. SIGUIENTE_KEY (trigésima cuarta
-          // vuelta): botón espejo en la esquina derecha ("→ AR123 ·
-          // Nombre"), mismo overlay global -- navega a otra Ficha de
-          // Marca completa, no una franja parcial de la misma pantalla.
+          // igual que brandRowWrap.
           var VOLVER_KEY = 'btn_volver_comercial';
-          var SIGUIENTE_KEY = 'btn_siguiente_marca';
 
           // Triggers de loader LOCAL (pedido explícito de Sabas,
           // trigésima vuelta): cambiar tab Ads/MD, cambiar país del
@@ -1614,8 +1610,7 @@ def render_loading_watcher():
               // necesitan su propio chequeo aparte del filtro de arriba.
               var brandRowWrap = btn.closest('div[class*="st-key-comercial_row_"]') ||
                                   btn.closest('div[class*="st-key-smartpri_row_"]');
-              var isVolver = !!btn.closest('div[class*="st-key-' + VOLVER_KEY + '"]') ||
-                              !!btn.closest('div[class*="st-key-' + SIGUIENTE_KEY + '"]');
+              var isVolver = !!btn.closest('div[class*="st-key-' + VOLVER_KEY + '"]');
               var localTrigger = matchLocalTrigger(btn);
               if (!inSidebar && !brandRowWrap && !isVolver && !localTrigger) return;
               if (brandRowWrap || isVolver) {{ startNav((btn.innerText || btn.textContent || '').trim()); return; }}
@@ -3176,69 +3171,32 @@ contact_html = (
 # ya existente en _render_funnel_comercial no manda "section" (siempre
 # fue comercial), así que el default aquí preserva ese comportamiento
 # sin tocar ese llamado.
+#
+# El botón espejo de "siguiente marca" que existió acá (esquina derecha,
+# "AR123 · Nombre →") se RETIRÓ por pedido explícito de Sabas (trigésima
+# quinta vuelta: "en la parte de Home, elimina ese botón... dejémoslo
+# solo en el volver a ficha de marca, solamente ese botón") -- go_to_brand
+# sigue aceptando "orden"/"pos" en volver_a (lo manda smart_priorities al
+# armar cada fila) por si se retoma más adelante, pero ya no se lee ni se
+# renderiza nada con esas dos claves.
 _volver_a = st.session_state.get("volver_a")
 if _volver_a:
     _volver_section = _volver_a.get("section", "comercial")
-    # "Siguiente marca" -- pedido explícito de Sabas (trigésima cuarta
-    # vuelta): "replicar ese botón en la otra esquina... el ID y el
-    # nombre de la siguiente marca... si miro a la izquierda vuelvo a
-    # Smart Priorities, pero si miro a la derecha me voy preparando para
-    # ver cuál es la marca que sigue". Solo aplica cuando se llegó desde
-    # Smart Priorities (trae "orden" -- Rendimiento Comercial no manda
-    # esta clave, así que ahí simplemente no aparece el botón derecho).
-    # Al presionarlo, avanza el "pos" +1 sobre el MISMO "orden" -- la
-    # cadena de "siguiente" sigue funcionando aunque el usuario encadene
-    # varios clicks seguidos (marca 2 -> 3 -> 4...), sin volver a Smart
-    # Priorities entre medio.
-    _orden = _volver_a.get("orden")
-    _pos = _volver_a.get("pos")
-    _siguiente = None
-    if _orden and _pos is not None and _pos + 1 < len(_orden):
-        _siguiente = _orden[_pos + 1]
-
-    if _siguiente:
-        col_izq, col_der = st.columns([1, 1])
+    if _volver_section == "brand_finder":
+        if st.button("← Volver a Ficha de Marca", key="btn_volver_comercial"):
+            st.session_state["view"] = "landing"
+            st.session_state["section"] = "brand_finder"
+            st.session_state.pop("volver_a", None)
+            st.rerun()
     else:
-        col_izq = st.container()
-        col_der = None
-
-    with col_izq:
-        if _volver_section == "brand_finder":
-            if st.button("← Volver a Ficha de Marca", key="btn_volver_comercial"):
-                st.session_state["view"] = "landing"
-                st.session_state["section"] = "brand_finder"
-                st.session_state.pop("volver_a", None)
-                st.rerun()
-        else:
-            if st.button("← Volver a Rendimiento Comercial", key="btn_volver_comercial"):
-                st.session_state["view"] = "landing"
-                st.session_state["section"] = "comercial"
-                st.session_state["comercial_tab_activo"] = _volver_a.get("tab", "ads")
-                st.session_state["comercial_ads_vista"] = _volver_a.get("vista_ads", "base")
-                st.session_state["comercial_md_vista"] = _volver_a.get("vista_md", "base")
-                st.session_state.pop("volver_a", None)
-                st.rerun()
-
-    if _siguiente and col_der is not None:
-        with col_der:
-            # Nombre truncado si es muy largo (pedido explícito: "si el
-            # nombre es muy largo, lo cortas, pero que se dé la
-            # sensación") -- 28 caracteres deja espacio para el ID +
-            # flecha sin desbordar el botón en la columna angosta.
-            _nombre_sig = _siguiente["nombre"]
-            _nombre_corto = _nombre_sig if len(_nombre_sig) <= 28 else _nombre_sig[:27].rstrip() + "…"
-            _label_siguiente = f'{_siguiente["id"]} · {_nombre_corto} →'
-            st.markdown(
-                '<div style="display:flex;justify-content:flex-end;">'
-                '<div style="width:100%;max-width:340px;">',
-                unsafe_allow_html=True,
-            )
-            if st.button(_label_siguiente, key="btn_siguiente_marca", use_container_width=True):
-                go_to_brand(
-                    _siguiente["id"],
-                    volver_a={"section": _volver_section, "orden": _orden, "pos": _pos + 1},
-                )
-            st.markdown("</div></div>", unsafe_allow_html=True)
+        if st.button("← Volver a Rendimiento Comercial", key="btn_volver_comercial"):
+            st.session_state["view"] = "landing"
+            st.session_state["section"] = "comercial"
+            st.session_state["comercial_tab_activo"] = _volver_a.get("tab", "ads")
+            st.session_state["comercial_ads_vista"] = _volver_a.get("vista_ads", "base")
+            st.session_state["comercial_md_vista"] = _volver_a.get("vista_md", "base")
+            st.session_state.pop("volver_a", None)
+            st.rerun()
 
 # Ícono de categoría como "primera letra" del título -- rediseño décima
 # tercera vuelta, pedido explícito de Sabas, aprobado como mockup visual
@@ -3248,13 +3206,35 @@ if _volver_a:
 # texto plano) -- pasa a ir INMEDIATAMENTE antes del nombre de la marca,
 # ambos centrados como un solo bloque, como si el ícono fuera la
 # primera letra del título.
+#
+# Último contacto (pedido explícito de Sabas, trigésima quinta vuelta:
+# "en la esquina superior derecha de la carta de cabecera... en
+# chiquitico en gris... 9 de septiembre del 2026") -- se arma como una
+# tercera columna dentro de la misma fila flex que ya centraba
+# ícono+título (antes solo 1 bloque centrado; ahora ese bloque central
+# convive con un espaciador a la izquierda y el texto de la fecha a la
+# derecha, para no romper el centrado del título). Se omite el bloque
+# entero (ver fmt_fecha_es) si la marca no tiene ninguna fecha
+# registrada en Priority Data -- nunca se muestra la etiqueta con un
+# valor vacío al lado.
+_ultimo_contacto_txt = dl.fmt_fecha_es(dl.ultimo_contacto_for(row.key))
+_ultimo_contacto_html = (
+    f'<div style="font-size:11px;color:{COLORS["muted"]};white-space:nowrap;">'
+    f'Último contacto: {_ultimo_contacto_txt}</div>'
+    if _ultimo_contacto_txt else ""
+)
+
 brand_title_html = (
+    '<div style="display:flex;align-items:center;">'
+    '<div style="flex:1;"></div>'
     '<div style="display:flex;align-items:center;justify-content:center;gap:16px;">'
     f'<div style="width:52px;height:52px;border-radius:50%;background:{COLORS["card2"]};'
     f'display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:11px;box-sizing:border-box;">'
     f'{icon_categoria_for(row.categoria)}'
     f'</div>'
     f'<div class="brand-title" style="margin-bottom:0;">{row.brand_name}</div>'
+    f'</div>'
+    f'<div style="flex:1;display:flex;justify-content:flex-end;align-items:center;">{_ultimo_contacto_html}</div>'
     f'</div>'
 )
 
@@ -3513,7 +3493,7 @@ with tab_action:
             return f'<span class="{base_class} has-icon">{icon_svg_bullet}</span>'
         return f'<span class="{base_class}"></span>'
 
-    def _action_mini(icon_svg, name, pct, tag, title, detail, items=None, icon_purple=False, top_res_html=""):
+    def _action_mini(icon_svg, name, pct, tag, title, detail, items=None, icon_purple=False, top_res_html="", extra_item=None):
         color = _tag_color(tag)
         border_class = _tag_border_class(tag)
         icon_class = "action-card-icon icon-purple" if icon_purple else "action-card-icon"
@@ -3565,6 +3545,24 @@ with tab_action:
                 f'<div class="action-card-title">{_bullet_html(tag, icon_purple)}{title}</div>'
                 f'<div class="action-card-detail">{detail}</div>'
             )
+            # extra_item (pedido explícito de Sabas, trigésima quinta
+            # vuelta): ítem de Promos vencidas/por vencer debajo del
+            # title/detail normal de Markdown, SIN reemplazarlos (a
+            # diferencia de "items", que sí reemplaza -- ese mecanismo es
+            # el que ya usan OPS/Menú, donde no hay title/detail
+            # separados que conservar). Mismo bullet con ícono según
+            # estado (warning/ojo/chulito) que el resto de la app.
+            if extra_item:
+                extra_texto, extra_estado = extra_item
+                peso_class = (
+                    "action-card-item-alert"
+                    if extra_estado in ("ALERT", "WATCH")
+                    else "action-card-item-normal"
+                )
+                cuerpo_html += (
+                    f'<div class="action-card-item {peso_class}">'
+                    f'{_bullet_html(extra_estado, icon_purple)}{extra_texto}</div>'
+                )
         return (
             f'<div class="action-card {border_class}">'
             f'<div class="action-card-head"><span class="{icon_class}">{icon_svg}</span></div>'
@@ -3591,7 +3589,7 @@ with tab_action:
         '<div class="action-grid">'
         + _action_mini(ICON_OPS, "OPS General", ops["pct"], ops["tag"], ops["title"], ops["detail"], items=ops.get("items"))
         + _action_mini(ICON_MENU, "Menú", menu["pct"], menu["tag"], menu["title"], menu["detail"], items=menu.get("items"))
-        + _action_mini(ICON_MARKDOWN, "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"])
+        + _action_mini(ICON_MARKDOWN, "Markdown", None, md_c["tag"], md_c["title"], md_c["detail"], extra_item=(md_c["items"][0] if md_c.get("items") else None))
         + _action_mini(ICON_ADS_LEVER, "Ads", None, ads_c["tag"], ads_c["title"], ads_c["detail"])
         + "</div>",
         unsafe_allow_html=True,
