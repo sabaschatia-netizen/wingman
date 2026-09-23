@@ -5405,15 +5405,18 @@ def rendimiento_comercial_md_for(farmer_email):
       - Base: hoja MD START (snapshot fijo de inicio de mes, mismo
         criterio que OPP START para Ads), columna "MARKDOWN $" == 0 (o
         sin dato) -> entra a la base.
-      - Contactados / Rechazado / Cerrado: TODO desde PRODUCTIVITY,
-        pedido explícito ("sigue tomando el cierre según productivity",
-        "mide igual que Rendimiento General") -- mismo criterio EXACTO
-        que ya usa conversion_ads_md_for() para "Conversión MD":
-        Contactado = "Markdown" == "SI"; de esas, Cerrado =
-        "¿Se aceptó lo ofrecido?" == "Sí"; Rechazado = "No aceptó
-        ninguno" (el mismo campo, valor complementario -- no hay
-        "Tipo Never MD" en PRODUCTIVITY, a diferencia de Ads que sí
-        tiene "Tipo Never Ads").
+      - Contactados / No Contactado / Sin Gestionar: hoja PRODUCTIVITY,
+        columna "¿Contactado?" (SI/NO -- mismo campo que usa
+        rendimiento_comercial_ads_for, corresponde 1:1 con "Fase" =
+        "Follow-UP finalizado"/"Aliado no contactado"). Sin Gestionar =
+        la marca no tiene ninguna fila en PRODUCTIVITY para este Farmer.
+      - Rechazado / Cerrado (dentro de las Contactadas): pedido explícito
+        de Sabas (trigésima segunda vuelta) -- exige "Markdown" == SI Y
+        "¿Es seguimiento MD?" == NO en la misma fila (si es seguimiento,
+        esa fila no cuenta para esta parte, aunque la marca siga siendo
+        Contactada). De las que cumplen ambas: Cerrado = "¿Se aceptó lo
+        ofrecido?" == "Sí"; Rechazado = "No aceptó ninguno"; cualquier
+        otro valor (incluido vacío) -> Palanca no mencionada.
       - Sin target: EXPORT ADS RELATION es específico de Ads, no hay
         equivalente de MD -- se omite el campo "target" de las filas
         (a diferencia de Ads, que sí lo trae).
@@ -5474,14 +5477,37 @@ def rendimiento_comercial_md_for(farmer_email):
 
     base_nums = {num for num in brand_a_key if brand_markdown_inicio.get(num, 0) == 0}
 
-    # Contactados / Rechazado / Cerrado -- TODO desde PRODUCTIVITY, mismo
-    # criterio que conversion_ads_md_for() usa para "Conversión MD".
+    # Contactados / No Contactado / Sin Gestionar -- pedido explícito de
+    # Sabas (trigésima segunda vuelta, corrección sobre el criterio
+    # anterior): esto se decide por "¿Contactado?" (Fase = "Follow-UP
+    # finalizado" -> SI / "Aliado no contactado" -> NO, correspondencia
+    # 1:1 confirmada contra el workbook real), el MISMO campo que ya usa
+    # rendimiento_comercial_ads_for -- NO por si se habló de Markdown en
+    # particular. Antes esta función usaba "Markdown" == SI para decidir
+    # Contactado en la BASE, lo cual mezclaba dos preguntas distintas
+    # ("¿hubo follow-up con la marca?" vs. "¿ese follow-up tocó el tema
+    # Markdown?") y podía dejar como "No Contactado"/"Sin Gestionar" a
+    # una marca que sí tuvo follow-up pero donde Markdown no vino al
+    # caso.
+    #
+    # Cerrado / Rechazado / Palanca no mencionada -- eso sí exige AMBAS
+    # condiciones dentro de las Contactadas (pedido explícito: "Markdown
+    # debe estar en sí, seguimiento debe estar en no... si es seguimiento
+    # no cuenta, queda fuera"): "Markdown" == SI (de verdad se habló de
+    # Markdown en esa gestión) Y "¿Es seguimiento MD?" == NO (es la
+    # gestión original, no un follow-up de una campaña ya en curso). Una
+    # marca Contactada que no cumple esta segunda condición (Markdown=NO,
+    # o es un seguimiento) sigue contando como "Contactado" en la base,
+    # pero no entra a evaluarse aquí -- ni suma a Cerrado, ni a
+    # Rechazado, ni a Palanca no mencionada.
     df_prod = _read("productivity")
     contactadas_si, tiene_registro, tiene_rechazo, tiene_cerrado = set(), set(), set(), set()
     if not df_prod.empty:
         c_code = pick_col(df_prod, "Code")
         c_prod_farmer = pick_col(df_prod, "Farmer", "KAM")
+        c_contactado = pick_col(df_prod, "¿Contactado?", "Contactado")
         c_md_val = pick_col(df_prod, "Markdown")
+        c_seguimiento_md = pick_col(df_prod, "¿Es seguimiento MD?")
         c_aceptado = pick_col(df_prod, "¿Se aceptó lo ofrecido?")
         if c_code and c_prod_farmer:
             for _, r in df_prod.iterrows():
@@ -5491,14 +5517,20 @@ def rendimiento_comercial_md_for(farmer_email):
                     continue
                 k = brand_key(code)
                 tiene_registro.add(k)
-                md_si = c_md_val and str(r.get(c_md_val) or "").strip().upper() == "SI"
-                if md_si:
+                contactado = c_contactado and str(r.get(c_contactado) or "").strip().upper() == "SI"
+                if contactado:
                     contactadas_si.add(k)
-                    aceptado = str(r.get(c_aceptado) or "").strip().lower() if c_aceptado else ""
-                    if aceptado == "sí":
-                        tiene_cerrado.add(k)
-                    elif aceptado == "no aceptó ninguno":
-                        tiene_rechazo.add(k)
+                    md_si = c_md_val and str(r.get(c_md_val) or "").strip().upper() == "SI"
+                    no_es_seguimiento = (
+                        not c_seguimiento_md
+                        or str(r.get(c_seguimiento_md) or "").strip().upper() == "NO"
+                    )
+                    if md_si and no_es_seguimiento:
+                        aceptado = str(r.get(c_aceptado) or "").strip().lower() if c_aceptado else ""
+                        if aceptado == "sí":
+                            tiene_cerrado.add(k)
+                        elif aceptado == "no aceptó ninguno":
+                            tiene_rechazo.add(k)
 
     base_rows, contactado_rows = [], []
     rechazado_n = pnm_n = cerrado_n = no_contactado_n = sin_gestionar_n = 0
@@ -5544,3 +5576,103 @@ def rendimiento_comercial_md_for(farmer_email):
             "rechazado": rechazado_n, "palanca_no_mencionada": pnm_n, "cerrado": cerrado_n,
         },
     }
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def smart_priorities_for(farmer_email):
+    """
+    Orden Smart Priorities de la cartera de un Farmer -- pedido explícito
+    de Sabas (trigésima tercera vuelta): "quiero que esa primera ficha
+    lleve el orden exacto de Smart Priorities... brand ID, brand name y
+    el puntaje de prioridad... organizado en orden descendente según el
+    puntaje".
+
+    IMPORTANTE (aclarado con Sabas en la misma vuelta, tras investigar):
+    el cálculo COMPLETO de Smart Priorities (pesos editables por Churn/
+    Adq.Ads/Adq.MD/Upsell/Reajuste MD/Operativa/Promo x vencer/PDF Menu,
+    panel de parámetros, umbrales P1-P4) vive en un Excel aparte
+    (PORTAFOLIO_SEPT_SR.xlsx y sus proxies por Farmer), NO en este
+    Wingman -- reconstruir esa fórmula acá sería inventar un cálculo
+    paralelo que podría desalinearse del original con cada cambio de
+    pesos. Por pedido explícito de Sabas, esta función usa el puntaje YA
+    CALCULADO que SÍ llega al Wingman: la hoja PRIORITY DATA trae, para
+    cada marca, una fila con Metric="Total" cuya columna "Prioridad BD"
+    es ese mismo puntaje consolidado (confirmado: mismo campo que ya usa
+    load_coinversion_md() para Coinversión MD/STATUS Brand, ambos viven
+    solo en esa fila Total de cada marca). No hay panel de pesos editable
+    acá -- si los pesos cambian en el Excel fuente, el número que se lee
+    acá cambia solo en el próximo corte de datos, sin que Wingman toque
+    la fórmula.
+
+    farmer_email: cartera de un solo Farmer (a diferencia de otras
+    funciones "_for" de este archivo que aceptan lista -- pedido
+    explícito de Sabas: "elegir Farmer primero, como ya funciona en
+    Rendimiento Comercial", un ranking a la vez, no el equipo mezclado).
+
+    Universo de marcas: DETALLE (mismo criterio que el resto de
+    Rendimiento Comercial/Ficha de Marca) -- correo del Farmer. El
+    puntaje se cruza por "key" (AR+numero) contra la fila Total de
+    PRIORITY DATA para cada una de esas marcas. Una marca de la cartera
+    sin fila Total en PRIORITY DATA (corte de datos incompleto para esa
+    marca) se omite del ranking -- no se inventa un puntaje 0 que la
+    mostraría empatada al final con marcas que sí tienen 0 real.
+
+    Retorna una lista de dicts {"id", "nombre", "puntaje"}, ya ordenada
+    puntaje descendente (pedido explícito: "organizado en orden
+    descendente según el puntaje de prioridad").
+    """
+    df_det = _read("detalle")
+    if df_det.empty:
+        return []
+    c_det_brand = pick_col(df_det, "Brand")
+    c_det_correo = pick_col(df_det, "Correo", "Email")
+    if not (c_det_brand and c_det_correo):
+        return []
+
+    brand_a_key, brand_a_nombre = {}, {}
+    for _, r in df_det.iterrows():
+        brand_txt, correo = r.get(c_det_brand), r.get(c_det_correo)
+        if not brand_txt or correo != farmer_email:
+            continue
+        m = re.match(r"^(\S+)\s*-\s*(.+)$", str(brand_txt).strip())
+        if not m:
+            continue
+        key = brand_key(m.group(1))
+        if not key:
+            continue
+        brand_a_key[key] = key
+        brand_a_nombre[key] = m.group(2).strip()
+
+    if not brand_a_key:
+        return []
+
+    # Fila Total de PRIORITY DATA -- mismo patrón que load_coinversion_md()
+    # (ver docstring arriba): se lee del crudo, no de load_priority(), que
+    # descarta esta fila a propósito para el listado de métricas
+    # individuales.
+    df_prio = _read("priority")
+    if df_prio.empty:
+        return []
+    c_id = pick_col(df_prio, "Brand", "BID", "brand id")
+    c_met = pick_col(df_prio, "Metric")
+    c_val = pick_col(df_prio, "Prioridad BD", "prioridad")
+    if not (c_id and c_met and c_val):
+        return []
+
+    df_prio = _drop_junk(df_prio, c_id)
+    total_rows = df_prio[df_prio[c_met].astype(str).str.strip().str.lower() == "total"]
+
+    puntaje_por_key = {}
+    for _, r in total_rows.iterrows():
+        key = brand_key(r.get(c_id))
+        if key:
+            puntaje_por_key[key] = to_num(r.get(c_val), default=0.0)
+
+    filas = []
+    for key in brand_a_key:
+        if key not in puntaje_por_key:
+            continue
+        filas.append({"id": key, "nombre": brand_a_nombre[key], "puntaje": puntaje_por_key[key]})
+
+    filas.sort(key=lambda f: -f["puntaje"])
+    return filas

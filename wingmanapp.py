@@ -1546,9 +1546,34 @@ def render_loading_watcher():
           var LOCAL_TRIGGERS = [
             {{ btnKey: 'comercial_tab_btn_ads', anchorKey: 'comercial_tabs_anchor' }},
             {{ btnKey: 'comercial_tab_btn_md', anchorKey: 'comercial_tabs_anchor' }},
-            {{ btnKeyPrefix: 'mapa_', anchorKey: 'comercial_mapa_anchor' }},
+            // 'mapa_' (pedido explícito de Sabas, trigésima tercera
+            // vuelta: "elegir Farmer primero, como ya funciona en
+            // Rendimiento Comercial") -- el mismo botón físico de
+            // render_conosur_map() ahora se monta dentro de DOS anchors
+            // distintos según la sección activa (comercial_mapa_anchor
+            // en Rendimiento Comercial, smartpri_mapa_anchor en Ficha de
+            // Marca), nunca los dos a la vez -- anchorKeys (plural) se
+            // resuelve probando cada uno con closest() y usando el que
+            // de verdad envuelve al botón clickeado.
+            {{ btnKeyPrefix: 'mapa_', anchorKeys: ['comercial_mapa_anchor', 'smartpri_mapa_anchor'] }},
             {{ containerKeyPrefix: 'st-key-comercial_blk_', anchorKey: 'comercial_tabs_anchor' }},
+            // Fila de Smart Priorities (Ficha de Marca) -- mismo
+            // mecanismo que 'st-key-comercial_row_' de Rendimiento
+            // Comercial (ver isVolver/brandRowWrap en onNavClick):
+            // dispara el overlay GLOBAL, no local, así que no lleva
+            // entrada acá -- se resuelve más abajo junto a brandRowWrap.
           ];
+
+          function resolveAnchorSelector(btn, trig) {{
+            if (trig.anchorKey) return '.st-key-' + trig.anchorKey;
+            if (trig.anchorKeys) {{
+              for (var i = 0; i < trig.anchorKeys.length; i++) {{
+                var sel = '.st-key-' + trig.anchorKeys[i];
+                if (btn.closest(sel)) return sel;
+              }}
+            }}
+            return null;
+          }}
 
           function matchLocalTrigger(btn) {{
             for (var i = 0; i < LOCAL_TRIGGERS.length; i++) {{
@@ -1572,23 +1597,24 @@ def render_loading_watcher():
               if (!btn) return;
               var sidebar = D.querySelector('.st-key-wingman-sidebar');
               var inSidebar = sidebar && sidebar.contains(btn);
-              // ID de marca clickeado en la tabla de Rendimiento Comercial
-              // (pedido explícito de Sabas, vigésima novena vuelta: "si yo
-              // selecciono la marca y me manda a la Ficha de Marca, debería
-              // mostrarme el loader mientras eso carga... no podemos
-              // permitir que se quede en pantalla en blanco mientras
-              // carga") -- el botón vive dentro de un contenedor cuya
-              // clase contiene "st-key-comercial_row_" (ver
-              // _render_funnel_comercial en wingmanapp.py), fuera del
-              // sidebar, así que necesita su propio chequeo aparte del
-              // filtro de sidebar de arriba.
-              var brandRowWrap = btn.closest('div[class*="st-key-comercial_row_"]');
+              // ID de marca clickeado en una tabla de ranking clicable --
+              // Rendimiento Comercial (st-key-comercial_row_) y ahora
+              // también Smart Priorities en Ficha de Marca (pedido
+              // explícito de Sabas, trigésima tercera vuelta: "cuando yo
+              // presione en el nombre de la marca o en el ID... me mande
+              // a la ficha de la marca... tener los loaders claramente
+              // entre cada cambio de página" -- st-key-smartpri_row_,
+              // mismo contrato que comercial_row_, mismo overlay
+              // GLOBAL). Ambos viven fuera del sidebar, así que
+              // necesitan su propio chequeo aparte del filtro de arriba.
+              var brandRowWrap = btn.closest('div[class*="st-key-comercial_row_"]') ||
+                                  btn.closest('div[class*="st-key-smartpri_row_"]');
               var isVolver = !!btn.closest('div[class*="st-key-' + VOLVER_KEY + '"]');
               var localTrigger = matchLocalTrigger(btn);
               if (!inSidebar && !brandRowWrap && !isVolver && !localTrigger) return;
               if (brandRowWrap || isVolver) {{ startNav((btn.innerText || btn.textContent || '').trim()); return; }}
               if (localTrigger) {{
-                startNav((btn.innerText || btn.textContent || '').trim(), '.st-key-' + localTrigger.anchorKey);
+                startNav((btn.innerText || btn.textContent || '').trim(), resolveAnchorSelector(btn, localTrigger));
                 return;
               }}
               // Ya no existe el componente sidebar nativo de Streamlit (es una
@@ -1633,14 +1659,29 @@ def render_loading_watcher():
           }}
 
           // Selector de Farmer del Supervisor (st.selectbox) -- pedido
-          // explícito de Sabas, trigésima vuelta: mismo loader LOCAL que
-          // el cambio de país, acotado a la franja debajo del mapa. Un
-          // st.selectbox de Streamlit no es un <select> nativo: es un
-          // combobox armado con un input de solo-lectura + listbox
+          // explícito de Sabas, trigésima vuelta (extendido en la
+          // trigésima tercera a Smart Priorities / Ficha de Marca, que
+          // usa el mismo patrón con su propio anchor): mismo loader
+          // LOCAL que el cambio de país, acotado a la franja debajo del
+          // mapa. Un st.selectbox de Streamlit no es un <select> nativo:
+          // es un combobox armado con un input de solo-lectura + listbox
           // desplegable, así que no dispara 'change' -- se escucha
           // 'click' sobre las opciones del listbox (role="option"), que
           // Streamlit monta en un portal al final del <body>, fuera del
           // propio contenedor del selectbox.
+          //
+          // FARMER_COMBOS (plural) -- dos combos de Farmer distintos
+          // pueden existir en el DOM según la sección activa
+          // (comercial_farmer_anchor en Rendimiento Comercial,
+          // smartpri_farmer_anchor en Ficha de Marca), nunca los dos a
+          // la vez. Se guarda CUÁL combo se abrió (su mapAnchor) en el
+          // atributo del body, para saber a qué overlay anclar cuando
+          // se elige una opción -- antes solo existía un combo, así que
+          // el anchor de cierre estaba hardcodeado.
+          var FARMER_COMBOS = [
+            {{ comboKey: 'comercial_farmer_anchor', mapAnchor: 'comercial_mapa_anchor' }},
+            {{ comboKey: 'smartpri_farmer_anchor', mapAnchor: 'smartpri_mapa_anchor' }},
+          ];
           function isFarmerSelectOption(t) {{
             try {{
               var opt = t && t.closest ? t.closest('[role="option"]') : null;
@@ -1650,16 +1691,21 @@ def render_loading_watcher():
               // actualmente abierto en vez de inspeccionar el texto de
               // la opción (evita falsos positivos con otro selectbox que
               // pudiera existir en la página).
-              return D.body.getAttribute('data-gw-farmer-combo-open') === '1';
+              return !!D.body.getAttribute('data-gw-farmer-combo-open');
             }} catch (e) {{ return false; }}
           }}
           function onFarmerComboClick(ev) {{
             try {{
-              var combo = ev.target && ev.target.closest ? ev.target.closest('.st-key-comercial_farmer_anchor') : null;
-              if (combo) {{ D.body.setAttribute('data-gw-farmer-combo-open', '1'); return; }}
+              for (var i = 0; i < FARMER_COMBOS.length; i++) {{
+                var fc = FARMER_COMBOS[i];
+                var combo = ev.target && ev.target.closest
+                  ? ev.target.closest('.st-key-' + fc.comboKey) : null;
+                if (combo) {{ D.body.setAttribute('data-gw-farmer-combo-open', fc.mapAnchor); return; }}
+              }}
               if (isFarmerSelectOption(ev.target)) {{
+                var mapAnchor = D.body.getAttribute('data-gw-farmer-combo-open');
                 D.body.removeAttribute('data-gw-farmer-combo-open');
-                startNav('Farmer', '.st-key-comercial_mapa_anchor');
+                startNav('Farmer', '.st-key-' + mapAnchor);
               }}
             }} catch (e) {{}}
           }}
@@ -2743,6 +2789,82 @@ if st.session_state["view"] == "landing":
             else:
                 st.info("Escribe un ID válido (ej. AR97338 o simplemente 97338).")
 
+        # Tabla Smart Priorities -- pedido explícito de Sabas (trigésima
+        # tercera vuelta): "que esa primera ficha lleve el orden exacto
+        # de Smart Priorities para cada uno de los farmers... brand ID,
+        # brand name y el puntaje de prioridad... organizado en orden
+        # descendente". Ver smart_priorities_for en data_layer.py para
+        # de dónde sale el puntaje (fila Total de PRIORITY DATA, no un
+        # cálculo propio -- el panel de pesos editable vive en otro
+        # Excel fuera de este Wingman).
+        #
+        # Selector de Farmer para Supervisor (pedido explícito: "elegir
+        # Farmer primero, como ya funciona en Rendimiento Comercial") --
+        # mismo patrón de loader LOCAL ya usado en la sección comercial:
+        # el selectbox va dentro de su propio st.container(key=...) para
+        # que el JS pueda anclar el overlay parcial a su borde inferior
+        # (ver LOCAL_TRIGGERS / onFarmerComboClick en
+        # render_loading_watcher, extendido más abajo para reconocer
+        # también "smartpri_farmer_anchor").
+        st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
+        if IS_SUPERVISOR:
+            st.session_state.setdefault("supervisor_pais", "AR")
+            with st.container(key="smartpri_mapa_anchor"):
+                render_conosur_map()
+            pais_smartpri = st.session_state["supervisor_pais"]
+            farmers_pais = dl.farmers_por_pais(pais_smartpri)
+            farmer_labels = {f: dl.farmer_display(f) for f in farmers_pais}
+            if not farmers_pais:
+                st.info("No hay Farmers con cartera activa en este país.")
+                st.stop()
+            with st.container(key="smartpri_farmer_anchor"):
+                farmer_para_smartpri = st.selectbox(
+                    "Farmer", farmers_pais, format_func=lambda f: farmer_labels.get(f, f),
+                    key="smartpri_farmer_select",
+                )
+        else:
+            farmer_para_smartpri = selected
+
+        with st.container(key="smartpri_zona_tapable"):
+            filas_sp = dl.smart_priorities_for(farmer_para_smartpri)
+            st.markdown(
+                '<div class="mgmt-card-title" style="margin:14px 0 8px;">'
+                f'<span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_RENDIMIENTO}</span>'
+                'Smart Priorities</div>',
+                unsafe_allow_html=True,
+            )
+            if not filas_sp:
+                st.info("No hay marcas con puntaje de Smart Priorities disponible para este Farmer.")
+            else:
+                header_html = (
+                    '<div style="display:grid;grid-template-columns:1.4fr 3.2fr 1.2fr;gap:8px;'
+                    f'padding:0 4px 6px;font-size:10px;font-weight:700;color:{COLORS["muted"]};'
+                    'text-transform:uppercase;">'
+                    '<span>ID</span><span>Nombre</span><span>Puntaje</span></div>'
+                )
+                st.markdown(
+                    f'<div style="border:1px solid {COLORS["card2"]};border-radius:12px 12px 0 0;'
+                    f'border-bottom:none;padding:10px 12px 0;">{header_html}</div>',
+                    unsafe_allow_html=True,
+                )
+                with st.container(key="smartpri_tabla", height=520, border=True):
+                    for idx, f in enumerate(filas_sp):
+                        row_cols = st.columns([1.4, 3.2, 1.2])
+                        with row_cols[0]:
+                            with st.container(key=f"smartpri_row_{idx}"):
+                                if st.button(f["id"], key=f"smartpri_row_btn_{idx}"):
+                                    go_to_brand(f["id"], volver_a={"section": "brand_finder"})
+                        with row_cols[1]:
+                            st.markdown(
+                                f'<div style="font-size:12px;padding-top:2px;">{html_lib.escape(f["nombre"])}</div>',
+                                unsafe_allow_html=True,
+                            )
+                        with row_cols[2]:
+                            st.markdown(
+                                f'<div style="font-size:12px;font-weight:800;padding-top:2px;">{f["puntaje"]:,.0f}</div>'.replace(",", "."),
+                                unsafe_allow_html=True,
+                            )
+
     elif section == "comercial":
         # Selector de Farmer para Supervisor -- mismo patrón que ya usa
         # Rendimiento General (render_conosur_map + farmers_por_pais).
@@ -2975,22 +3097,35 @@ contact_html = (
     "</div>"
 )
 
-# Botón "Volver" -- pedido explícito de Sabas (vigésima octava vuelta):
-# solo aparece si se llegó acá desde Rendimiento Comercial (go_to_brand
-# con volver_a) -- al presionarlo, restaura section="comercial" con el
-# MISMO tab (Ads/MD) y el MISMO bloque del funnel (base/contactado/
-# cierre) que tenía activo antes del click en el ID, no solo vuelve a
-# la pantalla de aterrizaje genérica como go_to_landing().
+# Botón "Volver" -- pedido explícito de Sabas (vigésima octava vuelta
+# para Rendimiento Comercial, extendido en la trigésima tercera vuelta a
+# Smart Priorities / Ficha de Marca: "seleccionar la segunda, vuelvo a
+# ficha de marca, luego vuelvo"): solo aparece si se llegó acá desde una
+# tabla con volver_a (go_to_brand) -- al presionarlo, restaura la
+# SECCIÓN Y EL ESTADO exactos que tenía antes del click en el ID, no
+# solo vuelve a la pantalla de aterrizaje genérica como go_to_landing().
+# "section" en volver_a decide a cuál de las dos restaurar -- el llamado
+# ya existente en _render_funnel_comercial no manda "section" (siempre
+# fue comercial), así que el default aquí preserva ese comportamiento
+# sin tocar ese llamado.
 _volver_a = st.session_state.get("volver_a")
 if _volver_a:
-    if st.button("← Volver a Rendimiento Comercial", key="btn_volver_comercial"):
-        st.session_state["view"] = "landing"
-        st.session_state["section"] = "comercial"
-        st.session_state["comercial_tab_activo"] = _volver_a.get("tab", "ads")
-        st.session_state["comercial_ads_vista"] = _volver_a.get("vista_ads", "base")
-        st.session_state["comercial_md_vista"] = _volver_a.get("vista_md", "base")
-        st.session_state.pop("volver_a", None)
-        st.rerun()
+    _volver_section = _volver_a.get("section", "comercial")
+    if _volver_section == "brand_finder":
+        if st.button("← Volver a Ficha de Marca", key="btn_volver_comercial"):
+            st.session_state["view"] = "landing"
+            st.session_state["section"] = "brand_finder"
+            st.session_state.pop("volver_a", None)
+            st.rerun()
+    else:
+        if st.button("← Volver a Rendimiento Comercial", key="btn_volver_comercial"):
+            st.session_state["view"] = "landing"
+            st.session_state["section"] = "comercial"
+            st.session_state["comercial_tab_activo"] = _volver_a.get("tab", "ads")
+            st.session_state["comercial_ads_vista"] = _volver_a.get("vista_ads", "base")
+            st.session_state["comercial_md_vista"] = _volver_a.get("vista_md", "base")
+            st.session_state.pop("volver_a", None)
+            st.rerun()
 
 # Ícono de categoría como "primera letra" del título -- rediseño décima
 # tercera vuelta, pedido explícito de Sabas, aprobado como mockup visual
