@@ -1455,7 +1455,23 @@ def render_loading_watcher():
           // conserva sin usar en la firma para no tener que tocar las 3
           // llamadas a startNav(label) que lo siguen pasando -- simplemente
           // ya no se renderiza en ningún lado.
-          function buildOverlay(label) {{
+          // buildOverlay(label, anchorSelector) -- pedido explícito de
+          // Sabas (trigésima vuelta): "cambiar tab Ads/MD", "cambiar
+          // país del Supervisor" y "cambiar Farmer del Supervisor" usan
+          // el MISMO overlay visual (logo + anillo), pero acotado a la
+          // franja de abajo, SIN tapar el control que el usuario acaba
+          // de tocar -- a diferencia del overlay global (click en ID de
+          // marca / botón Volver), que sigue tapando toda el área de
+          // contenido igual que siempre (anchorSelector null/omitido).
+          //
+          // anchorSelector, cuando se pasa, es el contenedor real
+          // (st.container(key=...) -> ".st-key-<key>") que marca DÓNDE
+          // empieza la zona a tapar: se mide su borde inferior
+          // (getBoundingClientRect().bottom) y el overlay arranca ahí,
+          // no en top:0 -- así el control disparador (botones Ads/MD,
+          // mapa de país, selector de Farmer) queda siempre visible y
+          // usable por fuera del overlay.
+          function buildOverlay(label, anchorSelector) {{
             var el = D.getElementById('gw-loading');
             if (!el) {{ el = D.createElement('div'); el.id = 'gw-loading'; D.body.appendChild(el); }}
             el.innerHTML = '<div class="gw-ring-wrap">' +
@@ -1478,8 +1494,19 @@ def render_loading_watcher():
               }}
             }} catch (e) {{}}
             el.style.left = left + 'px';
-            el.style.top = '0px';
             el.style.right = '0px';
+
+            var top = 0;
+            if (anchorSelector) {{
+              try {{
+                var anchor = D.querySelector(anchorSelector);
+                if (anchor) {{
+                  var ar = anchor.getBoundingClientRect();
+                  if (ar.bottom > 0) top = ar.bottom;
+                }}
+              }} catch (e) {{}}
+            }}
+            el.style.top = top + 'px';
             el.style.bottom = '0px';
 
             try {{ W.clearTimeout(W.__gwLoadingKill); }} catch (e) {{}}
@@ -1494,12 +1521,49 @@ def render_loading_watcher():
             S.sawBusy = false;
           }}
 
-          function startNav(label) {{
+          function startNav(label, anchorSelector) {{
             W.__gwPendingNav = true;
             S.sawBusy = false;
             S.shownAt = Date.now();
             S.lastAct = S.shownAt;
-            buildOverlay(label);
+            buildOverlay(label, anchorSelector);
+          }}
+
+          // Botón "← Volver a Rendimiento Comercial" (pedido explícito de
+          // Sabas, trigésima vuelta: "ese es el mismo [overlay global]
+          // que debe cargar al volver al rendimiento comercial") -- vive
+          // en la Ficha de Marca, fuera del sidebar, así que necesita su
+          // propio chequeo por key igual que brandRowWrap.
+          var VOLVER_KEY = 'btn_volver_comercial';
+
+          // Triggers de loader LOCAL (pedido explícito de Sabas,
+          // trigésima vuelta): cambiar tab Ads/MD, cambiar país del
+          // Supervisor y cambiar Farmer del Supervisor NO deben tapar
+          // pantalla completa -- cada uno tapa solo la franja de abajo
+          // de su propio anchor, dejando visible el control recién
+          // tocado. anchorKey es el st.container(key=...) cuyo borde
+          // inferior marca dónde arranca la zona tapada.
+          var LOCAL_TRIGGERS = [
+            {{ btnKey: 'comercial_tab_btn_ads', anchorKey: 'comercial_tabs_anchor' }},
+            {{ btnKey: 'comercial_tab_btn_md', anchorKey: 'comercial_tabs_anchor' }},
+            {{ btnKeyPrefix: 'mapa_', anchorKey: 'comercial_mapa_anchor' }},
+            {{ containerKeyPrefix: 'st-key-comercial_blk_', anchorKey: 'comercial_tabs_anchor' }},
+          ];
+
+          function matchLocalTrigger(btn) {{
+            for (var i = 0; i < LOCAL_TRIGGERS.length; i++) {{
+              var t = LOCAL_TRIGGERS[i];
+              if (t.btnKey && btn.className.indexOf('st-key-' + t.btnKey) !== -1) return t;
+              if (t.btnKeyPrefix) {{
+                var wrap = btn.closest('div[class*="st-key-' + t.btnKeyPrefix + '"]');
+                if (wrap) return t;
+              }}
+              if (t.containerKeyPrefix) {{
+                var cwrap = btn.closest('div[class*="' + t.containerKeyPrefix + '"]');
+                if (cwrap) return t;
+              }}
+            }}
+            return null;
           }}
 
           function onNavClick(ev) {{
@@ -1519,8 +1583,14 @@ def render_loading_watcher():
               // sidebar, así que necesita su propio chequeo aparte del
               // filtro de sidebar de arriba.
               var brandRowWrap = btn.closest('div[class*="st-key-comercial_row_"]');
-              if (!inSidebar && !brandRowWrap) return;
-              if (brandRowWrap) {{ startNav((btn.innerText || btn.textContent || '').trim()); return; }}
+              var isVolver = btn.className.indexOf('st-key-' + VOLVER_KEY) !== -1;
+              var localTrigger = matchLocalTrigger(btn);
+              if (!inSidebar && !brandRowWrap && !isVolver && !localTrigger) return;
+              if (brandRowWrap || isVolver) {{ startNav((btn.innerText || btn.textContent || '').trim()); return; }}
+              if (localTrigger) {{
+                startNav((btn.innerText || btn.textContent || '').trim(), '.st-key-' + localTrigger.anchorKey);
+                return;
+              }}
               // Ya no existe el componente sidebar nativo de Streamlit (es una
               // columna de layout normal), así que no debería haber ningún
               // botón de colapsar/expandir -- estos filtros quedan como
@@ -1559,6 +1629,38 @@ def render_loading_watcher():
               if (/^[a-z_]+$/.test(label) && label.indexOf('_') !== -1) return;
               if (label.indexOf('Salir') !== -1) return;
               startNav(label.replace(/^[^\\w]+/, '').trim());
+            }} catch (e) {{}}
+          }}
+
+          // Selector de Farmer del Supervisor (st.selectbox) -- pedido
+          // explícito de Sabas, trigésima vuelta: mismo loader LOCAL que
+          // el cambio de país, acotado a la franja debajo del mapa. Un
+          // st.selectbox de Streamlit no es un <select> nativo: es un
+          // combobox armado con un input de solo-lectura + listbox
+          // desplegable, así que no dispara 'change' -- se escucha
+          // 'click' sobre las opciones del listbox (role="option"), que
+          // Streamlit monta en un portal al final del <body>, fuera del
+          // propio contenedor del selectbox.
+          function isFarmerSelectOption(t) {{
+            try {{
+              var opt = t && t.closest ? t.closest('[role="option"]') : null;
+              if (!opt) return false;
+              // El listbox del selectbox de Farmer es el único que este
+              // watcher necesita distinguir -- se valida contra el combo
+              // actualmente abierto en vez de inspeccionar el texto de
+              // la opción (evita falsos positivos con otro selectbox que
+              // pudiera existir en la página).
+              return D.body.getAttribute('data-gw-farmer-combo-open') === '1';
+            }} catch (e) {{ return false; }}
+          }}
+          function onFarmerComboClick(ev) {{
+            try {{
+              var combo = ev.target && ev.target.closest ? ev.target.closest('.st-key-comercial_farmer_anchor') : null;
+              if (combo) {{ D.body.setAttribute('data-gw-farmer-combo-open', '1'); return; }}
+              if (isFarmerSelectOption(ev.target)) {{
+                D.body.removeAttribute('data-gw-farmer-combo-open');
+                startNav('Farmer', '.st-key-comercial_mapa_anchor');
+              }}
             }} catch (e) {{}}
           }}
 
@@ -1621,14 +1723,16 @@ def render_loading_watcher():
             var old = W.__gwNavHandlers;
             if (old) {{
               D.removeEventListener('click', old.click, true);
+              D.removeEventListener('click', old.farmerCombo, true);
               D.removeEventListener('keydown', old.key, true);
               D.removeEventListener('focusin', old.fin, true);
               D.removeEventListener('focusout', old.fout, true);
             }}
           }} catch (e) {{}}
-          var H = {{ click: onNavClick, key: onBrandKey, fin: onBrandFocusIn, fout: onBrandFocusOut }};
+          var H = {{ click: onNavClick, farmerCombo: onFarmerComboClick, key: onBrandKey, fin: onBrandFocusIn, fout: onBrandFocusOut }};
           W.__gwNavHandlers = H;
           D.addEventListener('click', H.click, true);
+          D.addEventListener('click', H.farmerCombo, true);
           D.addEventListener('keydown', H.key, true);
           D.addEventListener('focusin', H.fin, true);
           D.addEventListener('focusout', H.fout, true);
@@ -2121,26 +2225,24 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
         titulos = {"base": etiqueta_base.split(" (")[0].split(" · ")[0], "contactado": "Contactados", "cierre": etiqueta_cierre.split(" (")[0].split(" · ")[0]}
         titulo = titulos.get(vista, "")
 
-        # Loader acotado SOLO al cuadro de la tabla (pedido explícito
-        # de Sabas: "el loader debe estar estrictamente en ese
-        # cuadro de la tabla... yo selecciono el bloque, pero ahí
-        # en esos dos segunditos que carga la tabla, da mejor
-        # experiencia") -- st.spinner() dentro de un st.empty()
-        # acotado al contenedor de la tabla, no el
-        # render_loading_watcher() de pantalla completa que ya
-        # existe para el cambio de página entera.
+        # Loader del CLICK EN BLOQUE (pedido explícito de Sabas, trigésima
+        # vuelta) -- ya NO es este st.spinner() de Python: el cálculo real
+        # y pesado (datos = rendimiento_comercial_*_for arriba, sin cache,
+        # con iterrows sobre 5 hojas) ya terminó ANTES de llegar acá, así
+        # que un spinner puesto en este punto siempre llega tarde --
+        # cubre el momento en que ya no hay nada lento por esperar. El
+        # overlay LOCAL (mismo logo+anillo del global, acotado con
+        # buildOverlay(label, anchorSelector)) ahora se dispara desde JS
+        # al instante del click en el bloque (ver LOCAL_TRIGGERS /
+        # containerKeyPrefix 'st-key-comercial_blk_' en
+        # render_loading_watcher), que sí alcanza a cubrir el cálculo
+        # real. El time.sleep(0.4) artificial que existía acá se retira
+        # por el mismo motivo: corría en CADA ejecución de esta función
+        # (entrar desde el sidebar, cambiar de tab, volver de la Ficha),
+        # no solo al cambiar de bloque, sumando 0.4s a cargas que el
+        # overlay global ya cubre por su cuenta.
         tabla_placeholder = st.empty()
         with tabla_placeholder.container():
-            with st.spinner(""):
-                # Delay artificial de 0.4s (confirmado explícitamente
-                # por Sabas: "sí, agregar un pequeño delay artificial...
-                # es estético, no resuelve ningún cálculo lento real")
-                # -- el cálculo real (datos = rendimiento_comercial_*_for)
-                # ya ocurrió arriba, antes de dibujar el funnel, y armar
-                # este HTML es casi instantáneo, así que sin este delay
-                # el spinner nunca alcanzaría a verse en pantalla.
-                time.sleep(0.4)
-
                 if vista == "base":
                     filas = datos["base"]
                 elif vista == "contactado":
@@ -2626,46 +2728,65 @@ if st.session_state["view"] == "landing":
     elif section == "comercial":
         # Selector de Farmer para Supervisor -- mismo patrón que ya usa
         # Rendimiento General (render_conosur_map + farmers_por_pais).
+        #
+        # Anchors de loader LOCAL (pedido explícito de Sabas, trigésima
+        # vuelta): "cambiar tab Ads/MD", "cambiar país del Supervisor" y
+        # "cambiar Farmer del Supervisor" NO deben disparar el overlay de
+        # pantalla completa (ese se reserva para click en ID de marca y
+        # el botón Volver) -- deben tapar solo la franja de abajo, sin
+        # cubrir el control que el usuario acaba de tocar. Se envuelve
+        # cada control disparador en su propio st.container(key=...) para
+        # que el JS pueda medir su borde inferior real (mismo mecanismo
+        # que ya usa el sidebar completo vía getBoundingClientRect), y
+        # TODO lo que debe quedar tapado (desde ese punto hacia abajo)
+        # vive dentro de comercial_zona_tapable, un único contenedor real
+        # que el overlay local usa como referencia de ancho/alto/left.
         if IS_SUPERVISOR:
             st.session_state.setdefault("supervisor_pais", "AR")
-            render_conosur_map()
+            with st.container(key="comercial_mapa_anchor"):
+                render_conosur_map()
 
-            pais_comercial = st.session_state["supervisor_pais"]
-            farmers_pais = dl.farmers_por_pais(pais_comercial)
-            farmer_labels = {f: dl.farmer_display(f) for f in farmers_pais}
-            if not farmers_pais:
-                st.info("No hay Farmers con cartera activa en este país.")
-                st.stop()
-            farmer_para_funnel = st.selectbox(
-                "Farmer", farmers_pais, format_func=lambda f: farmer_labels.get(f, f),
-                key="comercial_farmer_select",
-            )
-        else:
-            farmer_para_funnel = selected
+        with st.container(key="comercial_zona_tapable"):
+            if IS_SUPERVISOR:
+                pais_comercial = st.session_state["supervisor_pais"]
+                farmers_pais = dl.farmers_por_pais(pais_comercial)
+                farmer_labels = {f: dl.farmer_display(f) for f in farmers_pais}
+                if not farmers_pais:
+                    st.info("No hay Farmers con cartera activa en este país.")
+                    st.stop()
+                with st.container(key="comercial_farmer_anchor"):
+                    farmer_para_funnel = st.selectbox(
+                        "Farmer", farmers_pais, format_func=lambda f: farmer_labels.get(f, f),
+                        key="comercial_farmer_select",
+                    )
+            else:
+                farmer_para_funnel = selected
 
-        # Tabs propios con botones, NO st.tabs() nativo -- st.tabs() no
-        # expone un key que persista cuál está activo entre reruns, y
-        # necesitamos recordarlo para el botón Volver de la Ficha de
-        # Marca (pedido explícito: "que quede en el MISMO bloque del
-        # funnel que tenía antes").
-        tcol1, tcol2 = st.columns(2)
-        with tcol1:
-            if st.button("Ads", key="comercial_tab_btn_ads", use_container_width=True,
-                         type="primary" if st.session_state["comercial_tab_activo"] == "ads" else "secondary"):
-                st.session_state["comercial_tab_activo"] = "ads"
-                st.rerun()
-        with tcol2:
-            if st.button("Markdown", key="comercial_tab_btn_md", use_container_width=True,
-                         type="primary" if st.session_state["comercial_tab_activo"] == "md" else "secondary"):
-                st.session_state["comercial_tab_activo"] = "md"
-                st.rerun()
+            # Tabs propios con botones, NO st.tabs() nativo -- st.tabs() no
+            # expone un key que persista cuál está activo entre reruns, y
+            # necesitamos recordarlo para el botón Volver de la Ficha de
+            # Marca (pedido explícito: "que quede en el MISMO bloque del
+            # funnel que tenía antes").
+            with st.container(key="comercial_tabs_anchor"):
+                tcol1, tcol2 = st.columns(2)
+                with tcol1:
+                    if st.button("Ads", key="comercial_tab_btn_ads", use_container_width=True,
+                                 type="primary" if st.session_state["comercial_tab_activo"] == "ads" else "secondary"):
+                        st.session_state["comercial_tab_activo"] = "ads"
+                        st.rerun()
+                with tcol2:
+                    if st.button("Markdown", key="comercial_tab_btn_md", use_container_width=True,
+                                 type="primary" if st.session_state["comercial_tab_activo"] == "md" else "secondary"):
+                        st.session_state["comercial_tab_activo"] = "md"
+                        st.rerun()
 
-        st.markdown('<div style="margin-top:16px;"></div>', unsafe_allow_html=True)
+            st.markdown('<div style="margin-top:16px;"></div>', unsafe_allow_html=True)
 
-        if st.session_state["comercial_tab_activo"] == "ads":
-            _render_funnel_comercial("ads", farmer_para_funnel)
-        else:
-            _render_funnel_comercial("md", farmer_para_funnel)
+            with st.container(key="comercial_funnel_zona"):
+                if st.session_state["comercial_tab_activo"] == "ads":
+                    _render_funnel_comercial("ads", farmer_para_funnel)
+                else:
+                    _render_funnel_comercial("md", farmer_para_funnel)
 
 
     # =====================================================
