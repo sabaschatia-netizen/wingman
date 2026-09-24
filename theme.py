@@ -463,9 +463,14 @@ ICON_PIN = _icon(
 # de trazo + glifo interno, ambos en currentColor.
 ICON_GOOGLE = _icon(
     '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>'
-    '<path d="M14.9 12.1h-2.75v1.15h1.55c-.15.85-.9 1.5-1.9 1.5-1.15 0-2.1-.95-2.1-2.15s.95-2.15 '
-    '2.1-2.15c.55 0 1.05.2 1.4.55l.9-.9c-.6-.55-1.4-.9-2.3-.9-1.85 0-3.35 1.5-3.35 3.4s1.5 3.4 3.35 '
-    '3.4c1.95 0 3.2-1.35 3.2-3.3 0-.2 0-.4-.05-.6z" fill="currentColor" stroke="none"/>'
+    '<path d="M15.8 12.15c0-.42-.04-.83-.11-1.22H12v2.31h2.13a1.82 1.82 0 01-.79 1.2v1h1.28a3.86 '
+    '3.86 0 001.18-2.9z" fill="currentColor" stroke="none"/>'
+    '<path d="M12 16.2c1.07 0 1.96-.35 2.62-.96l-1.28-1a2.4 2.4 0 01-1.34.38 2.42 2.42 0 01-2.27-1.68'
+    'H9.4v1.04A4.2 4.2 0 0012 16.2z" fill="currentColor" stroke="none"/>'
+    '<path d="M9.73 12.94a2.53 2.53 0 010-1.62v-1.04H8.4a4.2 4.2 0 000 3.7l1.33-1.04z" '
+    'fill="currentColor" stroke="none"/>'
+    '<path d="M12 9.44c.58 0 1.11.2 1.52.6l1.13-1.13A4.16 4.16 0 0012 7.8 4.2 4.2 0 008.4 10.28l1.33 '
+    '1.04A2.43 2.43 0 0112 9.44z" fill="currentColor" stroke="none"/>'
 )
 
 # Rappi -- círculo con "R" en trazo, reemplaza el eslabón 🔗 en el mismo
