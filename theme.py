@@ -788,17 +788,24 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 /* Pill de "Estado de conexión" dentro de la fila de 5 datos de la ficha
    de marca -- más chica y totalmente redondeada (999px) que .ctx-pill,
    mismos colores por estado (ok/warn/alert/info) reusados vía la misma
-   clase modificadora. */
+   clase modificadora.
+
+   Fondos más saturados + texto claro (corregido tras el rediseño de la
+   franja a azul petróleo, pedido explícito de Sabas: "el botón de
+   disponible se ve opaco") -- los pasteles tenues originales
+   (success_soft/warning_soft/etc., con texto oscuro) estaban pensados
+   para fondo blanco/card y casi no se distinguían sobre el nuevo fondo
+   azul petróleo de .brand-sticky. */
 .conn-status-pill {{
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 13px; font-weight: 700; padding: 5px 14px;
     border-radius: 999px; margin-top: 4px;
-    background: {COLORS["card2"]}; color: {COLORS["text"]};
+    background: rgba(255,255,255,0.14); color: {COLORS["sidebar_text"]};
 }}
-.conn-status-pill.warn  {{ background: {COLORS["warning_soft"]}; color: #A97A1E; }}
-.conn-status-pill.alert {{ background: {COLORS["danger_soft"]};  color: #C4483F; }}
-.conn-status-pill.ok    {{ background: {COLORS["success_soft"]}; color: #166534; }}
-.conn-status-pill.info  {{ background: {COLORS["info_bg"]};      color: {COLORS["blue"]}; }}
+.conn-status-pill.warn  {{ background: rgba(251,191,36,0.28); color: #FDE68A; }}
+.conn-status-pill.alert {{ background: rgba(239,68,68,0.30);  color: #FCA5A5; }}
+.conn-status-pill.ok    {{ background: rgba(34,197,94,0.30);  color: #86EFAC; }}
+.conn-status-pill.info  {{ background: rgba(108,155,209,0.30); color: #BFDBFE; }}
 
 /* ── BRAND HEADER (franja fija) ── */
 /* Título + ID centrados, y los 5 datos (Teléfono/Correo/Categoría/Local/
