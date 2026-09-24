@@ -2116,10 +2116,13 @@ col_main.__enter__()
 # Pedido explícito de Sabas (vigésima quinta a vigésima octava
 # vuelta): 3ra sección del sidebar, con 2 tabs (Ads/MD), cada uno con
 # su propio funnel Base -> Contactados -> Cierre. Ads: OPP START +
-# PRODUCTIVITY + ADS COMERCIAL + CHECKOUT (ver
-# rendimiento_comercial_ads_for). MD: MD START + PRODUCTIVITY (ver
-# rendimiento_comercial_md_for) -- sin target por marca ni fila de
-# Total (pedido explícito: "en las tablas de MD no hay target...
+# PRODUCTIVITY (Base/Contactados) + ADS nominal ACQ + ADS monetario ACQ
+# (Cierre -- antes ADS COMERCIAL + CHECKOUT, reemplazadas en la
+# cuadragésima vuelta, ver rendimiento_comercial_ads_for). MD: MD START +
+# PRODUCTIVITY (Base/Contactados/Rechazado, sin cambios) + MD nominal ACQ
+# (Cierre -- antes también PRODUCTIVITY, reemplazada en la cuadragésima
+# vuelta, ver rendimiento_comercial_md_for) -- sin target por marca ni
+# fila de Total (pedido explícito: "en las tablas de MD no hay target...
 # con la sola pill del status basta", "la fila Total solo aplica a
 # Ads").
 def _render_funnel_comercial(kind, farmer_para_funnel):
@@ -2251,7 +2254,12 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
         )
 
         with st.container(key=f"comercial_blk_cierre_{kind}"):
-            fuente_cierre = "Ads Comercial" if kind == "ads" else "Productivity"
+            # Texto visible bajo el bloque de Cierre -- actualizado
+            # (cuadragésima vuelta) para reflejar la fuente real nueva:
+            # antes "Ads Comercial"/"Productivity", ahora ambos salen de
+            # las hojas *_ACQ correspondientes (ver comentario de
+            # sección arriba y rendimiento_comercial_ads_for/md_for).
+            fuente_cierre = "Ads nominal ACQ" if kind == "ads" else "MD nominal ACQ"
             cierre_html = (
                 f'<div class="comercial-blk-visual" style="width:100%;background:{color_principal};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(18,62,74,0.25);">'
                 f'<div style="font-size:10.5px;font-weight:700;color:rgba(255,255,255,0.75);">{etiqueta_cierre} ({fuente_cierre})</div>'

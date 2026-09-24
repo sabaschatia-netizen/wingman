@@ -191,8 +191,19 @@ SHEETS = {
     "pitchdata": "PITCHDATA",
     "toprest": "TOPREST",
     "opp_start": "OPP START",
-    "ads_comercial": "ADS COMERCIAL",
+    # "ADS COMERCIAL" fue renombrada a "ADS nominal ACQ" en el workbook
+    # (confirmado por Sabas) -- se mantiene la clave interna
+    # "ads_comercial" (usada en varios lugares del código) para no tener
+    # que renombrar cada referencia, solo el nombre de hoja real cambia.
+    "ads_comercial": "ADS nominal ACQ",
     "md_start": "MD START",
+    # Hojas nuevas del workbook (confirmado por Sabas): equivalentes
+    # monetario/nominal de ADS y nominal de MD, mismo formato de 4 filas
+    # de header apiladas (ESTRATEGIA_ADS|MD / MONTH / WEEK / columna
+    # real) que ya usa ads_comercial -- ver rendimiento_comercial_ads_for
+    # y rendimiento_comercial_md_for.
+    "ads_monetario_acq": "ADS monetario ACQ",
+    "md_nominal_acq": "MD nominal ACQ",
 }
 
 _JUNK = ("total", "nan", "none", "filtros aplicados", "metrica", "metrica")
@@ -5277,6 +5288,30 @@ def load_login_log():
     return df
 
 
+def _leer_estrategia_acq(kind):
+    """
+    Lee una hoja de estrategia ACQ (formato compartido por ADS nominal
+    ACQ, ADS monetario ACQ y MD nominal ACQ: 4 filas de header apiladas
+    -- ESTRATEGIA_* / MONTH / WEEK / columna real) y devuelve
+    (df, fila_estrategia, fila_header, col_owner, col_brand, n_cols).
+    Usado por rendimiento_comercial_ads_for (Cierre de Ads, ambas hojas)
+    y rendimiento_comercial_md_for (Cierre de MD, cuadragésima vuelta:
+    "el cerrado... lo tomas de la hoja de MD nominal ACQ") -- antes
+    duplicado dentro de cada función, ahora compartido a nivel de módulo.
+
+    None si la hoja falta o no tiene al menos las 4 filas de header.
+    """
+    df = _read(kind, header=None)
+    if df.empty or len(df) < 4:
+        return None
+    fila_estrategia = df.iloc[0]
+    fila_header = df.iloc[3]
+    n_cols = len(fila_header)
+    col_owner = next((i for i in range(n_cols) if str(fila_header.iloc[i]).strip().upper() == "OWNER"), None)
+    col_brand = next((i for i in range(n_cols) if str(fila_header.iloc[i]).strip().upper() == "BRAND ID-NAME"), None)
+    return df, fila_estrategia, fila_header, col_owner, col_brand, n_cols
+
+
 @st.cache_data(ttl=86400, show_spinner=False)
 def rendimiento_comercial_ads_for(farmer_email):
     """
@@ -5291,9 +5326,9 @@ def rendimiento_comercial_ads_for(farmer_email):
     primera vuelta: "revisa el tema del caché para que todo cargue con
     la máxima velocidad posible") -- mismo patrón que ya usa el resto de
     esta capa (load_*), aplicado acá por primera vez a una función "_for"
-    porque es la única que recorre 5 hojas completas con iterrows
-    (DETALLE, OPP START, EXPORT ADS RELATION, PRODUCTIVITY, ADS
-    COMERCIAL, CHECKOUT) en CADA click de UI dentro de Rendimiento
+    porque es la única que recorre varias hojas completas con iterrows
+    (DETALLE, OPP START, EXPORT ADS RELATION, PRODUCTIVITY, ADS nominal
+    ACQ, ADS monetario ACQ) en CADA click de UI dentro de Rendimiento
     Comercial (cambiar de bloque, cambiar de tab, cambiar de Farmer) --
     _read() ya cachea la LECTURA de cada hoja en Parquet, pero no evita
     repetir ese recorrido Python entero cada vez. Con este decorador, dos
@@ -5319,10 +5354,22 @@ def rendimiento_comercial_ads_for(farmer_email):
         excluida (ya tenía actividad, no es adquisición nueva real).
       - Contactados / Rechazado: hoja PRODUCTIVITY, columnas "¿Contactado?"
         (SI) y "Tipo Never Ads" ("No activo" -- pedido explícito: "todo lo
-        que sea no activo de Never Ads cuenta como rechazado").
-      - Cierre: hoja CHECKOUT, "Tipo de Contratacion" == "Adquisicion"
-        (sin tilde, valor real del archivo) -- reemplaza a los archivos
-        WoW externos que se descartaron ("los WoW no se van a usar").
+        que sea no activo de Never Ads cuenta como rechazado"). Esto NO
+        cambió en la cuadragésima vuelta -- Sabas solo pidió cambiar la
+        fuente del bloque de Cierre, no la de Contactados.
+      - Cierre (NÚMERO): hoja ADS nominal ACQ (antes "ADS COMERCIAL",
+        solo renombrada -- pedido explícito, cuadragésima vuelta), máximo
+        de "ATT ESTRATEGIA" bajo estrategia ACQUIRE entre las 4 semanas
+        del mes.
+      - Cierre (DETALLE + VALOR por marca): hoja ADS monetario ACQ
+        (pedido explícito, cuadragésima vuelta: "esa hoja checkout ya no
+        la revisa... ahora va a estar revisando la de ads nominal ACQ...
+        para el total adquirido y del valor adquirido por marca... lo va
+        a tomar de ads monetario ACQ" -- reemplaza a CHECKOUT). Columna
+        REVENUE (bajo estrategia ACQUIRE) de la semana más reciente del
+        mes, en USD, convertida a ARS a 1.500 ARS/USD (pedido explícito:
+        "1500 pesos. No 1517" -- misma tasa que fmt_target usa para
+        Targets Bookings).
       - Target por marca: hoja EXPORT ADS RELATION, columna
         "Targets Bookings" -- "—" si la marca no aparece ahí.
 
@@ -5434,31 +5481,33 @@ def rendimiento_comercial_ads_for(farmer_email):
                 if c_tipo_never and str(r.get(c_tipo_never) or "").strip() == "No activo":
                     tiene_rechazo.add(k)
 
-    # Cierre: NÚMERO desde ADS COMERCIAL (vigésima séptima vuelta, pedido
-    # explícito de Sabas: "el bloque de cierre ya no va a tomar checkout,
-    # sino que va a tomar el número mayor que tenga cada comercial en esa
-    # hoja de Ads Comercial") -- MÁXIMO de "ATT ESTRATEGIA" (ACQUIRE)
-    # entre las 4 semanas del mes, no la última columna a ciegas (el
-    # acumulado semana a semana normalmente ya es creciente, pero tomar
-    # el máximo real es más robusto que asumir que la última semana
-    # siempre es la más alta). La estructura de esta hoja es distinta a
-    # todas las demás: 4 filas de "header" apiladas (ESTRATEGIA_ADS /
-    # MONTH / WEEK / columna real), por eso se lee con header=None y se
-    # arma el mapeo a mano, en vez de con pick_col() como el resto.
+    # Cierre: NÚMERO desde ADS nominal ACQ (antes "ADS COMERCIAL", solo
+    # cambió de nombre -- pedido explícito de Sabas, cuadragésima vuelta:
+    # "ads comercial ahora se llama ads nominal ACQ") -- MÁXIMO de "ATT
+    # ESTRATEGIA" (ACQUIRE) entre las 4 semanas del mes, no la última
+    # columna a ciegas (el acumulado semana a semana normalmente ya es
+    # creciente, pero tomar el máximo real es más robusto que asumir que
+    # la última semana siempre es la más alta). La estructura de esta
+    # hoja es distinta a todas las demás: 4 filas de "header" apiladas
+    # (ESTRATEGIA_ADS / MONTH / WEEK / columna real), por eso se lee con
+    # header=None y se arma el mapeo a mano, en vez de con pick_col()
+    # como el resto.
     #
-    # El DETALLE de la tabla (cuáles marcas, con nombre y valor) sigue
-    # saliendo de CHECKOUT -- ADS COMERCIAL no lo tiene, es un agregado
-    # por Farmer, no por marca. Si el número de ADS COMERCIAL es mayor a
-    # la cantidad de marcas que CHECKOUT logra identificar para este
-    # Farmer, se completa con filas "Sin dato disponible en Checkout"
-    # (pedido explícito) en vez de inventar marcas que no existen.
-    df_adscom = _read("ads_comercial", header=None)
+    # El DETALLE de la tabla (cuáles marcas, con nombre y valor) YA NO
+    # sale de CHECKOUT (pedido explícito de Sabas, cuadragésima vuelta:
+    # "esa hoja checkout ya no la revisa") -- pasa a salir de ADS
+    # monetario ACQ, columna REVENUE de la semana más reciente del mes
+    # (mismo criterio que ya usamos para leer esa hoja manualmente:
+    # última columna REVENUE del bloque de 4 semanas, acumulado MTD). Si
+    # el número de ADS nominal ACQ es mayor a la cantidad de marcas con
+    # revenue > 0 que ADS monetario ACQ identifica para este Farmer, se
+    # completa con filas "Sin dato disponible en Ads monetario ACQ" (
+    # mismo criterio de relleno que antes tenía CHECKOUT) en vez de
+    # inventar marcas que no existen.
+    parsed_nominal = _leer_estrategia_acq("ads_comercial")
     cierre_total_ads_comercial = 0
-    if not df_adscom.empty and len(df_adscom) >= 4:
-        fila_estrategia = df_adscom.iloc[0]
-        fila_header = df_adscom.iloc[3]
-        n_cols = len(fila_header)
-        col_owner = next((i for i in range(n_cols) if str(fila_header.iloc[i]).strip().upper() == "OWNER"), None)
+    if parsed_nominal is not None:
+        df_adscom, fila_estrategia, fila_header, col_owner, _, n_cols = parsed_nominal
         cols_att_acquire = [
             i for i in range(n_cols)
             if str(fila_header.iloc[i]).strip() == "ATT ESTRATEGIA"
@@ -5474,25 +5523,48 @@ def rendimiento_comercial_ads_for(farmer_email):
                 cierre_total_ads_comercial = int(max(valores_semana)) if valores_semana else 0
                 break
 
-    # Detalle de marcas (CHECKOUT) -- para saber CUÁLES y su valor, no
-    # para el número total (ese ya viene fijo de ADS COMERCIAL arriba).
-    df_check = _read("checkout")
+    # Detalle de marcas + valor (ADS monetario ACQ) -- para saber CUÁLES
+    # marcas y cuánto revenue trajeron, ya no CUÁNTAS en total (ese
+    # número ya viene fijo de ADS nominal ACQ arriba). Revenue de la
+    # ÚLTIMA columna REVENUE (semana más reciente, acumulado MTD),
+    # convertido de USD a ARS a 1.500 ARS/USD (pedido explícito de
+    # Sabas, cuadragésima vuelta: "1500 pesos. No 1517" -- misma tasa
+    # que ya usa fmt_target más abajo para Targets Bookings, NO la de
+    # 1.517 usada en el análisis puntual de un chat anterior).
+    TASA_USD_ARS = 1500
+    parsed_monetario = _leer_estrategia_acq("ads_monetario_acq")
     cerradas_valor = {}
-    if not df_check.empty:
-        c_check_farmer = pick_col(df_check, "FARMER")
-        c_tipo = pick_col(df_check, "Tipo de Contratacion")
-        c_check_brand = pick_col(df_check, "Brand ID")
-        c_presupuesto = pick_col(df_check, "Presupuesto ARS")
-        if c_check_farmer and c_tipo and c_check_brand:
-            for _, r in df_check.iterrows():
-                farmer, tipo, brand_id = r.get(c_check_farmer), r.get(c_tipo), r.get(c_check_brand)
-                if farmer != farmer_email or tipo != "Adquisicion" or brand_id is None:
+    if parsed_monetario is not None:
+        df_adsmon, fila_estrategia_m, fila_header_m, col_owner_m, col_brand_m, n_cols_m = parsed_monetario
+        cols_revenue = [
+            i for i in range(n_cols_m)
+            if str(fila_header_m.iloc[i]).strip() == "REVENUE"
+            and str(fila_estrategia_m.iloc[i]).strip().upper() == "ACQUIRE"
+        ]
+        if col_owner_m is not None and col_brand_m is not None and cols_revenue:
+            col_revenue_reciente = cols_revenue[-1]
+            for i in range(4, len(df_adsmon)):
+                fila = df_adsmon.iloc[i]
+                owner = fila.iloc[col_owner_m]
+                if owner != farmer_email:
                     continue
-                m = re.match(r"^(\d+)", str(brand_id).strip())
-                if m:
+                brand_txt = fila.iloc[col_brand_m]
+                if not brand_txt or str(brand_txt).strip() == "Total":
+                    continue
+                # BUG REAL CORREGIDO antes de entregar: a diferencia de
+                # DETALLE (que trae "101312 - Nombre", sin prefijo de
+                # país), esta hoja trae "AR101312 - Nombre" -- el número
+                # va DESPUÉS de las letras de país, no al inicio del
+                # string. El regex sin prefijo dejaba 0 matches (90
+                # filas de owner, 0 en cerradas_valor) porque ninguna
+                # marca real empieza directamente con un dígito acá.
+                m = re.match(r"^[A-Za-z]*(\d+)", str(brand_txt).strip())
+                if not m:
+                    continue
+                revenue_usd = to_num(fila.iloc[col_revenue_reciente], default=0.0)
+                if revenue_usd > 0:
                     num = int(m.group(1))
-                    valor = to_num(r.get(c_presupuesto), default=0.0) if c_presupuesto else 0.0
-                    cerradas_valor[num] = cerradas_valor.get(num, 0.0) + valor
+                    cerradas_valor[num] = cerradas_valor.get(num, 0.0) + revenue_usd * TASA_USD_ARS
 
     base_rows, contactado_rows, cierre_rows = [], [], []
     rechazado_n = pnm_n = cerrado_n = no_contactado_n = sin_gestionar_n = 0
@@ -5532,21 +5604,22 @@ def rendimiento_comercial_ads_for(farmer_email):
     base_rows.sort(key=lambda r: brand_target.get(id_a_num.get(r["id"]), -1) if brand_target.get(id_a_num.get(r["id"])) is not None else -1, reverse=True)
     contactado_rows.sort(key=lambda r: brand_target.get(id_a_num.get(r["id"]), -1) if brand_target.get(id_a_num.get(r["id"])) is not None else -1, reverse=True)
 
-    # El NÚMERO de cerrado es el de ADS COMERCIAL (fijo, ya calculado
-    # arriba), no len(cierre_rows) -- pedido explícito de Sabas. Si
-    # CHECKOUT identificó MENOS marcas concretas que ese número, se
-    # completa con filas de relleno "Sin dato disponible en Checkout"
-    # (pedido explícito: "si en checkout no están algunas las colocas
-    # como sin dato disponible en checkout") en vez de mostrar una tabla
-    # más corta que el número grande sin ninguna explicación. Si
-    # CHECKOUT tiene MÁS marcas que el número de ADS COMERCIAL (fuentes
-    # desalineadas), se muestran todas igual -- nunca se ocultan datos
-    # reales para forzar que el conteo cuadre.
+    # El NÚMERO de cerrado es el de ADS nominal ACQ (fijo, ya calculado
+    # arriba), no len(cierre_rows) -- mismo criterio que ya existía con
+    # ADS COMERCIAL/CHECKOUT, ahora aplicado a las hojas renombradas. Si
+    # ADS monetario ACQ identificó MENOS marcas concretas (con revenue >
+    # 0, dentro de la base de este Farmer) que ese número, se completa
+    # con filas de relleno "Sin dato disponible en Ads monetario ACQ" en
+    # vez de mostrar una tabla más corta que el número grande sin
+    # ninguna explicación. Si ADS monetario ACQ tiene MÁS marcas que el
+    # número de ADS nominal ACQ (fuentes desalineadas), se muestran
+    # todas igual -- nunca se ocultan datos reales para forzar que el
+    # conteo cuadre.
     cerrado_n = cierre_total_ads_comercial
     faltantes = cerrado_n - len(cierre_rows)
     if faltantes > 0:
         for _ in range(faltantes):
-            cierre_rows.append({"id": "—", "nombre": "Sin soporte disponible en Checkout", "valor": "—"})
+            cierre_rows.append({"id": "—", "nombre": "Sin dato disponible en Ads monetario ACQ", "valor": "—"})
 
     def _valor_ordenable(r):
         v = r["valor"]
@@ -5591,16 +5664,31 @@ def rendimiento_comercial_md_for(farmer_email):
         rendimiento_comercial_ads_for, corresponde 1:1 con "Fase" =
         "Follow-UP finalizado"/"Aliado no contactado"). Sin Gestionar =
         la marca no tiene ninguna fila en PRODUCTIVITY para este Farmer.
-      - Rechazado / Cerrado (dentro de las Contactadas): pedido explícito
-        de Sabas (trigésima segunda vuelta) -- exige "Markdown" == SI Y
-        "¿Es seguimiento MD?" == NO en la misma fila (si es seguimiento,
-        esa fila no cuenta para esta parte, aunque la marca siga siendo
-        Contactada). De las que cumplen ambas: Cerrado = "¿Se aceptó lo
-        ofrecido?" == "Sí"; Rechazado = "No aceptó ninguno"; cualquier
-        otro valor (incluido vacío) -> Palanca no mencionada.
+      - Rechazado / Palanca no mencionada (dentro de las Contactadas):
+        pedido explícito de Sabas (trigésima segunda vuelta) -- exige
+        "Markdown" == SI Y "¿Es seguimiento MD?" == NO en la misma fila
+        (si es seguimiento, esa fila no cuenta para esta parte, aunque
+        la marca siga siendo Contactada). Rechazado = "No aceptó
+        ninguno"; cualquier otro valor (incluido vacío) -> Palanca no
+        mencionada. Esto NO cambió en la cuadragésima vuelta -- Sabas
+        confirmó explícitamente "Productivity solo lo vas a quitar en
+        el bloque de cerrado... contactado va a seguir tomando su
+        productivity normal".
+      - Cerrado (dentro de las Contactadas): YA NO sale de PRODUCTIVITY
+        (pedido explícito, cuadragésima vuelta: "el cerrado ya no lo
+        tomas de productivity, sino que lo tomas de la hoja de MD
+        nominal ACQ") -- una marca Contactada se marca Cerrado si tiene
+        "ATT ESTRATEGIA" == 1 (bajo estrategia ACQUIRE) en la columna de
+        la semana más reciente del mes en MD nominal ACQ. El NÚMERO
+        grande del bloque de Cierre usa el mismo mecanismo que ya existe
+        para Ads nominal ACQ: máximo de "ATT ESTRATEGIA" entre las 4
+        semanas del mes, no len(cierre_rows) a ciegas.
       - Sin target: EXPORT ADS RELATION es específico de Ads, no hay
         equivalente de MD -- se omite el campo "target" de las filas
         (a diferencia de Ads, que sí lo trae).
+      - Sin valor en pesos: MD no tiene hoja monetaria equivalente a ADS
+        monetario ACQ (confirmado por Sabas, cuadragésima vuelta) -- las
+        filas de cierre traen solo {id, nombre}, nunca "valor".
 
     Devuelve el mismo esqueleto que Ads, sin "target" en las filas y sin
     valor en pesos en cierre (solo {id, nombre} ahí, ya que no hay plata
@@ -5679,10 +5767,13 @@ def rendimiento_comercial_md_for(farmer_email):
     # gestión original, no un follow-up de una campaña ya en curso). Una
     # marca Contactada que no cumple esta segunda condición (Markdown=NO,
     # o es un seguimiento) sigue contando como "Contactado" en la base,
-    # pero no entra a evaluarse aquí -- ni suma a Cerrado, ni a
-    # Rechazado, ni a Palanca no mencionada.
+    # pero no entra a evaluarse aquí -- ni suma a Rechazado, ni a
+    # Palanca no mencionada. Esto NO cambió en la cuadragésima vuelta --
+    # ver docstring: Sabas confirmó explícitamente que Productivity sigue
+    # siendo la fuente de Contactado/Rechazado/Palanca no mencionada, y
+    # que el cambio de fuente es EXCLUSIVO del estado Cerrado.
     df_prod = _read("productivity")
-    contactadas_si, tiene_registro, tiene_rechazo, tiene_cerrado = set(), set(), set(), set()
+    contactadas_si, tiene_registro, tiene_rechazo = set(), set(), set()
     if not df_prod.empty:
         c_code = pick_col(df_prod, "Code")
         c_prod_farmer = pick_col(df_prod, "Farmer", "KAM")
@@ -5708,10 +5799,43 @@ def rendimiento_comercial_md_for(farmer_email):
                     )
                     if md_si and no_es_seguimiento:
                         aceptado = str(r.get(c_aceptado) or "").strip().lower() if c_aceptado else ""
-                        if aceptado == "sí":
-                            tiene_cerrado.add(k)
-                        elif aceptado == "no aceptó ninguno":
+                        if aceptado == "no aceptó ninguno":
                             tiene_rechazo.add(k)
+
+    # Cerrado -- YA NO sale de PRODUCTIVITY (pedido explícito de Sabas,
+    # cuadragésima vuelta, ver docstring): una marca Contactada se marca
+    # Cerrado si tiene "ATT ESTRATEGIA" == 1 (bajo estrategia ACQUIRE) en
+    # la columna de la semana MÁS RECIENTE del mes en MD nominal ACQ --
+    # mismo criterio de "última semana" que ya usamos al leer esta hoja
+    # manualmente en el chat (a diferencia del NÚMERO total de Ads, que
+    # usa el MÁXIMO entre semanas -- acá alcanza con la última porque
+    # solo se necesita el estado on/off más reciente por marca, no un
+    # total agregado).
+    cerrado_md_nominal = set()
+    parsed_md_nominal = _leer_estrategia_acq("md_nominal_acq")
+    if parsed_md_nominal is not None:
+        df_mdnom, fila_estrategia_n, fila_header_n, col_owner_n, col_brand_n, n_cols_n = parsed_md_nominal
+        cols_att_acquire_n = [
+            i for i in range(n_cols_n)
+            if str(fila_header_n.iloc[i]).strip() == "ATT ESTRATEGIA"
+            and str(fila_estrategia_n.iloc[i]).strip().upper() == "ACQUIRE"
+        ]
+        if col_owner_n is not None and col_brand_n is not None and cols_att_acquire_n:
+            col_reciente_n = cols_att_acquire_n[-1]
+            for i in range(4, len(df_mdnom)):
+                fila = df_mdnom.iloc[i]
+                owner = fila.iloc[col_owner_n]
+                if owner != farmer_email:
+                    continue
+                brand_txt = fila.iloc[col_brand_n]
+                if not brand_txt or str(brand_txt).strip() == "Total":
+                    continue
+                # Mismo bug/fix que en ADS monetario ACQ arriba: el
+                # texto trae el prefijo de país antes del número
+                # ("AR101312 - Nombre"), el regex tiene que tolerarlo.
+                m = re.match(r"^[A-Za-z]*(\d+)", str(brand_txt).strip())
+                if m and to_num(fila.iloc[col_reciente_n], default=0) == 1:
+                    cerrado_md_nominal.add(brand_key(int(m.group(1))))
 
     base_rows, contactado_rows = [], []
     rechazado_n = pnm_n = cerrado_n = no_contactado_n = sin_gestionar_n = 0
@@ -5731,7 +5855,7 @@ def rendimiento_comercial_md_for(farmer_email):
 
         if key not in contactadas_si:
             continue
-        if key in tiene_cerrado:
+        if key in cerrado_md_nominal:
             estado_c = "Cerrado"
             cerrado_n += 1
         elif key in tiene_rechazo:
