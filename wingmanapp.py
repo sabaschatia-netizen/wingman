@@ -3178,7 +3178,18 @@ link_rappi = pitch_info["link"]
 # lenguaje visual que el resto de la app, no depende del render del
 # emoji por dispositivo/SO. vertical-align:middle centra el ícono
 # respecto al "/" separador y al resto del texto de la fila.
-_icon_link_style = "display:inline-flex;vertical-align:middle;width:18px;height:18px;"
+#
+# BUG REAL CORREGIDO: los íconos salían en azul (el color por defecto
+# de un <a> sin color propio en el navegador/Streamlit), no blancos --
+# con el emoji 🔎/🔗 de antes esto no se notaba porque el emoji trae su
+# propio color fijo, ajeno al `color` heredado; pero el SVG nuevo usa
+# currentColor (hereda del <a>), así que sin fijar color explícito
+# hereda el azul de link, no el blanco de .stat-value. Fix: color
+# inline explícito en el <a> (gana por especificidad sobre el estilo
+# nativo del navegador).
+_icon_link_style = (
+    f"display:inline-flex;vertical-align:middle;width:18px;height:18px;color:{COLORS['sidebar_text']};"
+)
 link_html = (
     f'<a href="{link_rappi}" target="_blank" rel="noopener noreferrer" '
     f'title="Abrir en Rappi" aria-label="Abrir en Rappi" '
