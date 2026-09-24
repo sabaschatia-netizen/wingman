@@ -656,25 +656,32 @@ def render_conosur_map():
 # vista Farmer -su propia fila-, agosto 2026)
 # =========================
 
-# _RENDIMIENTO_BG_COLOR: paleta PASTEL, usada por _rend_pill hasta la
-# vigésima tercera vuelta -- pedido explícito de Sabas la revirtió de
-# nuevo a fondo ELÉCTRICO/sólido (ver _RENDIMIENTO_SOLID_COLOR más abajo,
-# que ahora es la que usa _rend_pill). Se deja esta paleta definida sin
-# uso por si se reutiliza en el futuro, no se elimina.
+# _RENDIMIENTO_BG_COLOR: paleta PASTEL de las pills de Rendimiento
+# Farmer/País -- fondo suave + texto/ícono del mismo tono, más saturado
+# (ver _RENDIMIENTO_TEXT_COLOR). Vuelve a pastel (pedido explícito de
+# Sabas, mockup aprobado) después de un paso intermedio por fondo
+# ELÉCTRICO/sólido (_RENDIMIENTO_SOLID_COLOR, que queda sin uso acá pero
+# se mantiene por si se reutiliza en otro lado -- sigue siendo la que
+# pintan los 5 donuts de Brand Coverage). "red" comparte el mismo rojo
+# coral que el segmento "Rechazado" del funnel de Rendimiento Comercial
+# (COLORS["coral_soft"]/["coral_text"]), para que ambos contextos usen
+# idéntico tono.
 _RENDIMIENTO_BG_COLOR = {
-    "red": COLORS["danger_soft"], "green": COLORS["success_soft"],
+    "red": COLORS["coral_soft"], "green": COLORS["success_soft"],
     "yellow": COLORS["warning_soft"], "blue": "rgba(108,155,209,0.16)",
     "purple": COLORS["brand_purple_soft"], "orange": COLORS["brand_orange_soft"],
     "gray": "rgba(107,114,128,0.10)",
 }
+_RENDIMIENTO_TEXT_COLOR = {
+    "red": COLORS["coral_text"], "green": "#3E9160",
+    "yellow": "#A97A1E", "blue": "#4C7CAD",
+    "purple": COLORS["brand_purple"], "orange": COLORS["brand_orange"],
+    "gray": COLORS["muted"],
+}
 _RENDIMIENTO_ICON = {"blue": ICON_RAYO, "green": ICON_TROFEO, "red": ICON_CUADRADO, "purple": ICON_FUEGO, "yellow": ICON_BULLET_WARNING}
-# Color SÓLIDO/eléctrico -- usado por los 5 donuts de Brand Coverage Y
-# (desde la vigésima tercera vuelta, pedido explícito de Sabas: "los
-# colores de las pills ya no irán en tono pastel... sino en tono
-# eléctrico como los de arriba") por el FONDO de las pills de
-# Rendimiento País/Farmer -- ambos contextos comparten ahora la misma
-# paleta, para que el color de un farmer/equipo nunca contradiga entre
-# el donut y la pill de la tabla.
+# Color SÓLIDO/eléctrico -- usado por los 5 donuts de Brand Coverage
+# (ver render_brand_coverage_and_contact). Ya no lo usan las pills de
+# Rendimiento País/Farmer (ver _RENDIMIENTO_BG_COLOR arriba).
 _RENDIMIENTO_SOLID_COLOR = {
     "red": COLORS["danger"], "green": COLORS["success"], "yellow": "#A97A1E",
     "blue": COLORS["blue"], "purple": COLORS["brand_purple"],
@@ -683,30 +690,27 @@ _RENDIMIENTO_SOLID_COLOR = {
 
 
 def _rend_pill(valor, color):
-    # Pill invertida de nuevo (vigésima tercera vuelta, pedido explícito
-    # de Sabas): ya NO fondo pastel + texto gris -- ahora fondo del color
-    # ELÉCTRICO/sólido (el mismo que ya usan los 5 donuts de Brand
-    # Coverage, _RENDIMIENTO_SOLID_COLOR) + texto e ícono en blanco (el
-    # ícono hereda vía currentColor, no hace falta tocarlo aparte).
-    bg_color = _RENDIMIENTO_SOLID_COLOR.get(color, COLORS["muted"])
-    return f'<span class="sup-pill" style="background:{bg_color};color:{COLORS["brand_white"]};">{valor}</span>'
+    # Pill pastel (pedido explícito de Sabas, mockup aprobado): fondo
+    # suave (_RENDIMIENTO_BG_COLOR) + texto/ícono del mismo tono, más
+    # saturado (_RENDIMIENTO_TEXT_COLOR) -- el ícono hereda el color de
+    # texto vía currentColor, no hace falta tocarlo aparte.
+    bg_color = _RENDIMIENTO_BG_COLOR.get(color, "rgba(107,114,128,0.10)")
+    text_color = _RENDIMIENTO_TEXT_COLOR.get(color, COLORS["muted"])
+    return f'<span class="sup-pill" style="background:{bg_color};color:{text_color};">{valor}</span>'
 
 
 def _rend_pill_a(valor, color):
-    # Ícono SVG en BLANCO (vigésima cuarta vuelta, pedido explícito de
-    # Sabas -- "arreglar los emojis en blanco también"): hasta acá el
-    # ícono se quedaba gris fijo (heredado de la clase .lever-icon,
-    # color: COLORS["muted"], que pisa por especificidad de clase el
-    # currentColor blanco que ya trae el fondo de la pill vía
-    # herencia normal) -- correcto cuando la pill era pastel con texto
-    # gris, pero quedó desactualizado al invertir la pill de nuevo a
-    # fondo eléctrico + texto blanco (vigésima tercera vuelta). Fix:
-    # color blanco explícito en el style inline del ícono, que sí gana
-    # por especificidad sobre la clase .lever-icon.
+    # Vuelta a pill pastel (pedido explícito de Sabas, mockup aprobado):
+    # el ícono va del mismo color de texto que el resto de la pill
+    # (_RENDIMIENTO_TEXT_COLOR), no blanco fijo -- blanco solo tenía
+    # sentido cuando el fondo era el color eléctrico sólido. Color
+    # explícito en el style inline igual que antes, para ganar por
+    # especificidad sobre el gris fijo de la clase .lever-icon.
     icon_svg = _RENDIMIENTO_ICON.get(color, "")
+    text_color = _RENDIMIENTO_TEXT_COLOR.get(color, COLORS["muted"])
     icon_html = (
         f'<span class="lever-icon" style="margin-left:4px;width:13px;height:13px;'
-        f'vertical-align:-2px;color:{COLORS["brand_white"]};">{icon_svg}</span>'
+        f'vertical-align:-2px;color:{text_color};">{icon_svg}</span>'
         if icon_svg else ""
     )
     return _rend_pill(f"{valor}{icon_html}", color)
@@ -1311,14 +1315,18 @@ def _render_comision_ads_proyectada(farmer_email):
     alerta_html = ""
     if notas_bloqueo:
         items_html = "".join(
-            f'<div><span class="lever-icon" style="width:12px;height:12px;margin-right:5px;vertical-align:-2px;">{ICON_BULLET_WARNING}</span>{n}</div>'
+            f'<div><span class="lever-icon" style="width:12px;height:12px;margin-right:5px;vertical-align:-2px;color:{COLORS["brand_orange"]};">{ICON_BULLET_WARNING}</span>{n}</div>'
             for n in notas_bloqueo
         )
+        # Solo gris y naranja (pedido explícito de Sabas, mockup
+        # aprobado): la caja de aviso deja el fondo/texto amarillo-ámbar
+        # y pasa a fondo gris muy claro (card2) con ícono y título en
+        # naranja (brand_orange) y el texto en gris (muted).
         alerta_html = (
             '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;'
-            f'background:rgba(251,191,36,0.14);color:#A97A1E;font-size:12.5px;font-weight:600;'
+            f'background:{COLORS["card2"]};color:{COLORS["brand_orange"]};font-size:12.5px;font-weight:600;'
             f'line-height:1.6;">{items_html}'
-            f"<div style='margin-top:4px;font-weight:500;'>Afiná ahí para poder tomar esta plata de la mesa.</div>"
+            f'<div style="margin-top:4px;font-weight:500;color:{COLORS["muted"]};">Afiná ahí para poder tomar esta plata de la mesa.</div>'
             f"</div>"
         )
 
@@ -1343,13 +1351,14 @@ def _render_comision_ads_proyectada(farmer_email):
     # del target), no el resultado del ritmo real actual -- pedido
     # explícito de Sabas: siempre mostrar como mínimo lo que se ganaría
     # llegando al 91%, aclarando que es una meta alcanzable, no lo que ya
-    # se está ganando hoy.
+    # se está ganando hoy. Solo gris y naranja (mockup aprobado): el "91%
+    # del target" pasa de morado a naranja, el resto del texto en gris.
     piso_html = ""
     if r["es_piso"]:
         piso_html = (
-            f'<div style="font-size:11.5px;color:{COLORS["brand_purple"]};font-weight:700;margin-top:2px;">'
-            f'<span class="lever-icon" style="width:12px;height:12px;margin-right:5px;vertical-align:-2px;">{ICON_CONVERSION}</span>'
-            f"Esto es lo que ganarías llegando al 91% del target — con tu ritmo actual "
+            f'<div style="font-size:11.5px;color:{COLORS["muted"]};font-weight:700;margin-top:2px;">'
+            f'<span class="lever-icon" style="width:12px;height:12px;margin-right:5px;vertical-align:-2px;color:{COLORS["brand_orange"]};">{ICON_CONVERSION}</span>'
+            f'Esto es lo que ganarías llegando al <span style="color:{COLORS["brand_orange"]};">91% del target</span> — con tu ritmo actual '
             f"({r['revenue_pace_pct']:.0f}%) todavía no se desbloquea.</div>"
         )
 
@@ -1362,7 +1371,7 @@ def _render_comision_ads_proyectada(farmer_email):
         f'<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">'
         f'<div style="font-size:28px;font-weight:900;color:{COLORS["brand_orange"]};">'
         f'{dl.fmt_money(r["total_usd"], "USD")}</div>'
-        f'<div style="font-size:18px;font-weight:800;color:{COLORS["brand_purple"]};">'
+        f'<div style="font-size:18px;font-weight:800;color:{COLORS["muted"]};">'
         f'≈ {dl.fmt_money(r["total_cop"], "COP")}</div>'
         "</div>"
         f"{piso_html}"
@@ -2216,12 +2225,12 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                 f'<span style="font-size:20px;font-weight:800;color:white;">{c["contactado"]}</span>'
                 f'<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.75);">{pct_contactado}% de la base</span></div>'
                 '<div style="display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;">'
-                f'<div style="width:{pct_rechazado}%;background:{COLORS["brand_orange"]};"></div>'
+                f'<div style="width:{pct_rechazado}%;background:{COLORS["coral_solid"]};"></div>'
                 f'<div style="width:{pct_pnm}%;background:rgba(255,255,255,0.45);"></div>'
                 f'<div style="width:{pct_cerrado}%;background:{COLORS["success"]};"></div>'
                 "</div>"
                 + _leyenda([
-                    ("Rechazado", c["rechazado"], COLORS["brand_orange"]),
+                    ("Rechazado", c["rechazado"], COLORS["coral_solid"]),
                     ("Palanca no mencionada", c["palanca_no_mencionada"], "rgba(255,255,255,0.45)"),
                     ("Cerrado", c["cerrado"], COLORS["success"]),
                 ])
@@ -2261,7 +2270,7 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
             "Contactado": (color_principal, "white"),
             "No Contactado": (color_principal_soft, COLORS["text"]),
             "Sin Gestionar": (COLORS["card2"], COLORS["muted"]),
-            "Rechazado": (COLORS["brand_orange"], "white"),
+            "Rechazado": (COLORS["coral_solid"], "white"),
             "Palanca no mencionada": (color_pnm, "white"),
             "Cerrado": (COLORS["success"], "white"),
         }
@@ -2559,10 +2568,18 @@ def render_brand_coverage_and_contact(farmer_or_list):
         filled = round(circ * pct, 1)
         gap = round(circ - filled, 1)
         cx = cy = size / 2
+        # Rediseño Rendimiento General (pedido explícito de Sabas, mockup
+        # aprobado): la card pasa a fondo azul petróleo -- el track de
+        # fondo del donut ya no puede ser card2 (gris claro pensado para
+        # fondo blanco, invisible/roto sobre azul petróleo); pasa a un
+        # blanco translúcido tenue. El relleno de progreso ya no lleva el
+        # color eléctrico por métrica (rojo/verde/azul/morado) -- ahora es
+        # blanco sólido fijo para las 5 donas, coherente con "las donas se
+        # rellenan de blanco" del mockup.
         return (
             f'<svg width="{size}" height="{size}" viewBox="0 0 {size} {size}">'
-            f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{COLORS["card2"]}" stroke-width="{stroke}"/>'
-            f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{color}" stroke-width="{stroke}" '
+            f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="{stroke}"/>'
+            f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{COLORS["brand_white"]}" stroke-width="{stroke}" '
             f'stroke-dasharray="{filled} {gap}" stroke-dashoffset="{circ * 0.25}" stroke-linecap="round"/>'
             f"</svg>"
         )
@@ -2631,25 +2648,30 @@ def render_brand_coverage_and_contact(farmer_or_list):
     donuts_html_parts = []
     for k, label, fixed_color in donut_specs:
         color, icon_svg = _donut_color_and_emoji(k, fixed_color)
-        # Ícono SVG gris fijo debajo del %, no emoji Unicode a color
-        # (segunda vuelta, pedido explícito de Sabas) -- mismo criterio
-        # que _rend_pill_a: el símbolo va siempre en gris monocromático,
-        # el color solo lo lleva el número de arriba.
+        # Rediseño Rendimiento General (pedido explícito de Sabas, mockup
+        # aprobado): con la card en fondo azul petróleo, el ícono de
+        # ritmo (antes gris fijo, pensado para fondo blanco) pasa a
+        # blanco -- mismo criterio que el resto de la card ("todo el
+        # progreso se ve en blanco"). El color eléctrico por métrica
+        # (_donut_color_and_emoji) ya no se usa para pintar nada acá --
+        # se sigue calculando (queda disponible si se necesita en otro
+        # lado) pero el % y el ícono dentro del donut ahora son blancos
+        # fijos, no color.
         icon_html = (
-            f'<div class="donut-emoji"><span class="lever-icon" style="width:14px;height:14px;">{icon_svg}</span></div>'
+            f'<div class="donut-emoji"><span class="lever-icon" style="width:14px;height:14px;color:{COLORS["brand_white"]};">{icon_svg}</span></div>'
             if icon_svg else ""
         )
         donuts_html_parts.append(
             f'<div class="donut-item">'
             f'<div class="donut-wrap">{_donut_svg(_donut_pct(k), color)}'
-            f'<div class="donut-pct" style="color:{color};">{_donut_pct(k) * 100:.0f}%{icon_html}</div></div>'
+            f'<div class="donut-pct" style="color:{COLORS["brand_white"]};">{_donut_pct(k) * 100:.0f}%{icon_html}</div></div>'
             f'<div class="donut-label">{label}</div>'
             f'<div class="donut-count">{_donut_count_text(k)}</div>'
             f"</div>"
         )
     donuts_html = "".join(donuts_html_parts)
     st.markdown(
-        '<div class="mgmt-card">'
+        '<div class="mgmt-card mgmt-card-dark">'
         f'<div class="mgmt-card-title"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_CONVERSION}</span>Brand Coverage · Live ({cov["total"]} marcas en cartera)</div>'
         f'<div class="donut-grid">{donuts_html}</div>'
         "</div>",
@@ -2709,29 +2731,37 @@ def render_brand_coverage_and_contact(farmer_or_list):
         txt = f"{pct}%" if pct >= 7 else ""
         return f'<div class="cp-bar-seg" style="width:{pct}%;background:{color};">{txt}</div>'
 
+    # Pasteles dedicados de Contact Performance (pedido explícito de
+    # Sabas, mockup aprobado) -- ver COLORS["cp_*"] en theme.py.
     cp_bar_html = (
         '<div class="cp-bar">'
-        + _cp_seg(calls_pct, COLORS["brand_purple"])
-        + _cp_seg(chats_pct, COLORS["success"])
-        + _cp_seg(meets_pct, COLORS["blue"])
-        + _cp_seg(ghost_pct, COLORS["danger"])
+        + _cp_seg(calls_pct, COLORS["cp_calls"])
+        + _cp_seg(chats_pct, COLORS["cp_chats"])
+        + _cp_seg(meets_pct, COLORS["cp_meets"])
+        + _cp_seg(ghost_pct, COLORS["cp_ghost"])
         + "</div>"
     )
     legend_items = [
-        (ICON_TELEFONO, "Amazon Connect", cp["calls"], calls_pct, COLORS["brand_purple"]),
-        (ICON_CHAT, "WhatsApp", cp["chats"], chats_pct, COLORS["success"]),
-        (ICON_MONITOR, "Meet", cp["meets"], meets_pct, COLORS["blue"]),
-        (ICON_FANTASMA, "No Contactado", cp["not_contacted"], ghost_pct, COLORS["danger"]),
+        (ICON_TELEFONO, "Amazon Connect", cp["calls"], calls_pct, COLORS["cp_calls"]),
+        (ICON_CHAT, "WhatsApp", cp["chats"], chats_pct, COLORS["cp_chats"]),
+        (ICON_MONITOR, "Meet", cp["meets"], meets_pct, COLORS["cp_meets"]),
+        (ICON_FANTASMA, "No Contactado", cp["not_contacted"], ghost_pct, COLORS["cp_ghost"]),
     ]
+    # Con la card en fondo azul petróleo (pedido explícito de Sabas,
+    # mockup aprobado), el ícono y el conteo de cada ítem ya no pueden
+    # ir en gris muted (pensado para fondo claro, invisible sobre azul
+    # petróleo) -- pasan a blanco apagado. El nombre del ítem sigue
+    # llevando su color pastel propio (cp_calls/cp_chats/cp_meets/
+    # cp_ghost), que es lo que distingue cada segmento en la leyenda.
     legend_html = "".join(
         f'<div class="cp-legend-item"><div class="cp-legend-dot" style="background:{color};"></div>'
-        f'<span class="lever-icon" style="margin-right:5px;vertical-align:-2px;width:13px;height:13px;">{icon_svg}</span>'
+        f'<span class="lever-icon" style="margin-right:5px;vertical-align:-2px;width:13px;height:13px;color:rgba(252,250,248,0.75);">{icon_svg}</span>'
         f'<span style="color:{color};">{label}</span>'
-        f'<span style="color:{COLORS["muted"]};font-weight:600;">{n} · {pct}%</span></div>'
+        f'<span style="color:rgba(252,250,248,0.75);font-weight:600;">{n} · {pct}%</span></div>'
         for icon_svg, label, n, pct, color in legend_items
     )
     st.markdown(
-        '<div class="mgmt-card">'
+        '<div class="mgmt-card mgmt-card-dark">'
         f'<div class="mgmt-card-title"><span class="lever-icon" style="margin-right:6px;vertical-align:-3px;">{ICON_TELEFONO}</span>Contact Performance · desde {month_label}</div>'
         f'<div class="cp-total">{cp["total_effective"]} <span class="cp-total-label">contactos efectivos</span></div>'
         f"{target_html}"
@@ -3226,7 +3256,7 @@ if _volver_a:
 # valor vacío al lado.
 _ultimo_contacto_txt = dl.fmt_fecha_es(dl.ultimo_contacto_for(row.key))
 _ultimo_contacto_html = (
-    f'<div style="font-size:11px;color:{COLORS["muted"]};white-space:nowrap;">'
+    f'<div style="font-size:11px;color:rgba(252,250,248,0.65);white-space:nowrap;">'
     f'Último contacto: {_ultimo_contacto_txt}</div>'
     if _ultimo_contacto_txt else ""
 )
@@ -3235,7 +3265,7 @@ brand_title_html = (
     '<div style="display:flex;align-items:center;">'
     '<div style="flex:1;"></div>'
     '<div style="display:flex;align-items:center;justify-content:center;gap:16px;">'
-    f'<div style="width:52px;height:52px;border-radius:50%;background:{COLORS["card2"]};'
+    f'<div style="width:52px;height:52px;border-radius:50%;background:{COLORS["brand_orange"]};color:{COLORS["brand_white"]};'
     f'display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:11px;box-sizing:border-box;">'
     f'{icon_categoria_for(row.categoria)}'
     f'</div>'
