@@ -455,6 +455,29 @@ ICON_PIN = _icon(
     '<circle cx="12" cy="9.5" r="2.3" stroke="currentColor" stroke-width="1.5" fill="none"/>'
 )
 
+# Google -- círculo con "G" en trazo, reemplaza la lupa 🔎 en el dato
+# "GOOGLE / RAPPI" de la cabecera de Ficha de Marca (pedido explícito de
+# Sabas, mockup aprobado): emoji monolineal propio en vez del emoji
+# nativo del sistema (se ve distinto por dispositivo y no se puede
+# recolorear). Mismo lenguaje visual que el resto de íconos -- círculo
+# de trazo + glifo interno, ambos en currentColor.
+ICON_GOOGLE = _icon(
+    '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>'
+    '<path d="M14.9 12.1h-2.75v1.15h1.55c-.15.85-.9 1.5-1.9 1.5-1.15 0-2.1-.95-2.1-2.15s.95-2.15 '
+    '2.1-2.15c.55 0 1.05.2 1.4.55l.9-.9c-.6-.55-1.4-.9-2.3-.9-1.85 0-3.35 1.5-3.35 3.4s1.5 3.4 3.35 '
+    '3.4c1.95 0 3.2-1.35 3.2-3.3 0-.2 0-.4-.05-.6z" fill="currentColor" stroke="none"/>'
+)
+
+# Rappi -- círculo con "R" en trazo, reemplaza el eslabón 🔗 en el mismo
+# dato de cabecera (mismo pedido/mockup que ICON_GOOGLE).
+ICON_RAPPI = _icon(
+    '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>'
+    '<path d="M10 8.6v6.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>'
+    '<path d="M10 8.6h1.9c1.05 0 1.8.7 1.8 1.65s-.75 1.65-1.8 1.65H10" '
+    'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
+    '<path d="M11.6 11.9l2.1 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>'
+)
+
 
 # Íconos de los 6 grupos de coinversión (COINV_GROUPS en data_layer.py,
 # antes 🎯🌱🚫🛡️⭐📦) -- diferenciados entre sí porque cada grupo es un

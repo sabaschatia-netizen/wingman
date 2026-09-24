@@ -45,6 +45,7 @@ from theme import (
     ICON_FUEGO,
     ICON_FUNNEL,
     ICON_GMV,
+    ICON_GOOGLE,
     ICON_MARKDOWN,
     ICON_MARKDOWN_LEVER,
     ICON_MAPA,
@@ -56,6 +57,7 @@ from theme import (
     ICON_OPS,
     ICON_ORDENES,
     ICON_PIN,
+    ICON_RAPPI,
     ICON_RAYO,
     ICON_RENDIMIENTO,
     ICON_TELEFONO,
@@ -3171,16 +3173,23 @@ churn_icon = "✅" if row.churn_status == "Disponible" else "⚠️"
 #      referencia (si no hay link, el ícono no es clickeable).
 search_url = dl.google_search_url(row.brand_name, row.categoria, row.ciudad)
 link_rappi = pitch_info["link"]
+# Íconos SVG propios (G de Google, R de Rappi) en vez de los emojis
+# nativos 🔎/🔗 -- pedido explícito de Sabas, mockup aprobado: mismo
+# lenguaje visual que el resto de la app, no depende del render del
+# emoji por dispositivo/SO. vertical-align:middle centra el ícono
+# respecto al "/" separador y al resto del texto de la fila.
+_icon_link_style = "display:inline-flex;vertical-align:middle;width:18px;height:18px;"
 link_html = (
     f'<a href="{link_rappi}" target="_blank" rel="noopener noreferrer" '
     f'title="Abrir en Rappi" aria-label="Abrir en Rappi" '
-    f'style="text-decoration:none;">🔗</a>'
-    if link_rappi else '<span style="opacity:0.3;" title="Sin link disponible">🔗</span>'
+    f'style="text-decoration:none;{_icon_link_style}">{ICON_RAPPI}</a>'
+    if link_rappi else
+    f'<span style="opacity:0.3;{_icon_link_style}" title="Sin link disponible">{ICON_RAPPI}</span>'
 )
 google_html = (
     f'<a href="{search_url}" target="_blank" rel="noopener noreferrer" '
     f'title="Buscar en Google" aria-label="Buscar en Google" '
-    f'style="text-decoration:none;">🔎</a>'
+    f'style="text-decoration:none;{_icon_link_style}">{ICON_GOOGLE}</a>'
 )
 
 contact_html = (
