@@ -1558,6 +1558,12 @@ def render_loading_watcher():
           var LOCAL_TRIGGERS = [
             {{ btnKey: 'comercial_tab_btn_ads', anchorKey: 'comercial_tabs_anchor' }},
             {{ btnKey: 'comercial_tab_btn_md', anchorKey: 'comercial_tabs_anchor' }},
+            // Tab Churn (cuadragésima segunda vuelta, pedido explícito
+            // de Sabas: "cuando yo cambio a Chon... no está viéndose"
+            // el loader) -- faltaba esta entrada, el botón ya existía
+            // desde que se agregó la tercera tab pero nunca se registró
+            // acá, así que nunca disparaba el overlay local.
+            {{ btnKey: 'comercial_tab_btn_churn', anchorKey: 'comercial_tabs_anchor' }},
             // 'mapa_' (pedido explícito de Sabas, trigésima tercera
             // vuelta: "elegir Farmer primero, como ya funciona en
             // Rendimiento Comercial") -- el mismo botón físico de
@@ -2215,7 +2221,12 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
         with st.container(key=f"comercial_blk_base_{kind}"):
             base_html = (
                 f'<div class="comercial-blk-visual" style="width:100%;background:{color_principal};border:{borde_base};border-radius:16px 16px 0 0;padding:16px 24px;box-sizing:border-box;">'
-                f'<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.75);">{etiqueta_base} (inicio de mes)</div>'
+                # Título sin insight entre paréntesis (pedido explícito
+                # de Sabas, cuadragésima tercera vuelta: "esos insights
+                # vamos a quitarlos de ahí... deja solamente
+                # prospectados ads, prospectados MD") -- antes decía
+                # "Prospectados (inicio de mes)".
+                f'<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.75);">{etiqueta_base}</div>'
                 f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
                 f'<span style="font-size:26px;font-weight:800;color:white;">{c["base"]}</span>'
                 f'<span style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.75);">100%</span></div>'
@@ -2292,18 +2303,18 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
         )
 
         with st.container(key=f"comercial_blk_cierre_{kind}"):
-            # Texto visible bajo el bloque de Cierre -- actualizado
-            # (cuadragésima vuelta) para reflejar la fuente real nueva:
-            # antes "Ads Comercial"/"Productivity", ahora ambos salen de
-            # las hojas *_ACQ correspondientes (ver comentario de
-            # sección arriba y rendimiento_comercial_ads_for/md_for).
-            # Churn (cuadragésima segunda vuelta) sale de PITCHDATA
-            # ("Última Orden").
-            fuente_cierre = {"ads": "Ads nominal ACQ", "md": "MD nominal ACQ", "churn": "Pitchdata"}[kind]
+            # Título sin insight de fuente entre paréntesis (pedido
+            # explícito de Sabas, cuadragésima tercera vuelta: "quita
+            # ese de que dice entre paréntesis MD nominal o ads
+            # nominal... quita ese pitch data de ahí... deja
+            # solamente... adquiridos ads, adquiridos [md]... en los
+            # títulos normales") -- antes decía "Adquiridos (Ads nominal
+            # ACQ)" / "Adquiridos · MD (MD nominal ACQ)" / "Recuperados
+            # (Pitchdata)".
             n_cierre = c["recuperado"] if kind == "churn" else c["cerrado"]
             cierre_html = (
                 f'<div class="comercial-blk-visual" style="width:100%;background:{color_principal};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(18,62,74,0.25);">'
-                f'<div style="font-size:10.5px;font-weight:700;color:rgba(255,255,255,0.75);">{etiqueta_cierre} ({fuente_cierre})</div>'
+                f'<div style="font-size:10.5px;font-weight:700;color:rgba(255,255,255,0.75);">{etiqueta_cierre}</div>'
                 f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
                 f'<span style="font-size:20px;font-weight:800;color:white;">{n_cierre}</span>'
                 f'<span style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,0.75);">{pct_cierre_base}% base · {win_rate}% de contactados</span></div>'
@@ -2338,8 +2349,19 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
         # name, el status... y después la cuarta columna, ahí sí es la
         # pill de si está contactado" -- dos pills distintas en la misma
         # fila, no una).
+        #
+        # BUG REAL CORREGIDO antes de entregar (confirmado por Sabas:
+        # "la pill de estatus en Churn de PW1 está amarillo sobre
+        # amarillo. Eso se distorsiona"): el fondo/texto anteriores
+        # (rgba(251,191,36,0.28) + #FDE68A) estaban pensados para una
+        # pill sobre fondo azul petróleo oscuro (como .conn-status-pill
+        # en la cabecera de Ficha de Marca) -- acá la pill vive en la
+        # tabla, sobre fondo BLANCO, así que texto claro sobre fondo
+        # claro se veía casi ilegible. Mismo par que ya usa
+        # sup-pill-yellow en el resto de la app para tablas blancas:
+        # fondo amarillo pastel tenue + texto ámbar oscuro.
         color_status_churn = {
-            "PW1": ("rgba(251,191,36,0.28)", "#FDE68A"),
+            "PW1": ("rgba(251,191,36,0.16)", "#A97A1E"),
             "Churn": (COLORS["coral_solid"], "white"),
         }
 
