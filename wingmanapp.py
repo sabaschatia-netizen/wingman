@@ -3012,13 +3012,19 @@ if st.session_state["view"] == "landing":
             else:
                 farmer_para_funnel = selected
 
-            # Tabs propios con botones, NO st.tabs() nativo -- st.tabs() no
-            # expone un key que persista cuál está activo entre reruns, y
-            # necesitamos recordarlo para el botón Volver de la Ficha de
-            # Marca (pedido explícito: "que quede en el MISMO bloque del
-            # funnel que tenía antes").
+            # Tabs propios con botones re-skineados como st.tabs()
+            # (pedido explícito de Sabas: "quiero que ahora la forma de
+            # esas tabs sea así" -- refiriéndose al look de las tabs de
+            # Ficha de Marca) -- siguen siendo st.button() reales, NO
+            # st.tabs() nativo, por el mismo motivo de siempre: st.tabs()
+            # no expone un key que persista cuál está activo entre
+            # reruns, y hace falta recordarlo para el botón Volver de la
+            # Ficha de Marca. El CSS en theme.py (scoped a
+            # .st-key-comercial_tabs_anchor) es lo que hace que estos
+            # botones SE VEAN como las tabs nativas de .stTabs, en vez
+            # del botón sólido naranja/gris de siempre.
             with st.container(key="comercial_tabs_anchor"):
-                tcol1, tcol2 = st.columns(2)
+                tcol1, tcol2, tcol3 = st.columns(3)
                 with tcol1:
                     if st.button("Ads", key="comercial_tab_btn_ads", use_container_width=True,
                                  type="primary" if st.session_state["comercial_tab_activo"] == "ads" else "secondary"):
@@ -3029,14 +3035,27 @@ if st.session_state["view"] == "landing":
                                  type="primary" if st.session_state["comercial_tab_activo"] == "md" else "secondary"):
                         st.session_state["comercial_tab_activo"] = "md"
                         st.rerun()
+                with tcol3:
+                    if st.button("Churn", key="comercial_tab_btn_churn", use_container_width=True,
+                                 type="primary" if st.session_state["comercial_tab_activo"] == "churn" else "secondary"):
+                        st.session_state["comercial_tab_activo"] = "churn"
+                        st.rerun()
 
             st.markdown('<div style="margin-top:16px;"></div>', unsafe_allow_html=True)
 
             with st.container(key="comercial_funnel_zona"):
                 if st.session_state["comercial_tab_activo"] == "ads":
                     _render_funnel_comercial("ads", farmer_para_funnel)
-                else:
+                elif st.session_state["comercial_tab_activo"] == "md":
                     _render_funnel_comercial("md", farmer_para_funnel)
+                else:
+                    # Tab Churn: todavía en diseño de reglas con Sabas
+                    # (Prospectados/Contactados/Recuperados a nivel
+                    # Store, criterio de "Recuperado" pendiente de
+                    # cerrar) -- placeholder explícito en vez de llamar
+                    # a _render_funnel_comercial("churn", ...), que
+                    # todavía no soporta ese kind.
+                    st.info("El funnel de Churn está en construcción.")
 
 
     # =====================================================

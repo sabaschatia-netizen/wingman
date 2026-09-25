@@ -956,6 +956,46 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     color: {COLORS["brand_white"]} !important;
 }}
 
+/* Tabs de Rendimiento Comercial (Ads/Markdown/Churn) -- pedido explícito
+   de Sabas: "ya no quiero [el botón sólido naranja tipo hover]... quiero
+   que ahora la forma de esas tabs sea así" (refiriéndose al look de las
+   tabs reales de Ficha de Marca, .stTabs arriba). Siguen siendo
+   st.button() reales (kind="primary"/"secondary"), NO st.tabs() nativo
+   -- necesitan persistir cuál está activo entre reruns para el botón
+   Volver de la Ficha de Marca, algo que st.tabs() no permite. Este CSS
+   solo cambia cómo SE VEN, reproduciendo el mismo lenguaje visual de
+   .stTabs (fondo translúcido claro en reposo, texto gris; blanco sólido
+   + texto morado + más peso cuando está activa) en vez del botón sólido
+   naranja/gris por defecto de kind="primary"/"secondary". La línea
+   inferior naranja se simula con border-bottom (acá no existe el
+   highlight nativo de Streamlit, que solo vive dentro de un st.tabs()
+   real). */
+.st-key-comercial_tabs_anchor .stButton button {{
+    background: rgba(255,255,255,0.4) !important;
+    color: {COLORS["muted"]} !important;
+    border: none !important; border-bottom: 2px solid {COLORS["border"]} !important;
+    border-radius: 10px 10px 0 0 !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+    transition: background .15s, box-shadow .15s, padding .15s;
+}}
+.st-key-comercial_tabs_anchor .stButton button:hover {{
+    color: {COLORS["brand_purple"]} !important;
+    border-color: {COLORS["border"]} !important;
+}}
+.st-key-comercial_tabs_anchor .stButton button[kind="primary"] {{
+    background: {COLORS["card"]} !important;
+    color: {COLORS["brand_purple"]} !important;
+    border-bottom: 2px solid {COLORS["brand_orange"]} !important;
+    font-weight: 800 !important;
+    font-size: 1.05em !important;
+    box-shadow: 0 -4px 14px rgba(0,0,0,0.08) !important;
+}}
+.st-key-comercial_tabs_anchor .stButton button[kind="primary"]:hover {{
+    background: {COLORS["card"]} !important;
+    color: {COLORS["brand_purple"]} !important;
+}}
+
 /* Botón de submit del login ("Entrar" / "Entrar como Supervisor") --
    pedido explícito de Sabas: blanco, no naranja (con el naranja
    genérico, quedaba casi invisible contra el fondo también naranja del
