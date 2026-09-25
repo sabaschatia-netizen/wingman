@@ -17,7 +17,7 @@ Reglas que no se rompen:
 import os
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import quote_plus
 
 import pandas as pd
@@ -5948,6 +5948,262 @@ def rendimiento_comercial_md_for(farmer_email):
             "base": len(base_rows), "contactado": contactado_n,
             "no_contactado": no_contactado_n, "sin_gestionar": sin_gestionar_n,
             "rechazado": rechazado_n, "palanca_no_mencionada": pnm_n, "cerrado": cerrado_n,
+        },
+    }
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def rendimiento_comercial_churn_for(farmer_email):
+    """
+    Funnel de Rendimiento Comercial · Churn -- pedido explícito de Sabas
+    (cuadragésima segunda vuelta), tercera tab de Rendimiento Comercial
+    junto a Ads y Markdown. A diferencia de esas dos, TODO este funnel
+    corre a nivel STORE (COUNTRY_STORE_ID), no a nivel Brand -- pedido
+    explícito: "Churn también está medido con Store... todo lo van a
+    manejar por store... si hay una brand que tiene tres stores Churn y
+    recuperamos solo una, solo una. Las otras dos mantenerlas en su
+    estado como estén." Cada fila de las 3 tablas es una STORE, con su
+    Brand ID/Name de referencia (una marca con varias stores aparece
+    varias veces, una fila por store).
+
+    Fuentes:
+      - Prospectados: hoja CHURN, columna "Estado Actual" -- entra toda
+        store cuyo estado más reciente (mayor WEEK) sea "PW1" o "Churn"
+        (los únicos dos valores que existen hoy en el archivo real).
+        Tabla de detalle con 4 columnas (a diferencia de Ads/MD que
+        tienen 3): Brand ID, Brand Name, Status (PW1/Churn, el dato
+        crudo de esta hoja) y la pill de gestión (Contactado/No
+        Contactado/Sin Gestionar) en una cuarta columna aparte -- pedido
+        explícito: "cuando yo presione la tabla debe decirme brand ID,
+        brand name, el status... y después la cuarta columna, ahí sí es
+        la pill de si está contactado".
+      - Contactado / No Contactado / Sin Gestionar: hoja PRODUCTIVITY,
+        cruzando por "Country Store ID" (NO por Brand -- pedido
+        explícito: "con productivity sí lo cruzas a nivel brand [seguía
+        siendo ambiguo], verifícalo" -- se verificó: PRODUCTIVITY sí
+        tiene su propia columna "Country Store ID", exacto mismo formato
+        que COUNTRY_STORE_ID de CHURN, cruce directo sin pasar por
+        Brand) con "¿Contactado?" == SI.
+      - Recuperado / Baja total (dentro de las Contactadas, SIN tercer
+        estado -- pedido explícito: "elimina ese palanca no mencionada...
+        en los contactados simplemente vas a colocar baja total y
+        recuperados"): hoja PITCHDATA, columna "Última Orden", cruzando
+        por Store ID (mismo formato que COUNTRY_STORE_ID, cruce directo
+        verificado). Recuperado = la store tuvo al menos un pedido
+        DENTRO de la semana actual (lunes a domingo, calculada con
+        datetime.now() -- MISMO criterio que el resto de la app usa para
+        "hoy", sin zona horaria explícita, confirmado explícitamente por
+        Sabas: "no, usa datetime.now() tal cual, igual que el resto de
+        la app hoy" -- aunque él mismo la haya descrito en referencia al
+        calendario de Colombia). Baja total = no tuvo ningún pedido esa
+        semana (incluida la store sin ninguna fecha en absoluto).
+      - La tabla de Contactados solo muestra Baja total (pedido
+        explícito: "si estoy sobre contactado, solo me muestra los de
+        baja total") -- mismo patrón que ya usan Ads/MD para excluir
+        Cerrado de esa vista, acá excluye Recuperado.
+      - El bloque de cierre se llama "Recuperados", no "Cerrado" ni
+        "Adquiridos" (pedido explícito).
+
+    Orden de las 3 tablas (pedido explícito, cuadragésima segunda
+    vuelta): NO por Target a secas -- primero las stores cuya MARCA
+    tiene Ads activo (bookings > 0 en load_ads(), mismo criterio que ya
+    usa Brand Coverage), ordenadas entre sí por Target de Ads
+    descendente; DESPUÉS las que no tienen Ads activo, también
+    ordenadas entre sí por ese mismo Target descendente -- nunca una
+    sin-Ads se cuela antes que una con-Ads, aunque tenga target más
+    alto. Confirmado explícitamente que el "target"/"ads activo de
+    USD X" de su ejemplo es el mismo Targets Bookings de EXPORT ADS
+    RELATION que ya usan Ads/MD, no revenue real.
+
+    Devuelve el mismo esqueleto que Ads/MD, con las filas llevando
+    "store_id" y "status" (PW1/Churn) además de "id"/"nombre" (Brand ID/
+    Name -- puede repetirse entre filas de la misma marca) y "estado".
+    Sin "target"/"valor" en las filas (no se pidieron), el orden ya
+    resuelve el rol que el target cumplía en Ads.
+    """
+    vacio = {
+        "base": [], "contactado": [], "cierre": [],
+        "counts": {"base": 0, "contactado": 0, "no_contactado": 0, "sin_gestionar": 0,
+                   "recuperado": 0, "baja_total": 0},
+    }
+
+    # Prospectados: hoja CHURN, estado más reciente por STORE (no por
+    # marca -- ver docstring). Reimplementado acá en vez de reusar
+    # load_churn()/churn_map() porque esas dos ya colapsan a nivel Brand
+    # (quedándose con una sola fila por brand_key), perdiendo justo la
+    # granularidad de store que este funnel necesita.
+    df_churn = _read("churn")
+    if df_churn.empty:
+        return vacio
+    c_brand_id = pick_col(df_churn, "COUNTRY_BRAND_ID")
+    c_store_id = pick_col(df_churn, "COUNTRY_STORE_ID")
+    c_brand_name = pick_col(df_churn, "BRAND_NAME")
+    c_week = pick_col(df_churn, "WEEK")
+    c_estado = pick_col(df_churn, "Estado Actual")
+    c_farmer = pick_col(df_churn, "FARMER")
+    if not (c_brand_id and c_store_id and c_estado and c_farmer):
+        return vacio
+
+    # FARMER en CHURN viene SIN dominio de correo ("sabas.ramirez", no
+    # "sabas.ramirez@rappi.com") -- verificado contra los 22 farmers
+    # reales del archivo: el prefijo antes de "@" es único para cada
+    # uno, sin colisiones, así que comparar por prefijo en minúscula es
+    # seguro (confirmado explícitamente por Sabas: "la hoja de churn te
+    # dice el farmer").
+    prefijo_farmer = str(farmer_email).strip().lower().split("@")[0]
+
+    # Una store puede tener varias filas (varias semanas) -- nos
+    # quedamos con la de WEEK más reciente por store, mismo criterio que
+    # load_churn() ya usa a nivel marca.
+    df_churn = df_churn.copy()
+    df_churn["_farmer_norm"] = df_churn[c_farmer].astype(str).str.strip().str.lower()
+    df_f = df_churn[df_churn["_farmer_norm"] == prefijo_farmer]
+    if df_f.empty:
+        return vacio
+    if c_week:
+        df_f = df_f.sort_values(c_week)
+    df_f = df_f.drop_duplicates(subset=c_store_id, keep="last")
+
+    store_a_brandkey, store_a_brandnombre, store_a_status = {}, {}, {}
+    for _, r in df_f.iterrows():
+        store_id = str(r.get(c_store_id) or "").strip()
+        brand_id = r.get(c_brand_id)
+        estado = str(r.get(c_estado) or "").strip()
+        if not store_id or not brand_id or estado not in ("PW1", "Churn"):
+            continue
+        store_a_brandkey[store_id] = brand_key(brand_id)
+        store_a_brandnombre[store_id] = str(r.get(c_brand_name) or "").strip() if c_brand_name else ""
+        store_a_status[store_id] = estado
+
+    if not store_a_brandkey:
+        return vacio
+
+    # Contactado / No Contactado / Sin Gestionar -- PRODUCTIVITY,
+    # cruzando por "Country Store ID" (no por Brand, ver docstring).
+    df_prod = _read("productivity")
+    contactadas_si, tiene_registro = set(), set()
+    if not df_prod.empty:
+        c_store_prod = pick_col(df_prod, "Country Store ID")
+        c_prod_farmer = pick_col(df_prod, "Farmer", "KAM")
+        c_contactado = pick_col(df_prod, "¿Contactado?", "Contactado")
+        if c_store_prod and c_prod_farmer:
+            for _, r in df_prod.iterrows():
+                farmer = r.get(c_prod_farmer)
+                store_id = r.get(c_store_prod)
+                if farmer != farmer_email or not store_id:
+                    continue
+                sid = str(store_id).strip()
+                tiene_registro.add(sid)
+                if c_contactado and str(r.get(c_contactado) or "").strip().upper() == "SI":
+                    contactadas_si.add(sid)
+
+    # Recuperado / Baja total -- PITCHDATA, columna "Última Orden",
+    # cruzando por Store ID directo (mismo formato que COUNTRY_STORE_ID,
+    # verificado). Recuperado = tuvo pedido DENTRO de la semana actual
+    # (lunes a domingo). "Semana actual" con datetime.now() a secas --
+    # mismo criterio que el resto de la app (confirmado explícitamente
+    # por Sabas, ver docstring).
+    hoy = datetime.now()
+    lunes_semana = (hoy - timedelta(days=hoy.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    domingo_semana = lunes_semana + timedelta(days=6, hours=23, minutes=59, seconds=59)
+
+    df_pitch = _read("pitchdata")
+    ultima_orden_por_store = {}
+    if not df_pitch.empty:
+        c_store_pitch = pick_col(df_pitch, "Store ID")
+        c_orden = pick_col(df_pitch, "Última Orden", "Ultima Orden")
+        if c_store_pitch and c_orden:
+            for _, r in df_pitch.iterrows():
+                store_id = r.get(c_store_pitch)
+                orden = r.get(c_orden)
+                if not store_id or pd.isna(orden):
+                    continue
+                ultima_orden_por_store[str(store_id).strip()] = pd.to_datetime(orden, errors="coerce")
+
+    def _recuperada(store_id):
+        fecha = ultima_orden_por_store.get(store_id)
+        if fecha is None or pd.isna(fecha):
+            return False
+        return lunes_semana <= fecha <= domingo_semana
+
+    # Orden en dos niveles (pedido explícito, ver docstring): primero
+    # Ads activo (bookings > 0), luego Target de Ads descendente -- el
+    # MISMO orden se aplica a las 3 tablas (Prospectados/Contactados/
+    # Recuperados), por eso se calcula una sola vez acá arriba y se
+    # reusa en el sort de las 3 listas.
+    ads_df = load_ads()
+    ads_bookings = dict(zip(ads_df["key"], ads_df["bookings"])) if not ads_df.empty else {}
+
+    df_rel = _read("export_ads_relation")
+    brand_target = {}
+    if not df_rel.empty:
+        c_rel_farmer = pick_col(df_rel, "KAM", "OWNER", "FARMER")
+        c_rel_brand = pick_col(df_rel, "BRAND ID-NAME", "BRAND")
+        c_rel_target = pick_col(df_rel, "Targets Bookings")
+        if c_rel_farmer and c_rel_brand and c_rel_target:
+            for _, r in df_rel.iterrows():
+                farmer, brand = r.get(c_rel_farmer), r.get(c_rel_brand)
+                if farmer != farmer_email or not brand or str(brand).strip() == "Total":
+                    continue
+                m = re.match(r"^(\d+)", str(brand).strip())
+                if m:
+                    brand_target[brand_key(int(m.group(1)))] = to_num(r.get(c_rel_target), default=None)
+
+    def _orden_key(key):
+        # Ads activo primero (True > False en el sort con reverse=True
+        # ya que ambos criterios van en la misma dirección); dentro de
+        # cada grupo, Target descendente. Target ausente ("—") se trata
+        # como 0 para el ordenamiento, igual que ya hace Ads.
+        activo = ads_bookings.get(key, 0.0) > 0
+        target = brand_target.get(key)
+        return (activo, target if target is not None else -1)
+
+    base_rows, contactado_rows, cierre_rows = [], [], []
+    no_contactado_n = sin_gestionar_n = recuperado_n = baja_total_n = 0
+
+    for store_id, key in store_a_brandkey.items():
+        nombre = store_a_brandnombre.get(store_id, "")
+        status = store_a_status.get(store_id, "")
+        if store_id in contactadas_si:
+            estado_base = "Contactado"
+        elif store_id in tiene_registro:
+            estado_base = "No Contactado"
+            no_contactado_n += 1
+        else:
+            estado_base = "Sin Gestionar"
+            sin_gestionar_n += 1
+        base_rows.append({
+            "id": key, "nombre": nombre, "store_id": store_id,
+            "status": status, "estado": estado_base,
+        })
+
+        if store_id not in contactadas_si:
+            continue
+        if _recuperada(store_id):
+            estado_c = "Recuperado"
+            recuperado_n += 1
+            cierre_rows.append({"id": key, "nombre": nombre, "store_id": store_id, "estado": estado_c})
+        else:
+            estado_c = "Baja total"
+            baja_total_n += 1
+        contactado_rows.append({
+            "id": key, "nombre": nombre, "store_id": store_id, "estado": estado_c,
+        })
+
+    # Orden en dos niveles (Ads activo, luego Target descendente),
+    # aplicado a las 3 tablas -- pedido explícito, ver docstring arriba.
+    base_rows.sort(key=lambda r: _orden_key(r["id"]), reverse=True)
+    contactado_rows.sort(key=lambda r: _orden_key(r["id"]), reverse=True)
+    cierre_rows.sort(key=lambda r: _orden_key(r["id"]), reverse=True)
+
+    contactado_n = recuperado_n + baja_total_n
+
+    return {
+        "base": base_rows, "contactado": contactado_rows, "cierre": cierre_rows,
+        "counts": {
+            "base": len(base_rows), "contactado": contactado_n,
+            "no_contactado": no_contactado_n, "sin_gestionar": sin_gestionar_n,
+            "recuperado": recuperado_n, "baja_total": baja_total_n,
         },
     }
 

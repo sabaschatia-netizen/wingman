@@ -2127,18 +2127,29 @@ col_main.__enter__()
 # Ads").
 def _render_funnel_comercial(kind, farmer_para_funnel):
     """
-    kind: "ads" o "md". Dibuja el funnel de 3 bloques + tabla al
-    lado, con click-en-bloque, ID clickeable a la Ficha de Marca
+    kind: "ads", "md" o "churn". Dibuja el funnel de 3 bloques + tabla
+    al lado, con click-en-bloque, ID clickeable a la Ficha de Marca
     (con botón Volver que recuerda tab+bloque), loader acotado solo
     al cuadro de la tabla, y fila de Total en Cierre (solo Ads).
+
+    "churn" (pedido explícito de Sabas, cuadragésima segunda vuelta) es
+    el más distinto de los tres: corre a nivel STORE, no Brand (una
+    marca con varias stores aparece varias veces en las tablas, una fila
+    por store -- ver rendimiento_comercial_churn_for), el bloque 2 solo
+    tiene 2 segmentos (Recuperado/Baja total, sin "Palanca no
+    mencionada"), el bloque 3 se llama "Recuperados" (no "Adquiridos"/
+    "Cerrado"), y la tabla de Prospectados tiene una columna extra
+    ("Status": PW1/Churn) que Ads/MD no tienen.
     """
     vista_key = f"comercial_{kind}_vista"
     st.session_state.setdefault(vista_key, "base")
 
     if kind == "ads":
         datos = dl.rendimiento_comercial_ads_for(farmer_para_funnel)
-    else:
+    elif kind == "md":
         datos = dl.rendimiento_comercial_md_for(farmer_para_funnel)
+    else:
+        datos = dl.rendimiento_comercial_churn_for(farmer_para_funnel)
     c = datos["counts"]
 
     if c["base"] == 0:
@@ -2148,11 +2159,21 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
     pct_contactado = round(c["contactado"] / c["base"] * 100, 1) if c["base"] else 0
     pct_no_cont = round(c["no_contactado"] / c["base"] * 100, 1) if c["base"] else 0
     pct_sin_gest = round(c["sin_gestionar"] / c["base"] * 100, 1) if c["base"] else 0
-    pct_rechazado = round(c["rechazado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
-    pct_pnm = round(c["palanca_no_mencionada"] / c["contactado"] * 100, 1) if c["contactado"] else 0
-    pct_cerrado = round(c["cerrado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
-    pct_cierre_base = round(c["cerrado"] / c["base"] * 100, 1) if c["base"] else 0
-    win_rate = pct_cerrado
+    if kind == "churn":
+        # Solo 2 segmentos dentro de Contactado (pedido explícito: "en
+        # los contactados simplemente vas a colocar baja total y
+        # recuperados") -- sin el tercer "palanca no mencionada" que sí
+        # tienen Ads/MD.
+        pct_recuperado = round(c["recuperado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+        pct_baja_total = round(c["baja_total"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+        pct_cierre_base = round(c["recuperado"] / c["base"] * 100, 1) if c["base"] else 0
+        win_rate = pct_recuperado
+    else:
+        pct_rechazado = round(c["rechazado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+        pct_pnm = round(c["palanca_no_mencionada"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+        pct_cerrado = round(c["cerrado"] / c["contactado"] * 100, 1) if c["contactado"] else 0
+        pct_cierre_base = round(c["cerrado"] / c["base"] * 100, 1) if c["base"] else 0
+        win_rate = pct_cerrado
 
     # Colores (pedido explícito, vigésima octava vuelta): "los
     # bloques ahora serán de color azul de la sidebar, y las letras
@@ -2164,8 +2185,8 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
     color_principal_soft = "rgba(18,62,74,0.16)"
     color_pnm = COLORS["muted"]
 
-    etiqueta_base = "Prospectados" if kind == "ads" else "Prospectados · MD"
-    etiqueta_cierre = "Adquiridos" if kind == "ads" else "Adquiridos · MD"
+    etiqueta_base = {"ads": "Prospectados", "md": "Prospectados · MD", "churn": "Prospectados · Churn"}[kind]
+    etiqueta_cierre = {"ads": "Adquiridos", "md": "Adquiridos · MD", "churn": "Recuperados"}[kind]
 
     col_funnel, col_tabla = st.columns([1, 1])
     with col_funnel:
@@ -2223,22 +2244,39 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
         )
 
         with st.container(key=f"comercial_blk_contactado_{kind}"):
+            if kind == "churn":
+                # 2 segmentos, sin "palanca no mencionada" (pedido
+                # explícito, ver docstring de la función).
+                contactado_barra = (
+                    '<div style="display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;">'
+                    f'<div style="width:{pct_baja_total}%;background:{COLORS["coral_solid"]};"></div>'
+                    f'<div style="width:{pct_recuperado}%;background:{COLORS["success"]};"></div>'
+                    "</div>"
+                    + _leyenda([
+                        ("Baja total", c["baja_total"], COLORS["coral_solid"]),
+                        ("Recuperado", c["recuperado"], COLORS["success"]),
+                    ])
+                )
+            else:
+                contactado_barra = (
+                    '<div style="display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;">'
+                    f'<div style="width:{pct_rechazado}%;background:{COLORS["coral_solid"]};"></div>'
+                    f'<div style="width:{pct_pnm}%;background:rgba(255,255,255,0.45);"></div>'
+                    f'<div style="width:{pct_cerrado}%;background:{COLORS["success"]};"></div>'
+                    "</div>"
+                    + _leyenda([
+                        ("Rechazado", c["rechazado"], COLORS["coral_solid"]),
+                        ("Palanca no mencionada", c["palanca_no_mencionada"], "rgba(255,255,255,0.45)"),
+                        ("Cerrado", c["cerrado"], COLORS["success"]),
+                    ])
+                )
             contactado_html = (
                 f'<div class="comercial-blk-visual" style="width:100%;background:{color_principal};border:{borde_contactado};border-top:none;padding:14px 22px;box-sizing:border-box;">'
                 f'<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.75);">Contactados</div>'
                 f'<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;">'
                 f'<span style="font-size:20px;font-weight:800;color:white;">{c["contactado"]}</span>'
                 f'<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.75);">{pct_contactado}% de la base</span></div>'
-                '<div style="display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;">'
-                f'<div style="width:{pct_rechazado}%;background:{COLORS["coral_solid"]};"></div>'
-                f'<div style="width:{pct_pnm}%;background:rgba(255,255,255,0.45);"></div>'
-                f'<div style="width:{pct_cerrado}%;background:{COLORS["success"]};"></div>'
-                "</div>"
-                + _leyenda([
-                    ("Rechazado", c["rechazado"], COLORS["coral_solid"]),
-                    ("Palanca no mencionada", c["palanca_no_mencionada"], "rgba(255,255,255,0.45)"),
-                    ("Cerrado", c["cerrado"], COLORS["success"]),
-                ])
+                + contactado_barra
                 + "</div>"
             )
             st.markdown(contactado_html, unsafe_allow_html=True)
@@ -2259,12 +2297,15 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
             # antes "Ads Comercial"/"Productivity", ahora ambos salen de
             # las hojas *_ACQ correspondientes (ver comentario de
             # sección arriba y rendimiento_comercial_ads_for/md_for).
-            fuente_cierre = "Ads nominal ACQ" if kind == "ads" else "MD nominal ACQ"
+            # Churn (cuadragésima segunda vuelta) sale de PITCHDATA
+            # ("Última Orden").
+            fuente_cierre = {"ads": "Ads nominal ACQ", "md": "MD nominal ACQ", "churn": "Pitchdata"}[kind]
+            n_cierre = c["recuperado"] if kind == "churn" else c["cerrado"]
             cierre_html = (
                 f'<div class="comercial-blk-visual" style="width:100%;background:{color_principal};border:{borde_cierre};border-top:none;border-radius:0 0 16px 16px;padding:14px 20px;box-sizing:border-box;box-shadow:0 4px 14px rgba(18,62,74,0.25);">'
                 f'<div style="font-size:10.5px;font-weight:700;color:rgba(255,255,255,0.75);">{etiqueta_cierre} ({fuente_cierre})</div>'
                 f'<div style="display:flex;align-items:baseline;gap:7px;margin-top:2px;">'
-                f'<span style="font-size:20px;font-weight:800;color:white;">{c["cerrado"]}</span>'
+                f'<span style="font-size:20px;font-weight:800;color:white;">{n_cierre}</span>'
                 f'<span style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,0.75);">{pct_cierre_base}% base · {win_rate}% de contactados</span></div>'
                 f'<div style="margin-top:8px;"><span style="background:{COLORS["success"]};color:white;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;">Win rate {win_rate}%</span></div>'
                 "</div>"
@@ -2273,6 +2314,7 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
             if st.button(" ", key=f"comercial_blk_cierre_btn_{kind}"):
                 st.session_state[vista_key] = "cierre"
                 st.rerun()
+
 
     with col_tabla:
         vista = st.session_state[vista_key]
@@ -2283,7 +2325,31 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
             "Rechazado": (COLORS["coral_solid"], "white"),
             "Palanca no mencionada": (color_pnm, "white"),
             "Cerrado": (COLORS["success"], "white"),
+            # Churn (cuadragésima segunda vuelta): mismos 2 colores que
+            # Rechazado/Cerrado, reusados semánticamente -- rojo coral
+            # para lo negativo (Baja total), verde para lo positivo
+            # (Recuperado).
+            "Baja total": (COLORS["coral_solid"], "white"),
+            "Recuperado": (COLORS["success"], "white"),
         }
+        # Status crudo de CHURN (PW1/Churn) -- pill propia, distinta de
+        # color_estado (esto no es un estado de GESTIÓN, es el dato
+        # crudo de la hoja CHURN; pedido explícito: "brand ID, brand
+        # name, el status... y después la cuarta columna, ahí sí es la
+        # pill de si está contactado" -- dos pills distintas en la misma
+        # fila, no una).
+        color_status_churn = {
+            "PW1": ("rgba(251,191,36,0.28)", "#FDE68A"),
+            "Churn": (COLORS["coral_solid"], "white"),
+        }
+
+        def _pill_status(valor):
+            bg, fg = color_status_churn.get(valor, (COLORS["card2"], COLORS["muted"]))
+            return (
+                f'<span style="background:{bg};color:{fg};font-size:11px;font-weight:800;'
+                f'padding:3px 10px;border-radius:999px;display:inline-block;white-space:nowrap;">{html_lib.escape(str(valor))}</span>'
+            )
+
 
         def _pill_gris(valor):
             return (
@@ -2330,11 +2396,17 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                 if vista == "base":
                     filas = datos["base"]
                 elif vista == "contactado":
-                    filas = [f for f in datos["contactado"] if f["estado"] != "Cerrado"]
+                    # Solo Baja total en esta vista (pedido explícito
+                    # para churn: "si estoy sobre contactado, solo me
+                    # muestra los de baja total") -- excluye "Cerrado"
+                    # para ads/md, "Recuperado" para churn.
+                    estado_excluido = "Recuperado" if kind == "churn" else "Cerrado"
+                    filas = [f for f in datos["contactado"] if f["estado"] != estado_excluido]
                 else:
                     filas = datos["cierre"]
 
-                st.markdown(f'<div style="font-size:13px;font-weight:800;color:{COLORS["text"]};margin-bottom:8px;">{titulo} · {len(filas)} marcas</div>', unsafe_allow_html=True)
+                etiqueta_filas = "stores" if kind == "churn" else "marcas"
+                st.markdown(f'<div style="font-size:13px;font-weight:800;color:{COLORS["text"]};margin-bottom:8px;">{titulo} · {len(filas)} {etiqueta_filas}</div>', unsafe_allow_html=True)
 
                 if not filas:
                     st.info("Sin marcas en esta vista.")
@@ -2346,6 +2418,13 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                     # "AR104180" sin cortar), Target más angosto en MD
                     # (no existe esa columna en absoluto).
                     con_target = kind == "ads" and vista != "cierre"
+                    # Prospectados de Churn (pedido explícito,
+                    # cuadragésima segunda vuelta): 4 columnas -- ID,
+                    # Nombre, Status (PW1/Churn, dato crudo de la hoja
+                    # CHURN) y Estado (la pill de gestión) -- a
+                    # diferencia de Ads/MD que solo tienen 3 en esa
+                    # vista.
+                    con_status_churn = kind == "churn" and vista == "base"
                     # Mismas proporciones que row_cols (st.columns) de
                     # abajo, expresadas como fracciones CSS Grid (fr) --
                     # así el header y las filas quedan alineados en vez
@@ -2353,7 +2432,7 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                     # desalinearse sutilmente contra los ratios reales.
                     if vista == "cierre" and kind == "ads":
                         cols_css = "1.4fr 3.2fr 1.3fr"
-                    elif con_target:
+                    elif con_target or con_status_churn:
                         cols_css = "1.4fr 3.2fr 1fr 1.6fr"
                     else:
                         cols_css = "1.4fr 3.2fr 1.6fr"
@@ -2403,7 +2482,9 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                     )
 
                     header_cols = ["ID", "Nombre", "Valor"] if (vista == "cierre" and kind == "ads") else (
-                        ["ID", "Nombre", "Target", "Estado"] if con_target else ["ID", "Nombre", "Estado"]
+                        ["ID", "Nombre", "Target", "Estado"] if con_target else (
+                            ["ID", "Nombre", "Status", "Estado"] if con_status_churn else ["ID", "Nombre", "Estado"]
+                        )
                     )
                     header_html = (
                         f'<div style="display:grid;grid-template-columns:{cols_css};gap:8px;padding:0 4px 6px;'
@@ -2419,7 +2500,10 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                     total_valor = 0.0
                     with st.container(key=tabla_key, height=440, border=True):
                         for idx, f in enumerate(filas):
-                            row_cols = st.columns([1.4, 3.2, 1, 1.6] if con_target else ([1.4, 3.2, 1.3] if (vista == "cierre" and kind == "ads") else [1.4, 3.2, 1.6]))
+                            row_cols = st.columns(
+                                [1.4, 3.2, 1, 1.6] if (con_target or con_status_churn)
+                                else ([1.4, 3.2, 1.3] if (vista == "cierre" and kind == "ads") else [1.4, 3.2, 1.6])
+                            )
                             with row_cols[0]:
                                 if f["id"] != "—":
                                     with st.container(key=f"comercial_row_{kind}_{vista}_{idx}"):
@@ -2446,9 +2530,15 @@ def _render_funnel_comercial(kind, farmer_para_funnel):
                                     st.markdown(f'<div style="padding-top:2px;">{_pill_gris(f["target"])}</div>', unsafe_allow_html=True)
                                 with row_cols[3]:
                                     st.markdown(f'<div style="padding-top:2px;">{_pill_estado(f["estado"])}</div>', unsafe_allow_html=True)
+                            elif con_status_churn:
+                                with row_cols[2]:
+                                    st.markdown(f'<div style="padding-top:2px;">{_pill_status(f["status"])}</div>', unsafe_allow_html=True)
+                                with row_cols[3]:
+                                    st.markdown(f'<div style="padding-top:2px;">{_pill_estado(f["estado"])}</div>', unsafe_allow_html=True)
                             else:
                                 with row_cols[2]:
                                     st.markdown(f'<div style="padding-top:2px;">{_pill_estado(f["estado"])}</div>', unsafe_allow_html=True)
+
 
                     # Fila de Total (pedido explícito, solo Ads en
                     # Cierre: "añade una fila de total en cierre, que
@@ -3049,13 +3139,11 @@ if st.session_state["view"] == "landing":
                 elif st.session_state["comercial_tab_activo"] == "md":
                     _render_funnel_comercial("md", farmer_para_funnel)
                 else:
-                    # Tab Churn: todavía en diseño de reglas con Sabas
-                    # (Prospectados/Contactados/Recuperados a nivel
-                    # Store, criterio de "Recuperado" pendiente de
-                    # cerrar) -- placeholder explícito en vez de llamar
-                    # a _render_funnel_comercial("churn", ...), que
-                    # todavía no soporta ese kind.
-                    st.info("El funnel de Churn está en construcción.")
+                    # Tab Churn (cuadragésima segunda vuelta, pedido
+                    # explícito: "dame el churn funcional") -- funnel
+                    # completo, ver rendimiento_comercial_churn_for y
+                    # _render_funnel_comercial (kind="churn").
+                    _render_funnel_comercial("churn", farmer_para_funnel)
 
 
     # =====================================================
