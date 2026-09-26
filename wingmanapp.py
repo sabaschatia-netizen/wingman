@@ -13,6 +13,7 @@ import html as html_lib
 import json
 import re
 import time
+from datetime import date
 
 import pandas as pd
 import streamlit as st
@@ -1882,17 +1883,22 @@ def render_login():
             # Farmer (pedido explicito de Sabas). El resto del equipo solo ve
             # el boton Farmer.
             st.session_state.setdefault("login_role", "farmer")
-            rc1, rc2 = st.columns(2)
-            with rc1:
-                if st.button("👤 Farmer", use_container_width=True, key="login_toggle_farmer",
-                             type="primary" if st.session_state["login_role"] == "farmer" else "secondary"):
-                    st.session_state["login_role"] = "farmer"
-                    st.rerun()
-            with rc2:
-                if st.button("🧭 Supervisor", use_container_width=True, key="login_toggle_supervisor",
-                             type="primary" if st.session_state["login_role"] == "supervisor" else "secondary"):
-                    st.session_state["login_role"] = "supervisor"
-                    st.rerun()
+            # Container con key propia (no un <div> a mano -- st.columns no se
+            # puede anidar limpio dentro de un st.markdown sin cerrar) para
+            # poder pintarle el fondo píldora gris vía CSS (.st-key-login_role_toggle
+            # en theme.py), igual que en el mockup aprobado.
+            with st.container(key="login_role_toggle"):
+                rc1, rc2 = st.columns(2)
+                with rc1:
+                    if st.button("👤 Farmer", use_container_width=True, key="login_toggle_farmer",
+                                 type="primary" if st.session_state["login_role"] == "farmer" else "secondary"):
+                        st.session_state["login_role"] = "farmer"
+                        st.rerun()
+                with rc2:
+                    if st.button("🧭 Supervisor", use_container_width=True, key="login_toggle_supervisor",
+                                 type="primary" if st.session_state["login_role"] == "supervisor" else "secondary"):
+                        st.session_state["login_role"] = "supervisor"
+                        st.rerun()
 
             role = st.session_state["login_role"]
 
@@ -1940,9 +1946,20 @@ def render_login():
                         dl.registrar_login(sup_email)
                         st.rerun()
 
+            # Mes dinámico (antes "julio 2026" quedó hardcodeado y desactualizado --
+            # detectado sep-2026, ver mockup del login). _MESES_LOGIN es local a esta
+            # función porque data_layer.py ya tiene su propio _MESES_ES pero definido
+            # adentro de otras funciones, no a nivel de módulo -- no hay de dónde
+            # importarlo limpio sin tocar ese archivo aparte.
+            _MESES_LOGIN = {
+                1: "enero", 2: "febrero", 3: "marzo", 4: "abril", 5: "mayo", 6: "junio",
+                7: "julio", 8: "agosto", 9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre",
+            }
+            _hoy = date.today()
             st.markdown(
                 f'<div class="login-foot">'
-                f"{len(VALID_EMAILS)} Farmers con cartera activa · Datos de julio 2026</div>",
+                f"{len(VALID_EMAILS)} Farmers con cartera activa · "
+                f"Datos de {_MESES_LOGIN[_hoy.month]} {_hoy.year}</div>",
                 unsafe_allow_html=True,
             )
             st.markdown("</div>", unsafe_allow_html=True)

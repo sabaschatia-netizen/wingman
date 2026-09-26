@@ -517,9 +517,21 @@ ICON_COINV_REST = _icon(
 # =========================
 
 def build_css(login=False):
+    # Fondo de pantalla completa del login (rediseño septiembre 2026, pedido
+    # explícito de Sabas a partir de una referencia visual): diagonal grande
+    # de dos tonos -- brand_blue arriba/izquierda, card2 (gris claro) abajo/
+    # derecha -- con textura de puntos en ambas esquinas opuestas. El corte
+    # diagonal se logra con un conic-gradient de 2 colores rotado 135deg
+    # (mismo truco que un clip-path pero sin recortar contenido real detrás).
+    # La textura de puntos usa 2 radial-gradient en mosaico (uno claro sobre
+    # el lado oscuro, uno oscuro sobre el lado claro) limitados a las
+    # esquinas via mask, para no ensuciar el centro donde vive la tarjeta.
     LOGIN_CSS = (
         f'.stApp, [data-testid="stAppViewContainer"] {{'
-        f'  background: {COLORS["brand_blue"]} !important;'
+        f'  background:'
+        f'    radial-gradient(circle, rgba(255,255,255,0.16) 1.6px, transparent 1.6px) 0 0/26px 26px,'
+        f'    conic-gradient(from 135deg at 62% 0%, {COLORS["brand_blue"]} 0deg 205deg, {COLORS["card2"]} 205deg 360deg)'
+        f'    !important;'
         f'  min-height: 100vh; overflow-x: hidden;'
         f'}}'
         f'[data-testid="stAppViewContainer"] [data-testid="stMainBlockContainer"] {{'
@@ -879,22 +891,76 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .tag-inactive {{ background: {COLORS["card2"]}; color: {COLORS["muted"]}; }}
 
 /* ── PANTALLA DE ENTRADA ── */
-/* Fondo naranja sólido de página completa (pedido explícito de Sabas,
-   mismo tratamiento que ya se aplicó en Eagle con violeta): se activa
-   solo con build_css(login=True), ver LOGIN_CSS arriba -- así el resto
-   de la app (Gestión General, Buscador de Marcas, etc.) sigue con su
-   fondo claro normal sin que este bloque se filtre ahí. */
-.login-box {{ width: 100%; }}
+/* Rediseño septiembre 2026 (pedido explícito de Sabas, a partir de una
+   imagen de referencia): dos tarjetas independientes -- oscura (logo) +
+   clara (formulario) -- unidas por una curva continua en forma de S, no
+   un rectángulo partido al medio con corte recto. Se activa solo con
+   build_css(login=True) -- el resto de la app sigue con su fondo claro
+   normal sin que este bloque se filtre ahí.
+
+   LA CURVA EN S: cada mitad es un <div> normal (mismo layout de
+   st.columns de siempre) al que se le aplica clip-path: path(...) con
+   coordenadas en un viewBox local de 0..100 (ancho) x 0..100 (alto) --
+   Streamlit no permite escribir SVG propio acá, así que el recorte se
+   hace 100% en CSS, no en el markup. La columna oscura (col_logo) se
+   recorta con un borde derecho cóncavo (hacia adentro); la columna clara
+   (col_form) se recorta con un borde izquierdo convexo (hacia afuera)
+   que calza exactamente con el cóncavo de al lado, más una esquina
+   superior derecha cortada en diagonal seguiendo el ángulo del fondo
+   (ver conic-gradient en LOGIN_CSS). Los porcentajes fueron ajustados a
+   ojo contra la referencia -- si el "punto" de la S se ve desplazado en
+   una pantalla muy angosta, es lo primero a retocar. */
+/* Ancho MAXIMO fijo (no solo min-height) -- necesario porque clip-path:
+   path() usa coordenadas absolutas (px), no porcentaje del box; sin un
+   tamaño real conocido de antemano, el path queda mal escalado (recorte
+   miniatura en la esquina en vez de la curva completa -- bug real visto
+   al probar el primer intento con un path en rango 0..100 sobre un
+   contenedor de cientos de px, confirmado renderizando con WebKit). Con
+   max-width fijo acá, cada columna interna tiene un ancho previsible
+   (proporción 1.15/1 de st.columns en wingmanapp.py, gap="large"=24px)
+   -- son los valores usados abajo en los dos path(). Si se cambian esas
+   proporciones o el gap, los paths hay que reajustarlos a mano. */
+.login-box {{ width: 100%; max-width: 991px; margin: 0 auto; }}
 .login-box [data-testid="stHorizontalBlock"] {{
-    display: flex !important; align-items: flex-start !important;
+    display: flex !important; align-items: stretch !important;
+    filter: drop-shadow(0 22px 34px rgba(0,0,0,0.30));
 }}
 .login-box [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
-    display: flex !important; align-items: flex-start !important; align-self: flex-start !important;
+    display: flex !important; align-items: stretch !important; align-self: stretch !important;
 }}
 .login-box [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > div {{
     width: 100%;
 }}
-.login-logo-col, .login-form-col {{ width: 100%; }}
+.login-logo-col, .login-form-col {{ width: 100%; min-height: 560px; padding: 48px 44px; box-sizing: border-box; }}
+
+/* Mitad oscura -- borde derecho cóncavo formando la mitad izquierda de la S */
+.login-logo-col {{
+    background: {COLORS["brand_blue"]};
+    border-radius: 26px 0 0 26px;
+    /* Coordenadas en px reales sobre un box de 517x560 (ver nota de
+       max-width arriba) -- NO 0..100, eso fue el bug del primer intento.
+       Borde derecho con "cintura" cóncava a media altura (la mitad
+       izquierda de la S); el resto de esquinas usa radio normal de 26px
+       vía border-radius (arriba), no path. */
+    clip-path: path('M 26,0 L 517,0 L 517,204 C 480,222 420,240 420,280 C 420,320 480,338 517,356 L 517,560 L 26,560 C 12,560 0,548 0,534 L 0,26 C 0,12 12,0 26,0 Z');
+    display: flex; flex-direction: column; justify-content: center;
+    margin-right: -34px;
+    position: relative; z-index: 1;
+}}
+/* Mitad clara -- borde izquierdo convexo (encastra en el cóncavo de al
+   lado) + esquina superior derecha cortada en diagonal */
+.login-form-col {{
+    background: {COLORS["card2"]};
+    border-radius: 0 26px 26px 0;
+    /* Coordenadas en px reales sobre un box de 450x560. Borde izquierdo
+       convexo que encastra en el cóncavo de al lado (misma "cintura" a
+       230-330px de alto) + esquina superior derecha cortada en diagonal
+       siguiendo el ángulo del fondo (conic-gradient de LOGIN_CSS). */
+    clip-path: path('M 47,0 L 340,0 L 450,60 L 450,534 C 450,548 438,560 424,560 L 47,560 C 21,560 0,548 0,534 L 0,356 C 37,338 97,320 97,280 C 97,240 37,222 0,204 L 0,26 C 0,12 21,0 47,0 Z');
+    display: flex; flex-direction: column; justify-content: center;
+    margin-left: -34px;
+    position: relative; z-index: 2;
+}}
 .login-logo {{ display: flex; justify-content: flex-start; margin-bottom: 22px; max-width: 100%; }}
 .login-logo img {{ max-width: 100%; height: auto; }}
 .login-title {{
@@ -903,57 +969,66 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 }}
 .login-sub {{ font-size: 15px; color: rgba(255,255,255,0.78); line-height: 1.6;
     margin-bottom: 4px; text-align: left; max-width: 380px; }}
-.login-foot {{ font-size: 11.5px; color: rgba(255,255,255,0.55); margin-top: 18px; line-height: 1.5; }}
-/* Inputs y botones sobre fondo naranja -- fondo translúcido blanco, no
-   blanco sólido, para no competir visualmente con el logo (mismo
-   criterio que ya usa el sidebar de Wingman con su propio naranja).
-   Se agrandan (altura y tipografía) para que los campos tengan más
-   presencia junto al logo grande, igual que en Eagle. */
+.login-foot {{ font-size: 11.5px; color: {COLORS["muted"]}; margin-top: 18px; line-height: 1.5; }}
+/* Inputs y botón del formulario -- ahora viven sobre el panel CLARO
+   (.login-form-col, fondo card2), no sobre azul, así que pasan a fondo
+   blanco sólido con borde sutil (mismo lenguaje que el resto de la app,
+   ver .stTextInput input general más abajo) en vez del translúcido
+   blanco-sobre-oscuro que tenían antes. */
 .login-box .stTextInput input {{
-    background: rgba(255,255,255,0.14) !important; color: {COLORS["brand_white"]} !important;
-    border: 1px solid rgba(255,255,255,0.30) !important; border-radius: 10px !important;
+    background: {COLORS["card"]} !important; color: {COLORS["text"]} !important;
+    border: 1px solid {COLORS["border"]} !important; border-radius: 10px !important;
     padding: 14px 16px !important; font-size: 16px !important;
 }}
-.login-box .stTextInput label {{ color: {COLORS["brand_white"]} !important; font-size: 14px !important; }}
+.login-box .stTextInput label {{ color: {COLORS["text"]} !important; font-size: 14px !important; }}
 .login-box .stButton button {{
-    background: {COLORS["brand_white"]} !important; color: {COLORS["brand_orange"]} !important;
+    background: {COLORS["brand_orange"]} !important; color: {COLORS["brand_white"]} !important;
     border: none !important; font-weight: 700 !important;
     padding: 12px 0 !important; font-size: 16px !important;
 }}
-.login-box .stButton button:hover {{ background: {COLORS["card2"]} !important; }}
+.login-box .stButton button:hover {{ background: #D8460A !important; }}
 /* Los botones secundarios (type="secondary", el toggle Farmer/
    Supervisor cuando no está activo) necesitan su propio contraste --
    blanco translúcido, no blanco sólido, para distinguirse del botón
    primario "Entrar". */
-/* Toggle Farmer/Supervisor: pedido explícito de Sabas -- BLANCO cuando
-   está seleccionado (kind="primary"), MORADO cuando no (kind=
-   "secondary") -- antes se veía al revés (morado sólido cuando activo).
+.st-key-login_role_toggle {{
+    background: {COLORS["border"]}; border-radius: 16px; padding: 5px;
+    margin-bottom: 22px;
+}}
+.st-key-login_role_toggle [data-testid="stHorizontalBlock"] {{
+    gap: 4px !important;
+}}
+/* Toggle Farmer/Supervisor -- rediseño septiembre 2026: vive dentro de
+   la píldora contenedora gris de arriba (.st-key-login_role_toggle)
+   sobre el panel claro. BLANCO + naranja cuando está seleccionado
+   (kind="primary"), transparente + gris cuando no (kind="secondary").
    Apunta a las keys específicas del toggle (.st-key-login_toggle_*), NO
    a ".login-box .stButton button[kind=...]" en general -- el botón
    "Entrar" TAMBIÉN es kind="primary" y vive en la misma .login-box; una
-   regla genérica lo hubiera pintado blanco también, sin que se pidiera.
-   Con la key, el cambio queda aislado al toggle. */
+   regla genérica lo hubiera pintado igual, sin que se pidiera. Con la
+   key, el cambio queda aislado al toggle. */
 .st-key-login_toggle_farmer .stButton button[kind="primary"],
 .st-key-login_toggle_supervisor .stButton button[kind="primary"] {{
-    background: {COLORS["brand_white"]} !important;
+    background: {COLORS["card"]} !important;
     color: {COLORS["brand_orange"]} !important;
     border: none !important; font-weight: 800 !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.10) !important;
 }}
 .st-key-login_toggle_farmer .stButton button[kind="primary"]:hover,
 .st-key-login_toggle_supervisor .stButton button[kind="primary"]:hover {{
-    background: {COLORS["card2"]} !important;
+    background: {COLORS["card"]} !important;
     color: {COLORS["brand_orange"]} !important;
 }}
 .st-key-login_toggle_farmer .stButton button[kind="secondary"],
 .st-key-login_toggle_supervisor .stButton button[kind="secondary"] {{
-    background: {COLORS["brand_purple"]} !important;
-    color: {COLORS["brand_white"]} !important;
-    border: 1px solid {COLORS["brand_purple"]} !important;
+    background: transparent !important;
+    color: {COLORS["muted"]} !important;
+    border: none !important;
 }}
 .st-key-login_toggle_farmer .stButton button[kind="secondary"]:hover,
 .st-key-login_toggle_supervisor .stButton button[kind="secondary"]:hover {{
-    background: {COLORS["brand_purple_soft"]} !important;
-    color: {COLORS["brand_white"]} !important;
+    background: rgba(0,0,0,0.04) !important;
+    color: {COLORS["text"]} !important;
 }}
 
 /* Tabs de Rendimiento Comercial (Ads/Markdown/Churn) -- pedido explícito
@@ -997,24 +1072,26 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 }}
 
 /* Botón de submit del login ("Entrar" / "Entrar como Supervisor") --
-   pedido explícito de Sabas: blanco, no naranja (con el naranja
-   genérico, quedaba casi invisible contra el fondo también naranja del
-   login). Mismo criterio de key específica que el toggle, para no
-   afectar el resto de los botones primary de la app (ej. el de
-   Gestión General, que sigue naranja). */
+   rediseño septiembre 2026: el formulario ahora vive sobre panel CLARO
+   (no azul), así que el botón vuelve a naranja sólido con texto blanco
+   -- mismo lenguaje que el resto de la app -- en vez del blanco que
+   necesitaba antes para no perderse contra el fondo azul/naranja
+   original. Mismo criterio de key específica que el toggle, para no
+   afectar otros botones primary de la app. */
 .st-key-login_submit .stButton button[kind="primary"],
 .st-key-login_submit_sup .stButton button[kind="primary"] {{
-    background: {COLORS["brand_white"]} !important;
-    color: {COLORS["brand_orange"]} !important;
+    background: {COLORS["brand_orange"]} !important;
+    color: {COLORS["brand_white"]} !important;
     border: none !important; font-weight: 800 !important;
 }}
 .st-key-login_submit .stButton button[kind="primary"]:hover,
 .st-key-login_submit_sup .stButton button[kind="primary"]:hover {{
-    background: {COLORS["card2"]} !important;
-    color: {COLORS["brand_orange"]} !important;
+    background: #D8460A !important;
+    color: {COLORS["brand_white"]} !important;
 }}
 .login-box [data-testid="stAlert"] {{
-    background: rgba(255,255,255,0.14) !important; color: {COLORS["brand_white"]} !important;
+    background: {COLORS["card"]} !important; color: {COLORS["text"]} !important;
+    border: 1px solid {COLORS["border"]} !important;
 }}
 
 /* ── PILL DE SESIÓN EN SIDEBAR (estilo Growth OS) ── */
