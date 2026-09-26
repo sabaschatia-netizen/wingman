@@ -893,34 +893,31 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 /* ── PANTALLA DE ENTRADA ── */
 /* Rediseño septiembre 2026 (pedido explícito de Sabas, a partir de una
    imagen de referencia): dos tarjetas independientes -- oscura (logo) +
-   clara (formulario) -- unidas por una curva continua en forma de S, no
-   un rectángulo partido al medio con corte recto. Se activa solo con
-   build_css(login=True) -- el resto de la app sigue con su fondo claro
-   normal sin que este bloque se filtre ahí.
+   clara (formulario) -- superpuestas con esquinas redondeadas simples.
+   Se activa solo con build_css(login=True) -- el resto de la app sigue
+   con su fondo claro normal sin que este bloque se filtre ahí.
+   LAS DOS TARJETAS: cada mitad es un <div> normal (mismo layout de
+   st.columns de siempre) con esquinas redondeadas simples (border-
+   radius) y un leve solape entre ambas usando % (no px) para que la
+   superposición escale con cualquier ancho real de pantalla.
 
-   LA CURVA EN S: cada mitad es un <div> normal (mismo layout de
-   st.columns de siempre) al que se le aplica clip-path: path(...) con
-   coordenadas en un viewBox local de 0..100 (ancho) x 0..100 (alto) --
-   Streamlit no permite escribir SVG propio acá, así que el recorte se
-   hace 100% en CSS, no en el markup. La columna oscura (col_logo) se
-   recorta con un borde derecho cóncavo (hacia adentro); la columna clara
-   (col_form) se recorta con un borde izquierdo convexo (hacia afuera)
-   que calza exactamente con el cóncavo de al lado, más una esquina
-   superior derecha cortada en diagonal seguiendo el ángulo del fondo
-   (ver conic-gradient en LOGIN_CSS). Los porcentajes fueron ajustados a
-   ojo contra la referencia -- si el "punto" de la S se ve desplazado en
-   una pantalla muy angosta, es lo primero a retocar. */
-/* Ancho MAXIMO fijo (no solo min-height) -- necesario porque clip-path:
-   path() usa coordenadas absolutas (px), no porcentaje del box; sin un
-   tamaño real conocido de antemano, el path queda mal escalado (recorte
-   miniatura en la esquina en vez de la curva completa -- bug real visto
-   al probar el primer intento con un path en rango 0..100 sobre un
-   contenedor de cientos de px, confirmado renderizando con WebKit). Con
-   max-width fijo acá, cada columna interna tiene un ancho previsible
-   (proporción 1.15/1 de st.columns en wingmanapp.py, gap="large"=24px)
-   -- son los valores usados abajo en los dos path(). Si se cambian esas
-   proporciones o el gap, los paths hay que reajustarlos a mano. */
-.login-box {{ width: 100%; max-width: 991px; margin: 0 auto; }}
+   NOTA (revertido tras probarlo en pantalla real): el primer intento
+   usaba clip-path: path(...) con coordenadas en px fijos para lograr
+   una curva en S entre ambas mitades (una "cintura" cóncava/convexa en
+   el borde de unión). Se sacó por dos motivos, confirmados en captura
+   real de Sabas: (1) las coordenadas estaban calculadas contra un
+   ancho de referencia (991px) que no coincidía con el ancho real de
+   pantalla del usuario, y clip-path: path() usa unidades absolutas, no
+   porcentaje del box -- en una pantalla más ancha el recorte quedaba
+   ridículamente chico en una esquina, con forma de gota/mancha en vez
+   de cubrir el panel completo; y (2) el renderer disponible en este
+   entorno para probar el CSS antes de entregarlo (WebKit viejo vía
+   wkhtmltoimage) tampoco soporta clip-path: path() de forma confiable,
+   así que no hubo forma de validar la curva a ciegas antes de que
+   Sabas la viera fallar en su propia pantalla. Si en el futuro se
+   quiere retomar la curva en S, hay que probarla directo en un
+   navegador moderno real (Chrome/Safari/Firefox actuales), no acá. */
+.login-box {{ width: 100%; max-width: 960px; margin: 0 auto; }}
 .login-box [data-testid="stHorizontalBlock"] {{
     display: flex !important; align-items: stretch !important;
     filter: drop-shadow(0 22px 34px rgba(0,0,0,0.30));
@@ -933,32 +930,23 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 }}
 .login-logo-col, .login-form-col {{ width: 100%; min-height: 560px; padding: 48px 44px; box-sizing: border-box; }}
 
-/* Mitad oscura -- borde derecho cóncavo formando la mitad izquierda de la S */
+/* Mitad oscura -- esquinas redondeadas normales */
 .login-logo-col {{
     background: {COLORS["brand_blue"]};
-    border-radius: 26px 0 0 26px;
-    /* Coordenadas en px reales sobre un box de 517x560 (ver nota de
-       max-width arriba) -- NO 0..100, eso fue el bug del primer intento.
-       Borde derecho con "cintura" cóncava a media altura (la mitad
-       izquierda de la S); el resto de esquinas usa radio normal de 26px
-       vía border-radius (arriba), no path. */
-    clip-path: path('M 26,0 L 517,0 L 517,204 C 480,222 420,240 420,280 C 420,320 480,338 517,356 L 517,560 L 26,560 C 12,560 0,548 0,534 L 0,26 C 0,12 12,0 26,0 Z');
+    border-radius: 26px;
     display: flex; flex-direction: column; justify-content: center;
-    margin-right: -34px;
+    margin-right: -3%;
     position: relative; z-index: 1;
 }}
-/* Mitad clara -- borde izquierdo convexo (encastra en el cóncavo de al
-   lado) + esquina superior derecha cortada en diagonal */
+/* Mitad clara -- esquinas redondeadas normales, solapada un poco sobre
+   la oscura (margin negativo en %, no px, para escalar con cualquier
+   ancho real) dándole la sensación de dos tarjetas superpuestas */
 .login-form-col {{
     background: {COLORS["card2"]};
-    border-radius: 0 26px 26px 0;
-    /* Coordenadas en px reales sobre un box de 450x560. Borde izquierdo
-       convexo que encastra en el cóncavo de al lado (misma "cintura" a
-       230-330px de alto) + esquina superior derecha cortada en diagonal
-       siguiendo el ángulo del fondo (conic-gradient de LOGIN_CSS). */
-    clip-path: path('M 47,0 L 340,0 L 450,60 L 450,534 C 450,548 438,560 424,560 L 47,560 C 21,560 0,548 0,534 L 0,356 C 37,338 97,320 97,280 C 97,240 37,222 0,204 L 0,26 C 0,12 21,0 47,0 Z');
+    border-radius: 26px;
+    box-shadow: -10px 0 24px rgba(0,0,0,0.10);
     display: flex; flex-direction: column; justify-content: center;
-    margin-left: -34px;
+    margin-left: -3%;
     position: relative; z-index: 2;
 }}
 .login-logo {{ display: flex; justify-content: flex-start; margin-bottom: 22px; max-width: 100%; }}
