@@ -934,25 +934,51 @@ section[data-testid="stMain"] .stMainBlockContainer {{
    después, así que el hack funciona ahí sin problema.
 
    .login-form-col en cambio YA NO es una clase de <div> -- pasó a ser
-   un st.container(key="login_form_col") real (ver wingmanapp.py). BUG
-   REAL corregido (visto en pantalla por Sabas, dos capturas): el <div
-   class="login-form-col"> original se abría con st.markdown() y NUNCA
-   se cerraba en el HTML -- el resto del formulario (toggle, inputs,
-   botón) se renderizaba como HERMANO de ese div dentro de la misma
-   columna, no como hijo. El CSS (display:flex, padding, fondo card2)
-   terminaba aplicado a un div vacío y colapsado, mientras el formulario
-   real quedaba suelto debajo, sin fondo ni padding -- se veía como un
-   rectángulo claro vacío arriba y el toggle/inputs sueltos sobre el
-   fondo oscuro abajo. Con st.container(key=...), Streamlit genera un
-   data-testid="stVerticalBlock" real que SÍ envuelve todo su contenido,
-   así que el CSS ahora apunta a .st-key-login_form_col (la key la pone
-   Streamlit en un ancestro del stVerticalBlock) en vez de a una clase
-   de div manual. */
+   un st.container(key="login_form_col") real (ver wingmanapp.py).
+
+   BUG REAL #1 (corregido, visto en pantalla por Sabas, primeras dos
+   capturas): el <div class="login-form-col"> original se abría con
+   st.markdown() y NUNCA se cerraba en el HTML -- el resto del
+   formulario se renderizaba como HERMANO de ese div, no como hijo.
+
+   BUG REAL #2 (corregido, visto en pantalla por Sabas, capturas
+   siguientes): al pasar a st.container(key=...), el primer intento
+   apuntaba el fondo/padding a ".st-key-login_form_col > div" (un nivel
+   por debajo de donde Streamlit pone la clase st-key-*). Eso terminó
+   pintando una tarjeta clara SEPARADA por cada elemento del formulario
+   (una para el toggle, una para Correo, una para Contraseña, una para
+   el botón) en vez de una sola tarjeta para todo -- el combinador
+   "> div" resultó demasiado permisivo, calzando con más de un div hijo
+   directo del wrapper real (además del contenido esperado). Se
+   resuelve aplicando el fondo/padding/radius directo sobre
+   .st-key-login_form_col (sin bajar de nivel con "> div"), que es
+   donde Streamlit realmente pone la clase -- confirmado leyendo el
+   código fuente de streamlit/elements/layouts.py (block_proto.id se
+   asigna a UN SOLO bloque contenedor, no a cada hijo) en vez de
+   asumirlo por CSS a ciegas. */
 .login-logo-col {{ width: 100%; min-height: 560px; padding: 48px 44px; box-sizing: border-box; }}
-.st-key-login_form_col {{ width: 100%; }}
-.st-key-login_form_col > div {{
-    min-height: 560px; padding: 48px 44px; box-sizing: border-box;
-    height: 100%;
+.st-key-login_form_col {{
+    width: 100%; min-height: 560px; padding: 48px 44px; box-sizing: border-box;
+    background: {COLORS["card2"]};
+    border-radius: 26px;
+    box-shadow: -10px 0 24px rgba(0,0,0,0.10);
+    display: flex !important; flex-direction: column !important; justify-content: center !important;
+    margin-left: -3%;
+    position: relative; z-index: 2;
+}}
+/* Neutralizar cualquier fondo/gap/padding propio que Streamlit le ponga
+   por defecto al stVerticalBlock interno -- ahora que el estilo visual
+   vive en el wrapper (.st-key-login_form_col) de arriba, el bloque
+   interno debe ser 100% transparente e invisible como capa, para que no
+   se dupliquen bordes ni se generen tarjetas anidadas. */
+.st-key-login_form_col [data-testid="stVerticalBlock"] {{
+    background: transparent !important; box-shadow: none !important;
+    border: none !important; border-radius: 0 !important; padding: 0 !important;
+    gap: 14px !important;
+}}
+.st-key-login_form_col [data-testid="stElementContainer"] {{
+    background: transparent !important; box-shadow: none !important;
+    border: none !important; border-radius: 0 !important;
 }}
 
 /* Mitad oscura -- esquinas redondeadas normales */
@@ -962,17 +988,6 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     display: flex; flex-direction: column; justify-content: center;
     margin-right: -3%;
     position: relative; z-index: 1;
-}}
-/* Mitad clara -- esquinas redondeadas normales, solapada un poco sobre
-   la oscura (margin negativo en %, no px, para escalar con cualquier
-   ancho real) dándole la sensación de dos tarjetas superpuestas */
-.st-key-login_form_col > div {{
-    background: {COLORS["card2"]};
-    border-radius: 26px;
-    box-shadow: -10px 0 24px rgba(0,0,0,0.10);
-    display: flex; flex-direction: column; justify-content: center;
-    margin-left: -3%;
-    position: relative; z-index: 2;
 }}
 .login-logo {{ display: flex; justify-content: flex-start; margin-bottom: 22px; max-width: 100%; }}
 .login-logo img {{ max-width: 100%; height: auto; }}
