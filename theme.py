@@ -928,7 +928,32 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .login-box [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > div {{
     width: 100%;
 }}
-.login-logo-col, .login-form-col {{ width: 100%; min-height: 560px; padding: 48px 44px; box-sizing: border-box; }}
+/* .login-logo-col sigue siendo un <div class="..."> normal (ver
+   wingmanapp.py, col_logo) -- ese caso SÍ cierra su propio </div> dentro
+   del mismo st.markdown, sin elementos nativos de Streamlit sueltos
+   después, así que el hack funciona ahí sin problema.
+
+   .login-form-col en cambio YA NO es una clase de <div> -- pasó a ser
+   un st.container(key="login_form_col") real (ver wingmanapp.py). BUG
+   REAL corregido (visto en pantalla por Sabas, dos capturas): el <div
+   class="login-form-col"> original se abría con st.markdown() y NUNCA
+   se cerraba en el HTML -- el resto del formulario (toggle, inputs,
+   botón) se renderizaba como HERMANO de ese div dentro de la misma
+   columna, no como hijo. El CSS (display:flex, padding, fondo card2)
+   terminaba aplicado a un div vacío y colapsado, mientras el formulario
+   real quedaba suelto debajo, sin fondo ni padding -- se veía como un
+   rectángulo claro vacío arriba y el toggle/inputs sueltos sobre el
+   fondo oscuro abajo. Con st.container(key=...), Streamlit genera un
+   data-testid="stVerticalBlock" real que SÍ envuelve todo su contenido,
+   así que el CSS ahora apunta a .st-key-login_form_col (la key la pone
+   Streamlit en un ancestro del stVerticalBlock) en vez de a una clase
+   de div manual. */
+.login-logo-col {{ width: 100%; min-height: 560px; padding: 48px 44px; box-sizing: border-box; }}
+.st-key-login_form_col {{ width: 100%; }}
+.st-key-login_form_col > div {{
+    min-height: 560px; padding: 48px 44px; box-sizing: border-box;
+    height: 100%;
+}}
 
 /* Mitad oscura -- esquinas redondeadas normales */
 .login-logo-col {{
@@ -941,7 +966,7 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 /* Mitad clara -- esquinas redondeadas normales, solapada un poco sobre
    la oscura (margin negativo en %, no px, para escalar con cualquier
    ancho real) dándole la sensación de dos tarjetas superpuestas */
-.login-form-col {{
+.st-key-login_form_col > div {{
     background: {COLORS["card2"]};
     border-radius: 26px;
     box-shadow: -10px 0 24px rgba(0,0,0,0.10);
@@ -959,7 +984,7 @@ section[data-testid="stMain"] .stMainBlockContainer {{
     margin-bottom: 4px; text-align: left; max-width: 380px; }}
 .login-foot {{ font-size: 11.5px; color: {COLORS["muted"]}; margin-top: 18px; line-height: 1.5; }}
 /* Inputs y botón del formulario -- ahora viven sobre el panel CLARO
-   (.login-form-col, fondo card2), no sobre azul, así que pasan a fondo
+   (.st-key-login_form_col, fondo card2), no sobre azul, así que pasan a fondo
    blanco sólido con borde sutil (mismo lenguaje que el resto de la app,
    ver .stTextInput input general más abajo) en vez del translúcido
    blanco-sobre-oscuro que tenían antes. */

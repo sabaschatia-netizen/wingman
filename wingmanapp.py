@@ -1875,93 +1875,100 @@ def render_login():
             )
 
         with col_form:
-            st.markdown('<div class="login-form-col">', unsafe_allow_html=True)
+            # Container real (no un <div> markdown sin cerrar -- ESE era el bug
+            # real visto en pantalla por Sabas: el div "login-form-col" nunca se
+            # cerraba en el HTML, y Streamlit renderiza el toggle/inputs/botón
+            # como HERMANOS de ese div dentro de la misma columna, no como hijos
+            # -- así que el CSS (display:flex, padding, fondo) se aplicaba a un
+            # div vacío y colapsado, mientras el formulario real quedaba suelto
+            # debajo, sin fondo ni padding. Con st.container(key=...) el CSS
+            # apunta al contenedor REAL que sí envuelve todo el contenido.
+            with st.container(key="login_form_col"):
+                # Selector de rol (agosto 2026): Fabián es supervisor de todo Cono
+                # Sur (AR+CL+UY juntos, ver SUPERVISOR_EMAILS), y solo entra como
+                # Supervisor -- no necesita tambien ver una cartera individual de
+                # Farmer (pedido explicito de Sabas). El resto del equipo solo ve
+                # el boton Farmer.
+                st.session_state.setdefault("login_role", "farmer")
+                # Mismo motivo que arriba -- container real, no div suelto -- para
+                # poder pintarle el fondo píldora gris vía CSS
+                # (.st-key-login_role_toggle en theme.py), igual que en el mockup
+                # aprobado.
+                with st.container(key="login_role_toggle"):
+                    rc1, rc2 = st.columns(2)
+                    with rc1:
+                        if st.button("👤 Farmer", use_container_width=True, key="login_toggle_farmer",
+                                     type="primary" if st.session_state["login_role"] == "farmer" else "secondary"):
+                            st.session_state["login_role"] = "farmer"
+                            st.rerun()
+                    with rc2:
+                        if st.button("🧭 Supervisor", use_container_width=True, key="login_toggle_supervisor",
+                                     type="primary" if st.session_state["login_role"] == "supervisor" else "secondary"):
+                            st.session_state["login_role"] = "supervisor"
+                            st.rerun()
 
-            # Selector de rol (agosto 2026): Fabián es supervisor de todo Cono
-            # Sur (AR+CL+UY juntos, ver SUPERVISOR_EMAILS), y solo entra como
-            # Supervisor -- no necesita tambien ver una cartera individual de
-            # Farmer (pedido explicito de Sabas). El resto del equipo solo ve
-            # el boton Farmer.
-            st.session_state.setdefault("login_role", "farmer")
-            # Container con key propia (no un <div> a mano -- st.columns no se
-            # puede anidar limpio dentro de un st.markdown sin cerrar) para
-            # poder pintarle el fondo píldora gris vía CSS (.st-key-login_role_toggle
-            # en theme.py), igual que en el mockup aprobado.
-            with st.container(key="login_role_toggle"):
-                rc1, rc2 = st.columns(2)
-                with rc1:
-                    if st.button("👤 Farmer", use_container_width=True, key="login_toggle_farmer",
-                                 type="primary" if st.session_state["login_role"] == "farmer" else "secondary"):
-                        st.session_state["login_role"] = "farmer"
-                        st.rerun()
-                with rc2:
-                    if st.button("🧭 Supervisor", use_container_width=True, key="login_toggle_supervisor",
-                                 type="primary" if st.session_state["login_role"] == "supervisor" else "secondary"):
-                        st.session_state["login_role"] = "supervisor"
-                        st.rerun()
+                role = st.session_state["login_role"]
 
-            role = st.session_state["login_role"]
+                if role == "farmer":
+                    email = st.text_input("Correo", placeholder="nombre.apellido@rappi.com")
+                    password = st.text_input("Contraseña", type="password", placeholder="••••••••")
+                    entrar = st.button("Entrar", type="primary", use_container_width=True, key="login_submit")
 
-            if role == "farmer":
-                email = st.text_input("Correo", placeholder="nombre.apellido@rappi.com")
-                password = st.text_input("Contraseña", type="password", placeholder="••••••••")
-                entrar = st.button("Entrar", type="primary", use_container_width=True, key="login_submit")
+                    if entrar:
+                        clean = email.strip().lower()
+                        if not clean or not password:
+                            st.warning("Completa correo y contraseña para continuar.")
+                        elif clean not in VALID_EMAILS:
+                            st.error("Correo o contraseña incorrectos.")
+                        elif not dl.check_password(clean, password):
+                            st.error("Correo o contraseña incorrectos.")
+                        else:
+                            st.session_state["farmer"] = clean
+                            st.session_state["role"] = "farmer"
+                            st.session_state["view"] = "landing"
+                            dl.registrar_login(clean)
+                            st.rerun()
+                else:
+                    # Supervisor: un solo correo autorizado (SUPERVISOR_EMAILS), sin
+                    # selector libre de email -- evita que alguien intente entrar
+                    # como "supervisor" con otro correo del equipo.
+                    st.markdown(
+                        '<div style="font-size:12.5px;color:rgba(0,0,0,0.55);margin:-4px 0 10px;">'
+                        "Acceso de supervisor · todo Cono Sur (AR · CL · UY)</div>",
+                        unsafe_allow_html=True,
+                    )
+                    password = st.text_input("Contraseña", type="password", placeholder="••••••••", key="sup_pw")
+                    entrar_sup = st.button("Entrar como Supervisor", type="primary", use_container_width=True, key="login_submit_sup")
 
-                if entrar:
-                    clean = email.strip().lower()
-                    if not clean or not password:
-                        st.warning("Completa correo y contraseña para continuar.")
-                    elif clean not in VALID_EMAILS:
-                        st.error("Correo o contraseña incorrectos.")
-                    elif not dl.check_password(clean, password):
-                        st.error("Correo o contraseña incorrectos.")
-                    else:
-                        st.session_state["farmer"] = clean
-                        st.session_state["role"] = "farmer"
-                        st.session_state["view"] = "landing"
-                        dl.registrar_login(clean)
-                        st.rerun()
-            else:
-                # Supervisor: un solo correo autorizado (SUPERVISOR_EMAILS), sin
-                # selector libre de email -- evita que alguien intente entrar
-                # como "supervisor" con otro correo del equipo.
+                    if entrar_sup:
+                        sup_email = next(iter(dl.SUPERVISOR_EMAILS))
+                        if not password:
+                            st.warning("Completa la contraseña para continuar.")
+                        elif not dl.check_password(sup_email, password):
+                            st.error("Contraseña incorrecta.")
+                        else:
+                            st.session_state["farmer"] = sup_email
+                            st.session_state["role"] = "supervisor"
+                            st.session_state["view"] = "landing"
+                            dl.registrar_login(sup_email)
+                            st.rerun()
+
+                # Mes dinámico (antes "julio 2026" quedó hardcodeado y desactualizado --
+                # detectado sep-2026, ver mockup del login). _MESES_LOGIN es local a esta
+                # función porque data_layer.py ya tiene su propio _MESES_ES pero definido
+                # adentro de otras funciones, no a nivel de módulo -- no hay de dónde
+                # importarlo limpio sin tocar ese archivo aparte.
+                _MESES_LOGIN = {
+                    1: "enero", 2: "febrero", 3: "marzo", 4: "abril", 5: "mayo", 6: "junio",
+                    7: "julio", 8: "agosto", 9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre",
+                }
+                _hoy = date.today()
                 st.markdown(
-                    '<div style="font-size:12.5px;color:rgba(255,255,255,0.65);margin:-4px 0 10px;">'
-                    "Acceso de supervisor · todo Cono Sur (AR · CL · UY)</div>",
+                    f'<div class="login-foot">'
+                    f"{len(VALID_EMAILS)} Farmers con cartera activa · "
+                    f"Datos de {_MESES_LOGIN[_hoy.month]} {_hoy.year}</div>",
                     unsafe_allow_html=True,
                 )
-                password = st.text_input("Contraseña", type="password", placeholder="••••••••", key="sup_pw")
-                entrar_sup = st.button("Entrar como Supervisor", type="primary", use_container_width=True, key="login_submit_sup")
-
-                if entrar_sup:
-                    sup_email = next(iter(dl.SUPERVISOR_EMAILS))
-                    if not password:
-                        st.warning("Completa la contraseña para continuar.")
-                    elif not dl.check_password(sup_email, password):
-                        st.error("Contraseña incorrecta.")
-                    else:
-                        st.session_state["farmer"] = sup_email
-                        st.session_state["role"] = "supervisor"
-                        st.session_state["view"] = "landing"
-                        dl.registrar_login(sup_email)
-                        st.rerun()
-
-            # Mes dinámico (antes "julio 2026" quedó hardcodeado y desactualizado --
-            # detectado sep-2026, ver mockup del login). _MESES_LOGIN es local a esta
-            # función porque data_layer.py ya tiene su propio _MESES_ES pero definido
-            # adentro de otras funciones, no a nivel de módulo -- no hay de dónde
-            # importarlo limpio sin tocar ese archivo aparte.
-            _MESES_LOGIN = {
-                1: "enero", 2: "febrero", 3: "marzo", 4: "abril", 5: "mayo", 6: "junio",
-                7: "julio", 8: "agosto", 9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre",
-            }
-            _hoy = date.today()
-            st.markdown(
-                f'<div class="login-foot">'
-                f"{len(VALID_EMAILS)} Farmers con cartera activa · "
-                f"Datos de {_MESES_LOGIN[_hoy.month]} {_hoy.year}</div>",
-                unsafe_allow_html=True,
-            )
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
