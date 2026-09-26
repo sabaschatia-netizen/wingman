@@ -1933,7 +1933,7 @@ def render_login():
                     # selector libre de email -- evita que alguien intente entrar
                     # como "supervisor" con otro correo del equipo.
                     st.markdown(
-                        '<div style="font-size:12.5px;color:rgba(0,0,0,0.55);margin:-4px 0 10px;">'
+                        '<div style="font-size:12.5px;color:rgba(255,255,255,0.80);margin:-4px 0 10px;">'
                         "Acceso de supervisor · todo Cono Sur (AR · CL · UY)</div>",
                         unsafe_allow_html=True,
                     )
