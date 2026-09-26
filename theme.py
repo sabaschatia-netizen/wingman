@@ -526,11 +526,26 @@ def build_css(login=False):
     # La textura de puntos usa 2 radial-gradient en mosaico (uno claro sobre
     # el lado oscuro, uno oscuro sobre el lado claro) limitados a las
     # esquinas via mask, para no ensuciar el centro donde vive la tarjeta.
+    # Rediseño septiembre 2026 (segunda vuelta, pedido explícito de Sabas):
+    # se invierten los colores del fondo -- antes era azul petróleo con
+    # puntos claros y una diagonal partiendo hacia gris; ahora es BLANCO
+    # liso (sin diagonal, parejo en toda la pantalla) con puntos de color,
+    # mezclados entre azul petróleo y naranja (no todos del mismo color).
+    # La "mezcla aleatoria" se logra con un mosaico de 4 puntos por tile
+    # (3 teal + 1 naranja, en posiciones asimétricas dentro del tile) que
+    # se repite -- csss puro (background-image con varios radial-gradient),
+    # sin depender de que el navegador soporte nada más allá de lo básico.
+    # No es aleatorio de verdad (un patrón CSS no puede serlo) pero al no
+    # ser una grilla 1-color-por-punto ajedrezada, no se ve mecánico a
+    # simple vista -- mismo criterio que aprobó Sabas en el mockup.
     LOGIN_CSS = (
         f'.stApp, [data-testid="stAppViewContainer"] {{'
         f'  background:'
-        f'    radial-gradient(circle, rgba(255,255,255,0.16) 1.6px, transparent 1.6px) 0 0/26px 26px,'
-        f'    conic-gradient(from 135deg at 62% 0%, {COLORS["brand_blue"]} 0deg 205deg, {COLORS["card2"]} 205deg 360deg)'
+        f'    radial-gradient(circle, rgba(18,62,74,0.16) 2.6px, transparent 2.6px) 0 0/68px 68px,'
+        f'    radial-gradient(circle, rgba(18,62,74,0.16) 2.6px, transparent 2.6px) 34px 34px/68px 68px,'
+        f'    radial-gradient(circle, rgba(232,102,60,0.20) 2.6px, transparent 2.6px) 34px 0/68px 68px,'
+        f'    radial-gradient(circle, rgba(18,62,74,0.16) 2.6px, transparent 2.6px) 0 34px/68px 68px,'
+        f'    {COLORS["brand_white"]}'
         f'    !important;'
         f'  min-height: 100vh; overflow-x: hidden;'
         f'}}'
@@ -959,7 +974,7 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .login-logo-col {{ width: 100%; min-height: 560px; padding: 48px 44px; box-sizing: border-box; }}
 .st-key-login_form_col {{
     width: 100%; min-height: 560px; padding: 48px 44px; box-sizing: border-box;
-    background: {COLORS["card2"]};
+    background: {COLORS["brand_orange"]};
     border-radius: 26px;
     box-shadow: -10px 0 24px rgba(0,0,0,0.10);
     display: flex !important; flex-direction: column !important; justify-content: center !important;
@@ -997,39 +1012,44 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 }}
 .login-sub {{ font-size: 15px; color: rgba(255,255,255,0.78); line-height: 1.6;
     margin-bottom: 4px; text-align: left; max-width: 380px; }}
-.login-foot {{ font-size: 11.5px; color: {COLORS["muted"]}; margin-top: 18px; line-height: 1.5; }}
-/* Inputs y botón del formulario -- ahora viven sobre el panel CLARO
-   (.st-key-login_form_col, fondo card2), no sobre azul, así que pasan a fondo
-   blanco sólido con borde sutil (mismo lenguaje que el resto de la app,
-   ver .stTextInput input general más abajo) en vez del translúcido
-   blanco-sobre-oscuro que tenían antes. */
+/* Pie de página ("25 Farmers...") -- blanco translúcido (antes gris
+   .muted, ilegible sobre el fondo naranja nuevo de .st-key-login_form_col). */
+.login-foot {{ font-size: 11.5px; color: rgba(255,255,255,0.85); margin-top: 18px; line-height: 1.5; }}
+/* Inputs y botón del formulario -- ahora viven sobre el panel NARANJA
+   (.st-key-login_form_col, fondo brand_orange, rediseño segunda vuelta).
+   Los inputs se mantienen blanco sólido (buen contraste sobre naranja);
+   el label pasa a blanco (antes texto oscuro, ilegible sobre naranja); el
+   botón "Entrar" pasa de naranja a azul petróleo oscuro -- un botón
+   naranja sobre una tarjeta ya naranja se pierde por completo, necesita
+   un color de contraste, no el mismo tono del fondo. */
 .login-box .stTextInput input {{
     background: {COLORS["card"]} !important; color: {COLORS["text"]} !important;
     border: 1px solid {COLORS["border"]} !important; border-radius: 10px !important;
     padding: 14px 16px !important; font-size: 16px !important;
 }}
-.login-box .stTextInput label {{ color: {COLORS["text"]} !important; font-size: 14px !important; }}
+.login-box .stTextInput label {{ color: {COLORS["brand_white"]} !important; font-size: 14px !important; }}
 .login-box .stButton button {{
-    background: {COLORS["brand_orange"]} !important; color: {COLORS["brand_white"]} !important;
+    background: {COLORS["brand_blue"]} !important; color: {COLORS["brand_white"]} !important;
     border: none !important; font-weight: 700 !important;
     padding: 12px 0 !important; font-size: 16px !important;
 }}
-.login-box .stButton button:hover {{ background: #D8460A !important; }}
+.login-box .stButton button:hover {{ background: #0A2E38 !important; }}
 /* Los botones secundarios (type="secondary", el toggle Farmer/
    Supervisor cuando no está activo) necesitan su propio contraste --
    blanco translúcido, no blanco sólido, para distinguirse del botón
    primario "Entrar". */
 .st-key-login_role_toggle {{
-    background: {COLORS["border"]}; border-radius: 16px; padding: 5px;
+    background: rgba(255,255,255,0.22); border-radius: 16px; padding: 5px;
     margin-bottom: 22px;
 }}
 .st-key-login_role_toggle [data-testid="stHorizontalBlock"] {{
     gap: 4px !important;
 }}
-/* Toggle Farmer/Supervisor -- rediseño septiembre 2026: vive dentro de
-   la píldora contenedora gris de arriba (.st-key-login_role_toggle)
-   sobre el panel claro. BLANCO + naranja cuando está seleccionado
-   (kind="primary"), transparente + gris cuando no (kind="secondary").
+/* Toggle Farmer/Supervisor -- rediseño septiembre 2026 (segunda vuelta):
+   vive dentro de la píldora contenedora blanca translúcida de arriba
+   (.st-key-login_role_toggle) sobre el panel NARANJA. BLANCO sólido +
+   texto azul petróleo cuando está seleccionado (kind="primary"),
+   transparente + texto blanco translúcido cuando no (kind="secondary").
    Apunta a las keys específicas del toggle (.st-key-login_toggle_*), NO
    a ".login-box .stButton button[kind=...]" en general -- el botón
    "Entrar" TAMBIÉN es kind="primary" y vive en la misma .login-box; una
@@ -1038,26 +1058,27 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 .st-key-login_toggle_farmer .stButton button[kind="primary"],
 .st-key-login_toggle_supervisor .stButton button[kind="primary"] {{
     background: {COLORS["card"]} !important;
-    color: {COLORS["brand_orange"]} !important;
+    color: {COLORS["brand_blue"]} !important;
     border: none !important; font-weight: 800 !important;
     box-shadow: 0 2px 6px rgba(0,0,0,0.10) !important;
 }}
 .st-key-login_toggle_farmer .stButton button[kind="primary"]:hover,
 .st-key-login_toggle_supervisor .stButton button[kind="primary"]:hover {{
     background: {COLORS["card"]} !important;
-    color: {COLORS["brand_orange"]} !important;
+    color: {COLORS["brand_blue"]} !important;
 }}
 .st-key-login_toggle_farmer .stButton button[kind="secondary"],
 .st-key-login_toggle_supervisor .stButton button[kind="secondary"] {{
     background: transparent !important;
-    color: {COLORS["muted"]} !important;
+    color: rgba(255,255,255,0.75) !important;
     border: none !important;
 }}
 .st-key-login_toggle_farmer .stButton button[kind="secondary"]:hover,
 .st-key-login_toggle_supervisor .stButton button[kind="secondary"]:hover {{
-    background: rgba(0,0,0,0.04) !important;
-    color: {COLORS["text"]} !important;
+    background: rgba(255,255,255,0.12) !important;
+    color: {COLORS["brand_white"]} !important;
 }}
+
 
 /* Tabs de Rendimiento Comercial (Ads/Markdown/Churn) -- pedido explícito
    de Sabas: "ya no quiero [el botón sólido naranja tipo hover]... quiero
@@ -1100,21 +1121,20 @@ section[data-testid="stMain"] .stMainBlockContainer {{
 }}
 
 /* Botón de submit del login ("Entrar" / "Entrar como Supervisor") --
-   rediseño septiembre 2026: el formulario ahora vive sobre panel CLARO
-   (no azul), así que el botón vuelve a naranja sólido con texto blanco
-   -- mismo lenguaje que el resto de la app -- en vez del blanco que
-   necesitaba antes para no perderse contra el fondo azul/naranja
-   original. Mismo criterio de key específica que el toggle, para no
+   rediseño septiembre 2026 (segunda vuelta): el formulario ahora vive
+   sobre panel NARANJA, así que el botón pasa a azul petróleo sólido con
+   texto blanco -- un botón naranja se perdería contra la tarjeta, ya
+   naranja. Mismo criterio de key específica que el toggle, para no
    afectar otros botones primary de la app. */
 .st-key-login_submit .stButton button[kind="primary"],
 .st-key-login_submit_sup .stButton button[kind="primary"] {{
-    background: {COLORS["brand_orange"]} !important;
+    background: {COLORS["brand_blue"]} !important;
     color: {COLORS["brand_white"]} !important;
     border: none !important; font-weight: 800 !important;
 }}
 .st-key-login_submit .stButton button[kind="primary"]:hover,
 .st-key-login_submit_sup .stButton button[kind="primary"]:hover {{
-    background: #D8460A !important;
+    background: #0A2E38 !important;
     color: {COLORS["brand_white"]} !important;
 }}
 .login-box [data-testid="stAlert"] {{
